@@ -25,8 +25,11 @@ jobs:
         gradle-version: '8.5'
         cache-disabled: true
 
+    - name: Create local.properties
+      run: echo "sdk.dir=$ANDROID_SDK_ROOT" > local.properties
+
     - name: Build with Gradle
-      run: gradle assembleDebug
+      run: gradle assembleDebug -x lint --stacktrace
 
     - name: Upload APK
       uses: actions/upload-artifact@v4
