@@ -9,12 +9,12 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface CycleDao {
-    @Insert(onConflict = OnConflictStrategy.REPLACE)
-    suspend fun insertCycle(cycle: Cycle)
-
-    @Update
-    suspend fun updateCycle(cycle: Cycle)
-
     @Query("SELECT * FROM cycles ORDER BY startDate DESC")
     fun getAllCycles(): Flow<List<Cycle>>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insert(cycle: Cycle)
+
+    @Update
+    suspend fun update(cycle: Cycle)
 }
