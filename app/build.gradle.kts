@@ -2,6 +2,8 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("com.google.devtools.ksp")
+    id("kotlin-kapt")
+    id("com.google.dagger.hilt.android")
 }
 
 android {
@@ -47,6 +49,7 @@ dependencies {
     val nav_version = "2.7.7"
     val room_version = "2.6.1"
     val lifecycle_version = "2.7.0"
+    val hilt_version = "2.50"
 
     // Core Android
     implementation("androidx.core:core-ktx:1.12.0")
@@ -70,6 +73,11 @@ dependencies {
     implementation("androidx.room:room-runtime:$room_version")
     implementation("androidx.room:room-ktx:$room_version")
     ksp("androidx.room:room-compiler:$room_version")
+
+    // Hilt (Dagger)
+    implementation("com.google.dagger:hilt-android:$hilt_version")
+    kapt("com.google.dagger:hilt-android-compiler:$hilt_version")
+    implementation("androidx.hilt:hilt-navigation-compose:1.2.0")
 
     // Testing
     testImplementation("junit:junit:4.13.2")
