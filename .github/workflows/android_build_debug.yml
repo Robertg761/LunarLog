@@ -27,11 +27,12 @@ jobs:
 
     - name: Build with Smart Path Discovery
       run: |
-        # Find the folder containing settings.gradle (max depth 3 to be safe)
-        PROJECT_ROOT=$(find . -maxdepth 3 -name settings.gradle -printf '%h\n' | head -n 1)
+        # Find the folder containing settings.gradle OR settings.gradle.kts
+        # The * wildcard handles both .gradle and .gradle.kts
+        PROJECT_ROOT=$(find . -maxdepth 3 -name "settings.gradle*" -printf '%h\n' | head -n 1)
 
         if [ -z "$PROJECT_ROOT" ]; then
-          echo "CRITICAL ERROR: Could not find settings.gradle anywhere!"
+          echo "CRITICAL ERROR: Could not find settings.gradle(.kts) anywhere!"
           # List files to help debug if this fails
           ls -R
           exit 1
@@ -50,6 +51,5 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: lunarlog-debug
-        # Use wildcards (**) to find the APK no matter what folder it is in
         path: '**/build/outputs/apk/debug/*.apk'
         retention-days: 5
