@@ -1,0 +1,55 @@
+name: Android Debug Build
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v4
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Gradle
+      uses: gradle/actions/setup-gradle@v3
+      with:
+        gradle-version: '8.5'
+        cache-disabled: true
+
+    - name: Build with Smart Path Discovery
+      run: |
+        # Find the folder containing settings.gradle (max depth 3 to be safe)
+        PROJECT_ROOT=$(find . -maxdepth 3 -name settings.gradle -printf '%h\n' | head -n 1)
+
+        if [ -z "$PROJECT_ROOT" ]; then
+          echo "CRITICAL ERROR: Could not find settings.gradle anywhere!"
+          # List files to help debug if this fails
+          ls -R
+          exit 1
+        fi
+
+        echo "✅ Project root found at: $PROJECT_ROOT"
+
+        # Create local.properties right where it needs to be
+        echo "sdk.dir=$ANDROID_SDK_ROOT" > "$PROJECT_ROOT/local.properties"
+
+        # Enter that directory and build
+        cd "$PROJECT_ROOT"
+        gradle assembleDebug --stacktrace --info
+
+    - name: Upload APK
+      uses: actions/upload-artifact@v4
+      with:
+        name: lunarlog-debug
+        # Use wildcards (**) to find the APK no matter what folder it is in
+        path: '**/build/outputs/apk/debug/*.apk'
+        retention-days: 5
