@@ -5,7 +5,6 @@ import androidx.lifecycle.viewModelScope
 import com.lunarlog.data.CycleRepository
 import com.lunarlog.logic.CyclePredictionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.map
@@ -39,7 +38,7 @@ class HomeViewModel @Inject constructor(
                 val today = LocalDate.now()
 
                 val daysUntil = ChronoUnit.DAYS.between(today, nextPeriodStart).toInt()
-                val currentCycleDay = ChronoUnit.DAYS.between(lastCycle.startDate, today).toInt() + 1
+                val currentCycleDay = ChronoUnit.DAYS.between(LocalDate.ofEpochDay(lastCycle.startDate), today).toInt() + 1
 
                 // Check fertile window
                 val (fertileStart, fertileEnd) = CyclePredictionUtils.predictFertileWindow(nextPeriodStart)
@@ -47,7 +46,7 @@ class HomeViewModel @Inject constructor(
 
                 // Simple check if period is active (assuming 5 days default or checking endDate if exists)
                 val isPeriodActive = if (lastCycle.endDate != null) {
-                    !today.isAfter(lastCycle.endDate)
+                    !today.isAfter(LocalDate.ofEpochDay(lastCycle.endDate))
                 } else {
                     // Fallback if no end date logged yet, assume active if within 7 days for safety?
                     // Or just strictly rely on data.

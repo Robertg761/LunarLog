@@ -42,8 +42,8 @@ class LogPeriodViewModel @Inject constructor(
             try {
                 cycleRepository.insertCycle(
                     Cycle(
-                        startDate = startLocalDate,
-                        endDate = endLocalDate
+                        startDate = startLocalDate.toEpochDay(),
+                        endDate = endLocalDate.toEpochDay()
                     )
                 )
                 _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
