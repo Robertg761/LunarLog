@@ -22,7 +22,7 @@ jobs:
     - name: Setup Gradle
       uses: gradle/actions/setup-gradle@v3
       with:
-        gradle-version: '8.5'
+        gradle-version: '8.13'
         cache-disabled: true
 
     - name: Build with Smart Path Discovery
@@ -41,13 +41,7 @@ jobs:
         echo "✅ Project root found at: $PROJECT_ROOT"
 
         # Create local.properties right where it needs to be
-        if [ -n "$ANDROID_HOME" ]; then
-            echo "sdk.dir=$ANDROID_HOME" > "$PROJECT_ROOT/local.properties"
-        elif [ -n "$ANDROID_SDK_ROOT" ]; then
-            echo "sdk.dir=$ANDROID_SDK_ROOT" > "$PROJECT_ROOT/local.properties"
-        else
-             echo "Warning: neither ANDROID_HOME nor ANDROID_SDK_ROOT is set. Build might fail."
-        fi
+        echo "sdk.dir=$ANDROID_SDK_ROOT" > "$PROJECT_ROOT/local.properties"
 
         # Enter that directory and build
         cd "$PROJECT_ROOT"
