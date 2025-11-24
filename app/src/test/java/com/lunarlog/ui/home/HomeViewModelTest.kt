@@ -2,6 +2,7 @@ package com.lunarlog.ui.home
 
 import com.lunarlog.data.Cycle
 import com.lunarlog.data.CycleRepository
+import com.lunarlog.data.DailyLogRepository
 import io.mockk.every
 import io.mockk.mockk
 import kotlinx.coroutines.Dispatchers
@@ -23,6 +24,7 @@ import java.time.LocalDate
 class HomeViewModelTest {
 
     private val cycleRepository = mockk<CycleRepository>()
+    private val dailyLogRepository = mockk<DailyLogRepository>()
     private lateinit var viewModel: HomeViewModel
     private val testDispatcher = UnconfinedTestDispatcher()
 
@@ -44,8 +46,9 @@ class HomeViewModelTest {
         val cycle = Cycle(id = 1, startDate = lastCycleStart.toEpochDay())
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
+        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
 
-        viewModel = HomeViewModel(cycleRepository)
+        viewModel = HomeViewModel(cycleRepository, dailyLogRepository)
         
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect()

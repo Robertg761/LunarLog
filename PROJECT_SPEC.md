@@ -191,20 +191,20 @@
 
 #### 3. Feature: Log History & Robust Retrieval
 *Make finding past data performant and easy.*
-- [ ] **FTS4 Integration**: Implement Full-Text Search (FTS4) virtual table in Room for high-performance note searching.
-- [ ] **Log History Screen**: Chronological `LazyColumn` list of all past entries.
-- [ ] **Advanced Search UI**: Filter logs by Symptom (using definitions) or Text content.
+- [x] **FTS4 Integration**: Implement Full-Text Search (FTS4) virtual table in Room for high-performance note searching.
+- [x] **Log History Screen**: Chronological `LazyColumn` list of all past entries.
+- [x] **Advanced Search UI**: Filter logs by Symptom (using definitions) or Text content.
 
 #### 4. UI/UX: Rapid Data Entry
 *Reduce friction for daily logging.*
-- [ ] **"Quick Log" Bottom Sheet**: Replace FAB with a ModalBottomSheet for 1-tap actions (Period Start/End).
-- [ ] **Contextual Shortcuts**: Show top 3 most used symptoms for the *current cycle phase* in the quick menu.
+- [x] **"Quick Log" Bottom Sheet**: Replace FAB with a ModalBottomSheet for 1-tap actions (Period Start/End).
+- [x] **Contextual Shortcuts**: Show top 3 most used symptoms for the *current cycle phase* in the quick menu.
 
 #### 5. Feature: Narrative Insights
 *Make data digestible at a glance.*
-- [ ] **NarrativeGenerator Engine**: Pure logic class to analyze a Cycle + associated Logs.
-- [ ] **Cycle Summaries**: Generate text (e.g., "Cycle 4 was 29 days long...") for the Analysis screen.
-- [ ] **Weekly Digest**: View for the past week's trends.
+- [x] **NarrativeGenerator Engine**: Pure logic class to analyze a Cycle + associated Logs.
+- [x] **Cycle Summaries**: Generate text (e.g., "Cycle 4 was 29 days long...") for the Analysis screen.
+- [x] **Weekly Digest**: View for the past week's trends.
 
 #### 6. Technical Polish
 - [ ] **Container Transforms**: Implement Material 3 Motion `ContainerTransform` for smooth Circle-to-Rect transitions (List to Detail).

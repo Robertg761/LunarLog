@@ -30,7 +30,7 @@ object AppModule {
             AppDatabase::class.java,
             "lunar_log_database"
         )
-        .addMigrations(AppDatabase.MIGRATION_3_4)
+        .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5)
         .addCallback(object : RoomDatabase.Callback() {
             override fun onCreate(db: SupportSQLiteDatabase) {
                 super.onCreate(db)

@@ -47,10 +47,17 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 
+import androidx.compose.material.icons.automirrored.filled.List
+
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material3.Card
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AnalysisScreen(
     onBack: () -> Unit,
+    onHistoryClick: () -> Unit,
     viewModel: AnalysisViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -64,6 +71,11 @@ fun AnalysisScreen(
                 navigationIcon = {
                     IconButton(onClick = onBack) {
                         Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                    }
+                },
+                actions = {
+                    IconButton(onClick = onHistoryClick) {
+                        Icon(Icons.AutoMirrored.Filled.List, contentDescription = "Log History")
                     }
                 }
             )
@@ -117,6 +129,57 @@ fun TrendsTab(uiState: AnalysisUiState) {
             .verticalScroll(rememberScrollState())
             .padding(16.dp)
     ) {
+        // Weekly Digest
+        uiState.weeklyDigest?.let { digest ->
+            Text("Weekly Digest", style = MaterialTheme.typography.titleMedium)
+            Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text(digest.narrative, style = MaterialTheme.typography.bodyMedium)
+                }
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+
+        // Cycle Summaries
+        if (uiState.recentCycleSummaries.isNotEmpty()) {
+            Text("Cycle Insights", style = MaterialTheme.typography.titleMedium)
+            
+            uiState.recentCycleSummaries.forEach { summary ->
+                Card(modifier = Modifier.fillMaxWidth().padding(top = 8.dp)) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text("Cycle ${summary.cycleId}", style = MaterialTheme.typography.titleSmall)
+                            Spacer(modifier = Modifier.width(8.dp))
+                            Text(
+                                "(${summary.startDate} - ${summary.endDate})", 
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Spacer(modifier = Modifier.height(4.dp))
+                        Text(summary.narrative, style = MaterialTheme.typography.bodyMedium)
+                        
+                        if (summary.keyInsights.isNotEmpty()) {
+                             Spacer(modifier = Modifier.height(8.dp))
+                             summary.keyInsights.forEach { insight ->
+                                 Row(modifier = Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        Icons.Default.Star, 
+                                        contentDescription = null, 
+                                        modifier = Modifier.size(16.dp),
+                                        tint = MaterialTheme.colorScheme.primary
+                                    )
+                                    Spacer(modifier = Modifier.width(8.dp))
+                                    Text(insight, style = MaterialTheme.typography.bodySmall)
+                                 }
+                            }
+                        }
+                    }
+                }
+            }
+            Spacer(modifier = Modifier.height(32.dp))
+        }
+
         if (uiState.cycleHistory.isNotEmpty()) {
             Text("Cycle Length History", style = MaterialTheme.typography.titleMedium)
             val entries = uiState.cycleHistory.map { it.second.toFloat() }.toTypedArray()

@@ -4,6 +4,9 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
+import com.lunarlog.logic.CycleSummary
+import com.lunarlog.logic.NarrativeGenerator
+import com.lunarlog.logic.WeeklyDigest
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -17,6 +20,8 @@ data class AnalysisUiState(
     val cycleHistory: List<Pair<LocalDate, Int>> = emptyList(),
     val symptomCounts: Map<String, Int> = emptyMap(),
     val moodCounts: Map<String, Int> = emptyMap(),
+    val recentCycleSummaries: List<CycleSummary> = emptyList(),
+    val weeklyDigest: WeeklyDigest? = null,
     val isLoading: Boolean = true
 )
 
@@ -42,8 +47,7 @@ class AnalysisViewModel @Inject constructor(
             val cycleHistory = cycles.filter { it.endDate != null }
                 .map { 
                     val start = LocalDate.ofEpochDay(it.startDate)
-                    val end = LocalDate.ofEpochDay(it.endDate!!)
-                    val length = (it.endDate - it.startDate + 1).toInt()
+                    val length = (it.endDate!! - it.startDate + 1).toInt()
                     start to length
                 }
                 .sortedBy { it.first }
@@ -66,11 +70,21 @@ class AnalysisViewModel @Inject constructor(
                 .toList()
                 .sortedByDescending { it.second }
                 .toMap()
+            
+            // Generate Narratives
+            val cycleSummaries = cycles.filter { it.endDate != null }
+                .sortedByDescending { it.startDate }
+                .take(5) // Last 5 cycles
+                .mapNotNull { NarrativeGenerator.generateCycleSummary(it, logs) }
+
+            val weeklyDigest = NarrativeGenerator.generateWeeklyDigest(logs)
 
             _uiState.value = AnalysisUiState(
                 cycleHistory = cycleHistory,
                 symptomCounts = symptomCounts,
                 moodCounts = moodCounts,
+                recentCycleSummaries = cycleSummaries,
+                weeklyDigest = weeklyDigest,
                 isLoading = false
             )
         }

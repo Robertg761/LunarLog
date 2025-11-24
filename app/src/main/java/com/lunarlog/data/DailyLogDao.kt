@@ -19,4 +19,18 @@ interface DailyLogDao {
 
     @Query("SELECT * FROM daily_logs")
     suspend fun getAllLogsSync(): List<DailyLog>
+
+    @Query("SELECT * FROM daily_logs ORDER BY date DESC")
+    fun getAllLogs(): Flow<List<DailyLog>>
+
+    @Query("""
+        SELECT daily_logs.* FROM daily_logs 
+        JOIN daily_logs_fts ON daily_logs.date = daily_logs_fts.docid 
+        WHERE daily_logs_fts MATCH :query
+        ORDER BY daily_logs.date DESC
+    """)
+    fun searchLogsFts(query: String): Flow<List<DailyLog>>
+
+    @Query("SELECT * FROM daily_logs WHERE symptoms LIKE '%' || :symptom || '%' ORDER BY date DESC")
+    fun searchLogsBySymptom(symptom: String): Flow<List<DailyLog>>
 }

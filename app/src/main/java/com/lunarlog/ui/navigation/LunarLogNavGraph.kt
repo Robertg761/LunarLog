@@ -53,6 +53,7 @@ sealed class Screen(
         fun createRoute(date: Long) = "details/$date"
     }
     object Settings : Screen("settings")
+    object LogHistory : Screen("log_history")
     object Onboarding : Screen("onboarding")
 }
 
@@ -189,12 +190,21 @@ fun LunarLogNavGraph(
                     }
                 ) {
                     AnalysisScreen(
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        onHistoryClick = { navController.navigate(Screen.LogHistory.route) }
                     )
                 }
                 composable(Screen.Settings.route) {
                     SettingsScreen(
                         onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(Screen.LogHistory.route) {
+                    com.lunarlog.ui.loghistory.LogHistoryScreen(
+                        onBackClick = { navController.popBackStack() },
+                        onLogClick = { date ->
+                            navController.navigate(Screen.Details.createRoute(date))
+                        }
                     )
                 }
                 composable(Screen.Onboarding.route) {

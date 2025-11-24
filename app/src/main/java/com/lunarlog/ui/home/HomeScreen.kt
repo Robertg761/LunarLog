@@ -19,6 +19,9 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,6 +53,9 @@ fun HomeScreen(
     val scrollState = rememberScrollState()
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    
+    val sheetState = rememberModalBottomSheetState()
+    var showBottomSheet by remember { mutableStateOf(false) }
 
     // Gradient Background
     Box(
@@ -105,11 +111,11 @@ fun HomeScreen(
             },
             floatingActionButton = {
                 ExtendedFloatingActionButton(
-                    onClick = onLogPeriodClicked,
+                    onClick = { showBottomSheet = true },
                     containerColor = MaterialTheme.colorScheme.primary,
                     contentColor = Color.White,
-                    icon = { Icon(Icons.Default.Add, "Log Period") },
-                    text = { Text("Log Period", fontWeight = FontWeight.Bold) }
+                    icon = { Icon(Icons.Default.Edit, "Quick Log") },
+                    text = { Text("Log", fontWeight = FontWeight.Bold) }
                 )
             }
         ) { paddingValues ->
@@ -152,6 +158,18 @@ fun HomeScreen(
                     Spacer(modifier = Modifier.height(80.dp))
                 }
             }
+        }
+        
+        if (showBottomSheet) {
+            QuickLogBottomSheet(
+                onDismissRequest = { showBottomSheet = false },
+                sheetState = sheetState,
+                isPeriodActive = uiState.isPeriodActive,
+                onTogglePeriod = { viewModel.togglePeriod() },
+                quickSymptoms = uiState.quickLogSymptoms,
+                onSymptomClick = { viewModel.logQuickSymptom(it) },
+                onFullDetailsClick = onLogDetailsClicked
+            )
         }
     }
 }

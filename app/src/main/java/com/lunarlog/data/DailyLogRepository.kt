@@ -23,4 +23,18 @@ class DailyLogRepository @Inject constructor(
     suspend fun saveLog(dailyLog: DailyLog) {
         dailyLogDao.insertLog(dailyLog)
     }
+
+    fun getAllLogs(): Flow<List<DailyLog>> {
+        return dailyLogDao.getAllLogs()
+    }
+
+    fun searchLogs(query: String): Flow<List<DailyLog>> {
+        // Append * to query for prefix matching if not present
+        val ftsQuery = if (query.endsWith("*")) query else "$query*"
+        return dailyLogDao.searchLogsFts(ftsQuery)
+    }
+
+    fun searchLogsBySymptom(symptom: String): Flow<List<DailyLog>> {
+        return dailyLogDao.searchLogsBySymptom(symptom)
+    }
 }
