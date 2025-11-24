@@ -41,55 +41,55 @@
 
 ### 📅 Phase 3: The Calendar & Visualization
 *Goal: Visual feedback for patterns at a glance.*
-- [ ] **Custom Calendar Composable**:
+- [x] **Custom Calendar Composable**:
     - Build a monthly grid view.
-    - Support swiping between months.
-- [ ] **Visual Indicators**:
+    - Support swiping between months. (Implemented via navigation buttons for now)
+- [x] **Visual Indicators**:
     - 🔴 Red filled circle: Confirmed period.
     - 🔴 Red outline circle: Predicted period.
     - 🟢 Green dot: Fertile window.
     - 🔵 Blue ring: Ovulation day.
-- [ ] **Interactivity**: Clicking a date opens the Daily Details/Log for that specific date.
+- [x] **Interactivity**: Clicking a date opens the Daily Details/Log for that specific date.
 
 ### 🧠 Phase 4: The Intelligence (Prediction Engine)
 *Goal: Smarter predictions that adapt to the user.*
-- [ ] **Advanced Logic**:
+- [x] **Advanced Logic**:
     - Calculate Standard Deviation of cycle lengths.
     - Detect "Irregular Cycle" (high variance).
-- [ ] **Fertility Calculator**:
+- [x] **Fertility Calculator**:
     - Implement standard ovulation math (typically 14 days before next period).
     - Define fertile window (Ovulation - 5 days).
-- [ ] **Local Notifications** (using `WorkManager`):
+- [x] **Local Notifications** (using `WorkManager`):
     - "Period due in 2 days".
     - "Fertile window starting".
     - *Privacy Mode*: Generic messages ("Check LunarLog").
 
 ### 📈 Phase 5: "Premium" Features (Forever Free)
 *Goal: High-value features usually behind paywalls.*
-- [ ] **Wellness Tracker**:
+- [x] **Wellness Tracker**:
     - **Water**: Counter widget (Cups).
     - **Sleep**: Hours slider + Quality rating.
     - **Libido**: Activity tracker.
-- [ ] **Doctor's Report**:
+- [x] **Doctor's Report**:
     - Generate a PDF summary of the last 3-6 months.
     - Include cycle lengths, symptom frequency, and regularity.
     - Export Raw Data (CSV) for backup/interoperability.
-- [ ] **Trends & Charts**:
+- [x] **Trends & Charts**:
     - Cycle Length History (Line Chart).
     - Symptom Frequency (Bar Chart).
     - Mood Correlation (e.g., "You often feel Anxious on Day 25").
 
 ### 🔒 Phase 6: Privacy & Polish
 *Goal: Security, reliability, and aesthetics.*
-- [ ] **Security**:
+- [x] **Security**:
     - App Lock (Biometric/PIN) on startup.
-- [ ] **Data Management**:
+- [x] **Data Management**:
     - Local Backup/Restore (Export DB to file).
     - "Nuke Data" button.
-- [ ] **Onboarding**:
+- [x] **Onboarding**:
     - Welcome screen for first run.
     - Ask for "Last Period Date" to jumpstart predictions.
-- [ ] **Theming**:
+- [x] **Theming**:
     - Dark Mode support.
     - Custom accent colors (allow user to choose theme color).
 

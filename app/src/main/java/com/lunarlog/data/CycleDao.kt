@@ -12,6 +12,9 @@ interface CycleDao {
     @Query("SELECT * FROM cycles ORDER BY startDate DESC")
     fun getAllCycles(): Flow<List<Cycle>>
 
+    @Query("SELECT * FROM cycles ORDER BY startDate DESC")
+    suspend fun getAllCyclesList(): List<Cycle>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insert(cycle: Cycle)
 

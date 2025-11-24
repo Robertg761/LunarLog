@@ -1,0 +1,49 @@
+package com.lunarlog.data
+
+import android.content.Context
+import androidx.datastore.core.DataStore
+import androidx.datastore.preferences.core.Preferences
+import androidx.datastore.preferences.core.booleanPreferencesKey
+import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.preferencesDataStore
+import dagger.hilt.android.qualifiers.ApplicationContext
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.map
+import javax.inject.Inject
+import javax.inject.Singleton
+
+val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_prefs")
+
+@Singleton
+class UserPreferencesRepository @Inject constructor(
+    @ApplicationContext private val context: Context
+) {
+    private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run")
+    private val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
+    private val THEME_COLOR = longPreferencesKey("theme_color") // Store ARGB or similar
+
+    val isFirstRun: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[IS_FIRST_RUN] ?: true
+        }
+
+    val isAppLockEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[APP_LOCK_ENABLED] ?: false
+        }
+    
+    // We'll leave theme color for later or simple toggle
+    
+    suspend fun setFirstRunComplete() {
+        context.dataStore.edit { preferences ->
+            preferences[IS_FIRST_RUN] = false
+        }
+    }
+
+    suspend fun setAppLockEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[APP_LOCK_ENABLED] = enabled
+        }
+    }
+}

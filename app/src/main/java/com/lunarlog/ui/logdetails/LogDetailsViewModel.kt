@@ -106,8 +106,26 @@ class LogDetailsViewModel @Inject constructor(
         }
         _uiState.value = _uiState.value.copy(selectedMoods = current)
     }
-    
-    // Add other update methods as needed for Phase 5 features later
+
+    fun updateWaterIntake(cups: Int) {
+        _uiState.value = _uiState.value.copy(waterIntake = cups)
+    }
+
+    fun updateSleepHours(hours: Float) {
+        _uiState.value = _uiState.value.copy(sleepHours = hours)
+    }
+
+    fun updateSleepQuality(quality: Int) {
+        _uiState.value = _uiState.value.copy(sleepQuality = quality)
+    }
+
+    fun updateSexDrive(level: Int) {
+        _uiState.value = _uiState.value.copy(sexDrive = level)
+    }
+
+    fun updateNotes(text: String) {
+        _uiState.value = _uiState.value.copy(notes = text)
+    }
 
     fun saveLog() {
         val state = _uiState.value

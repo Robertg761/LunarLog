@@ -7,4 +7,5 @@ class CycleRepository @Inject constructor(private val cycleDao: CycleDao) {
     suspend fun insertCycle(cycle: Cycle) = cycleDao.insert(cycle)
     suspend fun updateCycle(cycle: Cycle) = cycleDao.update(cycle)
     fun getAllCycles(): Flow<List<Cycle>> = cycleDao.getAllCycles()
+    suspend fun getAllCyclesSync(): List<Cycle> = cycleDao.getAllCyclesList()
 }

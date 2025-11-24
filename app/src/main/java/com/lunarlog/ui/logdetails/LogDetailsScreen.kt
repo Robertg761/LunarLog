@@ -13,8 +13,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -23,6 +27,7 @@ import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
 import androidx.compose.material3.SnackbarHost
@@ -175,6 +180,69 @@ fun LogDetailsScreen(
                         )
                     }
                 }
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Wellness Section
+                SectionHeader("Wellness")
+                
+                // Water
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    Text("Water Intake (Cups): ", modifier = Modifier.weight(1f))
+                    IconButton(onClick = { if (uiState.waterIntake > 0) viewModel.updateWaterIntake(uiState.waterIntake - 1) }) {
+                        Icon(Icons.Filled.Remove, "Decrease Water")
+                    }
+                    Text(text = uiState.waterIntake.toString(), style = MaterialTheme.typography.titleMedium)
+                    IconButton(onClick = { viewModel.updateWaterIntake(uiState.waterIntake + 1) }) {
+                        Icon(Icons.Filled.Add, "Increase Water")
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Sleep
+                Text("Sleep: ${uiState.sleepHours} hrs")
+                Slider(
+                    value = uiState.sleepHours,
+                    onValueChange = { viewModel.updateSleepHours(it) },
+                    valueRange = 0f..12f,
+                    steps = 23 // 0.5 increments
+                )
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text("Quality:")
+                    (1..5).forEach { star ->
+                        IconButton(onClick = { viewModel.updateSleepQuality(star) }) {
+                            Icon(
+                                imageVector = if (star <= uiState.sleepQuality) Icons.Filled.Star else Icons.Outlined.StarBorder,
+                                contentDescription = "Rate $star stars",
+                                tint = MaterialTheme.colorScheme.primary
+                            )
+                        }
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                // Libido
+                Text("Libido: " + when(uiState.sexDrive) { 0 -> "None"; 1 -> "Low"; 2 -> "Medium"; 3 -> "High"; else -> "None" })
+                Slider(
+                    value = uiState.sexDrive.toFloat(),
+                    onValueChange = { viewModel.updateSexDrive(it.toInt()) },
+                    valueRange = 0f..3f,
+                    steps = 2
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
+                // Notes
+                SectionHeader("Notes")
+                OutlinedTextField(
+                    value = uiState.notes,
+                    onValueChange = { viewModel.updateNotes(it) },
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text("Daily notes...") },
+                    minLines = 3
+                )
                 
                 Spacer(modifier = Modifier.height(48.dp))
             }
