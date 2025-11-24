@@ -38,6 +38,7 @@ import com.lunarlog.ui.theme.SoftTeal
 @Composable
 fun HomeScreen(
     onLogPeriodClicked: () -> Unit,
+    onLogDetailsClicked: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
@@ -76,6 +77,12 @@ fun HomeScreen(
                 } else {
                     // Placeholder to keep layout stable or alternative message
                     Spacer(modifier = Modifier.height(24.dp))
+                }
+                
+                Spacer(modifier = Modifier.height(32.dp))
+                
+                androidx.compose.material3.Button(onClick = onLogDetailsClicked) {
+                    Text("Log Today's Details")
                 }
             }
         }

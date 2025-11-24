@@ -27,17 +27,17 @@
 
 ### 📝 Phase 2: Core Data Entry
 *Goal: Enable detailed health tracking beyond just dates.*
-- [ ] **DailyLog Entity Update**: Ensure fields for:
+- [x] **DailyLog Entity Update**: Ensure fields for:
     - Flow (Int: 0-4)
     - Symptoms (List<String> or Bitmask)
     - Mood (List<String>)
     - Notes (String)
-- [ ] **Symptom Logging UI**:
+- [x] **Symptom Logging UI**:
     - Create a "Daily Details" screen/bottom sheet.
     - **Flow Intensity**: Custom Slider or Segmented Button.
     - **Symptoms/Mood**: Multi-select `FilterChip`s.
-- [ ] **Repository Layer**: Methods to insert/update `DailyLog` entries.
-- [ ] **Integration**: Link Home Screen "Log Today" button to this new UI.
+- [x] **Repository Layer**: Methods to insert/update `DailyLog` entries.
+- [x] **Integration**: Link Home Screen "Log Today" button to this new UI.
 
 ### 📅 Phase 3: The Calendar & Visualization
 *Goal: Visual feedback for patterns at a glance.*
