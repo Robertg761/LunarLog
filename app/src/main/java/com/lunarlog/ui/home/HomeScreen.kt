@@ -5,6 +5,7 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
@@ -21,6 +22,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -30,6 +32,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lunarlog.ui.theme.*
+
+import androidx.compose.material.icons.filled.Share
+import android.content.Intent
+import androidx.compose.ui.input.nestedscroll.nestedScroll
+import androidx.compose.ui.platform.LocalContext
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -41,6 +48,8 @@ fun HomeScreen(
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
+    val context = LocalContext.current
+    val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
 
     // Gradient Background
     Box(
@@ -56,6 +65,7 @@ fun HomeScreen(
             )
     ) {
         Scaffold(
+            modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
             // Make Scaffold background transparent so gradient shows through
             containerColor = Color.Transparent,
             topBar = {
@@ -70,12 +80,26 @@ fun HomeScreen(
                         )
                     },
                     actions = {
+                        IconButton(onClick = {
+                            val status = viewModel.getShareableStatus()
+                            val sendIntent: Intent = Intent().apply {
+                                action = Intent.ACTION_SEND
+                                putExtra(Intent.EXTRA_TEXT, status)
+                                type = "text/plain"
+                            }
+                            val shareIntent = Intent.createChooser(sendIntent, "Share Status")
+                            context.startActivity(shareIntent)
+                        }) {
+                             Icon(Icons.Default.Share, contentDescription = "Share Status", tint = MaterialTheme.colorScheme.secondary)
+                        }
                         IconButton(onClick = onSettingsClicked) {
                             Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.secondary)
                         }
                     },
+                    scrollBehavior = scrollBehavior,
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
-                        containerColor = Color.Transparent // Transparent TopBar
+                        containerColor = Color.Transparent, // Transparent TopBar
+                        scrolledContainerColor = Color.Transparent
                     )
                 )
             },
@@ -100,14 +124,13 @@ fun HomeScreen(
                 Spacer(modifier = Modifier.height(24.dp))
 
                 if (uiState.isLoading) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator(color = MaterialTheme.colorScheme.primary)
-                    }
+                    HomeSkeleton()
                 } else {
                     // Cycle Indicator
                     CycleStatusCircle(
                         day = uiState.currentCycleDay,
-                        daysUntil = uiState.daysUntilPeriod
+                        daysUntil = uiState.daysUntilPeriod,
+                        scrollState = scrollState
                     )
 
                     Spacer(modifier = Modifier.height(40.dp))
@@ -134,15 +157,60 @@ fun HomeScreen(
 }
 
 @Composable
-fun CycleStatusCircle(day: Int, daysUntil: Int) {
+fun HomeSkeleton() {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        modifier = Modifier.fillMaxWidth()
+    ) {
+        // Cycle Circle Skeleton
+        Box(
+            modifier = Modifier
+                .size(300.dp)
+                .clip(CircleShape)
+                .shimmerEffect()
+        )
+        
+        Spacer(modifier = Modifier.height(40.dp))
+        
+        // Summary Card Skeleton
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(100.dp)
+                .clip(MaterialTheme.shapes.large)
+                .shimmerEffect()
+        )
+        
+        Spacer(modifier = Modifier.height(24.dp))
+        
+        // Fertility Card Skeleton
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(80.dp)
+                .clip(MaterialTheme.shapes.large)
+                .shimmerEffect()
+        )
+    }
+}
+
+@Composable
+fun CycleStatusCircle(day: Int, daysUntil: Int, scrollState: ScrollState? = null) {
     val primaryColor = MaterialTheme.colorScheme.primary
     val secondaryColor = MaterialTheme.colorScheme.secondary
     val tertiaryColor = MaterialTheme.colorScheme.tertiary
     val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.5f)
 
+    val parallaxModifier = if (scrollState != null) {
+        Modifier.graphicsLayer {
+            translationY = scrollState.value * 0.5f
+            alpha = (1f - (scrollState.value / 600f)).coerceIn(0f, 1f)
+        }
+    } else Modifier
+
     Box(
         contentAlignment = Alignment.Center,
-        modifier = Modifier.size(300.dp)
+        modifier = Modifier.size(300.dp).then(parallaxModifier)
     ) {
         // Soft Glow / Shadow behind
         Canvas(modifier = Modifier.fillMaxSize()) {
@@ -184,8 +252,7 @@ fun CycleStatusCircle(day: Int, daysUntil: Int) {
             Text(
                 text = "$day",
                 style = MaterialTheme.typography.displayLarge.copy(
-                    fontWeight = FontWeight.Black,
-                    fontSize = 96.sp
+                    fontWeight = FontWeight.Black
                 ),
                 color = MaterialTheme.colorScheme.primary
             )
@@ -203,9 +270,10 @@ fun DailySummaryCard(onLogDetailsClicked: () -> Unit) {
     ElevatedCard(
         onClick = onLogDetailsClicked,
         modifier = Modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp), // More rounded
+        shape = MaterialTheme.shapes.large,
+ // More rounded
         colors = CardDefaults.elevatedCardColors(
-            containerColor = Color.White // Pop against background
+            containerColor = MaterialTheme.colorScheme.surface
         ),
         elevation = CardDefaults.cardElevation(defaultElevation = 4.dp)
     ) {
@@ -253,7 +321,8 @@ fun FertilityCard() {
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.tertiaryContainer
         ),
-        shape = RoundedCornerShape(24.dp),
+        shape = MaterialTheme.shapes.large,
+
         modifier = Modifier.fillMaxWidth()
     ) {
         Row(
@@ -262,7 +331,7 @@ fun FertilityCard() {
         ) {
             Icon(
                 imageVector = Icons.Default.Favorite,
-                contentDescription = null,
+                contentDescription = "Heart Icon",
                 tint = MaterialTheme.colorScheme.tertiary,
                 modifier = Modifier.size(32.dp)
             )

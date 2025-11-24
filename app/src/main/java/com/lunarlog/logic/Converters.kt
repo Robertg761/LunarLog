@@ -27,4 +27,18 @@ class Converters {
             value.split(";")
         }
     }
+
+    @TypeConverter
+    fun fromSymptomCategory(value: com.lunarlog.data.SymptomCategory): String {
+        return value.name
+    }
+
+    @TypeConverter
+    fun toSymptomCategory(value: String): com.lunarlog.data.SymptomCategory {
+        return try {
+            com.lunarlog.data.SymptomCategory.valueOf(value)
+        } catch (e: IllegalArgumentException) {
+            com.lunarlog.data.SymptomCategory.OTHER
+        }
+    }
 }

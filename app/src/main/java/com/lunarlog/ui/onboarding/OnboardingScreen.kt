@@ -98,18 +98,15 @@ fun OnboardingScreen(
             ) {
                 Text(
                     text = "LunarLog",
-                    style = MaterialTheme.typography.displayLarge.copy(
-                        fontWeight = FontWeight.Bold,
-                        fontSize = 48.sp
+                    style = MaterialTheme.typography.displayMedium.copy(
+                        fontWeight = FontWeight.Bold
                     ),
                     color = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.height(16.dp))
                 Text(
                     text = "Your Cycle. Your Rhythm.\nYour Privacy.",
-                    style = MaterialTheme.typography.headlineSmall.copy(
-                        lineHeight = 32.sp
-                    ),
+                    style = MaterialTheme.typography.headlineSmall,
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurface
                 )
@@ -234,7 +231,7 @@ fun AnimatedAuroraBackground() {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(Color.White.copy(alpha = 0.2f))
+            .background(MaterialTheme.colorScheme.surface.copy(alpha = 0.2f))
     )
 }
 
@@ -255,7 +252,7 @@ fun DateSelectorButton(date: LocalDate, onClick: () -> Unit) {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 Icon(
                     imageVector = Icons.Default.CalendarMonth,
-                    contentDescription = null,
+                    contentDescription = "Select Date",
                     tint = MaterialTheme.colorScheme.primary
                 )
                 Spacer(modifier = Modifier.size(12.dp))
@@ -266,7 +263,7 @@ fun DateSelectorButton(date: LocalDate, onClick: () -> Unit) {
             }
             Icon(
                 imageVector = Icons.Default.ChevronRight,
-                contentDescription = null,
+                contentDescription = "Open Date Picker",
                 tint = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
@@ -295,7 +292,7 @@ fun PrimaryCTAButton(text: String, onClick: () -> Unit) {
     ) {
         Text(
             text = text,
-            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold, letterSpacing = 1.sp)
+            style = MaterialTheme.typography.titleMedium.copy(fontWeight = FontWeight.Bold)
         )
     }
 }

@@ -21,7 +21,7 @@ class UserPreferencesRepository @Inject constructor(
 ) {
     private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run")
     private val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
-    private val THEME_COLOR = longPreferencesKey("theme_color") // Store ARGB or similar
+    private val THEME_SEED_COLOR = longPreferencesKey("theme_seed_color") // Store ARGB
 
     val isFirstRun: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
@@ -33,7 +33,10 @@ class UserPreferencesRepository @Inject constructor(
             preferences[APP_LOCK_ENABLED] ?: false
         }
     
-    // We'll leave theme color for later or simple toggle
+    val themeSeedColor: Flow<Long?> = context.dataStore.data
+        .map { preferences ->
+            preferences[THEME_SEED_COLOR]
+        }
     
     suspend fun setFirstRunComplete() {
         context.dataStore.edit { preferences ->
@@ -44,6 +47,12 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setAppLockEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[APP_LOCK_ENABLED] = enabled
+        }
+    }
+
+    suspend fun setThemeSeedColor(color: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[THEME_SEED_COLOR] = color
         }
     }
 }

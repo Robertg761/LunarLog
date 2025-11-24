@@ -5,10 +5,14 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lunarlog.data.DailyLog
 import com.lunarlog.data.DailyLogRepository
+import com.lunarlog.data.SymptomCategory
+import com.lunarlog.data.SymptomDefinition
+import com.lunarlog.data.SymptomRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.firstOrNull
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -19,6 +23,8 @@ data class LogDetailsUiState(
     val flowLevel: Int = 0,
     val selectedSymptoms: List<String> = emptyList(),
     val selectedMoods: List<String> = emptyList(),
+    val availableMoods: List<SymptomDefinition> = emptyList(),
+    val availableSymptoms: Map<SymptomCategory, List<SymptomDefinition>> = emptyMap(),
     val waterIntake: Int = 0,
     val sleepHours: Float = 0f,
     val sleepQuality: Int = 0,
@@ -33,6 +39,7 @@ data class LogDetailsUiState(
 @HiltViewModel
 class LogDetailsViewModel @Inject constructor(
     private val repository: DailyLogRepository,
+    private val symptomRepository: SymptomRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -48,6 +55,46 @@ class LogDetailsViewModel @Inject constructor(
             LocalDate.now()
         }
         loadLog(date)
+        loadSymptoms()
+    }
+
+    private fun loadSymptoms() {
+        viewModelScope.launch {
+            val endDate = LocalDate.now().toEpochDay()
+            val startDate = LocalDate.now().minusDays(90).toEpochDay()
+
+            combine(
+                symptomRepository.getAllSymptoms(),
+                repository.getLogsForRange(startDate, endDate)
+            ) { symptoms, logs ->
+                val symptomCounts = logs.flatMap { it.symptoms + it.mood }
+                    .groupingBy { it }
+                    .eachCount()
+
+                val sorter = Comparator<SymptomDefinition> { a, b ->
+                    val countA = symptomCounts[a.name] ?: 0
+                    val countB = symptomCounts[b.name] ?: 0
+                    if (countA != countB) {
+                        countB - countA
+                    } else {
+                        a.displayName.compareTo(b.displayName)
+                    }
+                }
+
+                val sortedSymptoms = symptoms.sortedWith(sorter)
+
+                val moods = sortedSymptoms.filter { it.category == SymptomCategory.EMOTIONAL }
+                val otherSymptoms = sortedSymptoms.filter { it.category != SymptomCategory.EMOTIONAL }
+                    .groupBy { it.category }
+
+                Pair(moods, otherSymptoms)
+            }.collect { (moods, otherSymptoms) ->
+                _uiState.value = _uiState.value.copy(
+                    availableMoods = moods,
+                    availableSymptoms = otherSymptoms
+                )
+            }
+        }
     }
 
     private fun loadLog(date: LocalDate) {
@@ -55,7 +102,6 @@ class LogDetailsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, date = date)
             try {
                 // We use firstOrNull to get the current state from DB once for editing
-                // We could also collect flow if we wanted real-time updates, but for a form, one-shot is usually easier to manage state
                 val log = repository.getLogForDate(date.toEpochDay()).firstOrNull()
                 
                 if (log != null) {
@@ -105,6 +151,12 @@ class LogDetailsViewModel @Inject constructor(
             current.add(mood)
         }
         _uiState.value = _uiState.value.copy(selectedMoods = current)
+    }
+
+    fun addCustomSymptom(name: String, category: SymptomCategory) {
+        viewModelScope.launch {
+            symptomRepository.addCustomSymptom(name, category)
+        }
     }
 
     fun updateWaterIntake(cups: Int) {

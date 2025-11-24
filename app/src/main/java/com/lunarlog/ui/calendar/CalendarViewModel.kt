@@ -157,6 +157,7 @@ class CalendarViewModel @Inject constructor(
         }
 
         val hasLog = logs.any { it.date == epochDay }
+        val flowIntensity = logs.find { it.date == epochDay }?.flowLevel ?: 0
 
         return CalendarDayState(
             date = date,
@@ -165,7 +166,8 @@ class CalendarViewModel @Inject constructor(
             isPredictedPeriod = isPredictedPeriod,
             isFertile = isFertile,
             isOvulation = isOvulation,
-            hasLog = hasLog
+            hasLog = hasLog,
+            flowIntensity = flowIntensity
         )
     }
 }
@@ -185,5 +187,6 @@ data class CalendarDayState(
     val isPredictedPeriod: Boolean = false,
     val isFertile: Boolean = false,
     val isOvulation: Boolean = false,
-    val hasLog: Boolean = false
+    val hasLog: Boolean = false,
+    val flowIntensity: Int = 0 // 0=None, 1-4=Intensity
 )

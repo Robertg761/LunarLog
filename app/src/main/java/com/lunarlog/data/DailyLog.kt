@@ -13,5 +13,7 @@ data class DailyLog(
     val sleepHours: Float = 0f,
     val sleepQuality: Int = 0, // 1-5
     val sexDrive: Int = 0, // 0=None, 1=Low, 2=Medium, 3=High
-    val notes: String = ""
+    val notes: String = "",
+    val temperature: Float? = null, // Basal Body Temperature (Celsius or Fahrenheit, handled by UI preference)
+    val cervicalMucus: Int = 0 // 0=None/Dry, 1=Sticky, 2=Creamy, 3=Watery, 4=Egg White (Peak Fertility)
 )

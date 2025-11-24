@@ -26,6 +26,9 @@ class SettingsViewModel @Inject constructor(
 
     val isAppLockEnabled = userPreferencesRepository.isAppLockEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+        
+    val themeSeedColor = userPreferencesRepository.themeSeedColor
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
     private val _message = MutableStateFlow<String?>(null)
     val message = _message
@@ -33,6 +36,12 @@ class SettingsViewModel @Inject constructor(
     fun toggleAppLock(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setAppLockEnabled(enabled)
+        }
+    }
+    
+    fun setThemeSeedColor(color: Long) {
+        viewModelScope.launch {
+            userPreferencesRepository.setThemeSeedColor(color)
         }
     }
 

@@ -15,7 +15,8 @@ import javax.inject.Inject
 data class MainActivityUiState(
     val isLoading: Boolean = true,
     val startDestination: String = Screen.Home.route,
-    val isAppLockEnabled: Boolean = false
+    val isAppLockEnabled: Boolean = false,
+    val themeSeedColor: Int? = null
 )
 
 @HiltViewModel
@@ -25,12 +26,14 @@ class MainViewModel @Inject constructor(
 
     val uiState = combine(
         userPreferencesRepository.isFirstRun,
-        userPreferencesRepository.isAppLockEnabled
-    ) { isFirstRun, isAppLockEnabled ->
+        userPreferencesRepository.isAppLockEnabled,
+        userPreferencesRepository.themeSeedColor
+    ) { isFirstRun, isAppLockEnabled, themeSeedColor ->
         MainActivityUiState(
             isLoading = false,
             startDestination = if (isFirstRun) Screen.Onboarding.route else Screen.Home.route,
-            isAppLockEnabled = isAppLockEnabled
+            isAppLockEnabled = isAppLockEnabled,
+            themeSeedColor = themeSeedColor?.toInt()
         )
     }.stateIn(
         scope = viewModelScope,

@@ -70,4 +70,19 @@ class HomeViewModel @Inject constructor(
             started = SharingStarted.WhileSubscribed(5000),
             initialValue = HomeUiState()
         )
+
+    fun getShareableStatus(): String {
+        val state = uiState.value
+        if (state.isLoading) return "Loading..."
+
+        return """
+            🌙 LunarLog Status Update
+            
+            📅 Day ${state.currentCycleDay} of Cycle
+            ⏳ Period due in ${state.daysUntilPeriod} days
+            ${if (state.isFertile) "🌿 Likely Fertile Window" else ""}
+            
+            Sent from my private LunarLog
+        """.trimIndent()
+    }
 }

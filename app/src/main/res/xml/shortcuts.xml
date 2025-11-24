@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<shortcuts xmlns:android="http://schemas.android.com/apk/res/android">
+    <shortcut
+        android:shortcutId="log_period"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_log"
+        android:shortcutShortLabel="@string/shortcut_log_short"
+        android:shortcutLongLabel="@string/shortcut_log_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="lunarlog://logging" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="calendar"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_calendar"
+        android:shortcutShortLabel="@string/shortcut_calendar_short"
+        android:shortcutLongLabel="@string/shortcut_calendar_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="lunarlog://calendar" />
+    </shortcut>
+    <shortcut
+        android:shortcutId="analysis"
+        android:enabled="true"
+        android:icon="@drawable/ic_shortcut_analysis"
+        android:shortcutShortLabel="@string/shortcut_analysis_short"
+        android:shortcutLongLabel="@string/shortcut_analysis_long">
+        <intent
+            android:action="android.intent.action.VIEW"
+            android:data="lunarlog://analysis" />
+    </shortcut>
+</shortcuts>

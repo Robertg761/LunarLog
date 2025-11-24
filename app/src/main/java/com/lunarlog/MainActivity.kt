@@ -38,6 +38,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
 import androidx.compose.ui.unit.dp
 
+import androidx.activity.enableEdgeToEdge
+
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
@@ -45,6 +47,7 @@ class MainActivity : FragmentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
+        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         
         // Keep splash screen until data is loaded
@@ -58,7 +61,9 @@ class MainActivity : FragmentActivity() {
             val uiState by viewModel.uiState.collectAsState()
             val isLocked by viewModel.isLocked.collectAsState()
 
-            LunarLogTheme {
+            LunarLogTheme(
+                seedColor = uiState.themeSeedColor
+            ) {
                 Surface(
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background

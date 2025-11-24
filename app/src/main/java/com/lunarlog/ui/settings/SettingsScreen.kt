@@ -10,14 +10,26 @@ import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.toArgb
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Lock
@@ -57,6 +69,7 @@ fun SettingsScreen(
     viewModel: SettingsViewModel = hiltViewModel()
 ) {
     val isAppLockEnabled by viewModel.isAppLockEnabled.collectAsState()
+    val themeSeedColor by viewModel.themeSeedColor.collectAsState()
     val message by viewModel.message.collectAsState()
     val context = LocalContext.current
     var showNukeDialog by remember { mutableStateOf(false) }
@@ -141,7 +154,7 @@ fun SettingsScreen(
                 title = { Text("Settings") },
                 navigationIcon = {
                     IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
                     }
                 }
             )
@@ -151,6 +164,7 @@ fun SettingsScreen(
             modifier = Modifier
                 .fillMaxSize()
                 .padding(padding)
+                .verticalScroll(rememberScrollState())
                 .padding(16.dp)
         ) {
             // Security Section
@@ -165,7 +179,7 @@ fun SettingsScreen(
                     modifier = Modifier.padding(16.dp),
                     verticalAlignment = Alignment.CenterVertically
                 ) {
-                    Icon(Icons.Filled.Lock, contentDescription = null)
+                    Icon(Icons.Filled.Lock, contentDescription = "App Lock Icon")
                     Spacer(modifier = Modifier.padding(8.dp))
                     Column(modifier = Modifier.weight(1f)) {
                         Text("App Lock")
@@ -188,6 +202,54 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+            
+            // Appearance
+            Text(
+                "Appearance",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Filled.ColorLens, contentDescription = "Theme Color Icon")
+                        Spacer(modifier = Modifier.padding(8.dp))
+                        Text("Theme Color")
+                    }
+                    Spacer(modifier = Modifier.height(16.dp))
+                    
+                    val colors = listOf(
+                        0xFFFFB2DD, // Blossom (Default)
+                        0xFFE1BEE7, // Lavender
+                        0xFFFFCCBC, // Peach
+                        0xFFB2DFDB, // Teal
+                        0xFFBBDEFB, // Blue
+                        0xFFC5E1A5  // Green
+                    )
+                    
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        colors.forEach { colorLong ->
+                            val color = Color(colorLong)
+                            val isSelected = themeSeedColor == colorLong || (themeSeedColor == null && colorLong == 0xFFFFB2DD.toLong())
+                            
+                            Box(
+                                modifier = Modifier
+                                    .size(40.dp)
+                                    .clip(CircleShape)
+                                    .background(color)
+                                    .clickable { viewModel.setThemeSeedColor(colorLong) }
+                                    .then(if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
+                            )
+                        }
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
 
             // Data Management
             Text(
@@ -201,7 +263,7 @@ fun SettingsScreen(
                 onClick = { exportLauncher.launch("lunarlog_backup_${System.currentTimeMillis()}.json") },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Filled.Download, null)
+                Icon(Icons.Filled.Download, "Download Icon")
                 Spacer(modifier = Modifier.padding(4.dp))
                 Text("Backup Data")
             }
@@ -212,7 +274,7 @@ fun SettingsScreen(
                 onClick = { importLauncher.launch(arrayOf("application/json")) },
                 modifier = Modifier.fillMaxWidth()
             ) {
-                Icon(Icons.Filled.Upload, null)
+                Icon(Icons.Filled.Upload, "Upload Icon")
                 Spacer(modifier = Modifier.padding(4.dp))
                 Text("Restore Backup")
             }
@@ -224,7 +286,7 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth(),
                 colors = ButtonDefaults.buttonColors(containerColor = MaterialTheme.colorScheme.error)
             ) {
-                Icon(Icons.Filled.DeleteForever, null)
+                Icon(Icons.Filled.DeleteForever, "Delete Icon")
                 Spacer(modifier = Modifier.padding(4.dp))
                 Text("Nuke Data (Factory Reset)")
             }

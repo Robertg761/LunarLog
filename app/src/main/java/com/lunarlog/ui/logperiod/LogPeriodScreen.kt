@@ -6,8 +6,12 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.Box
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.getValue
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DateRangePicker
@@ -30,6 +34,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 
+import androidx.compose.foundation.layout.Box
+import com.lunarlog.ui.components.SuccessOverlay
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun LogPeriodScreen(
@@ -39,11 +46,12 @@ fun LogPeriodScreen(
     val datePickerState = rememberDateRangePickerState()
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
+    var showSuccess by remember { mutableStateOf(false) }
 
     LaunchedEffect(uiState.isSaved) {
         if (uiState.isSaved) {
-            viewModel.onNavigatedBack()
-            onBack()
+            showSuccess = true
+            // Navigation happens after animation in SuccessOverlay callback
         }
     }
 
@@ -54,58 +62,67 @@ fun LogPeriodScreen(
         }
     }
 
-    Scaffold(
-        snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
-        topBar = {
-            TopAppBar(
-                title = { Text("Log Period") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.Filled.ArrowBack, contentDescription = "Back")
+    Box(modifier = Modifier.fillMaxSize()) {
+        Scaffold(
+            snackbarHost = { SnackbarHost(hostState = snackbarHostState) },
+            topBar = {
+                TopAppBar(
+                    title = { Text("Log Period") },
+                    navigationIcon = {
+                        IconButton(onClick = onBack) {
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Back")
+                        }
                     }
-                }
-            )
-        }
-    ) { paddingValues ->
-        Column(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues)
-                .padding(16.dp)
-        ) {
-            DateRangePicker(
-                state = datePickerState,
-                modifier = Modifier.weight(1f),
-                title = { Text("Select dates") },
-                headline = { Text("Select period range") },
-                showModeToggle = false
-            )
-
-            Spacer(modifier = Modifier.height(16.dp))
-
-            Button(
-                onClick = {
-                    val startDate = datePickerState.selectedStartDateMillis
-                    val endDate = datePickerState.selectedEndDateMillis
-
-                    if (startDate != null) {
-                        // If end date is not selected, assume it's a one-day period (start = end)
-                        val finalEndDate = endDate ?: startDate
-                        viewModel.savePeriod(startDate, finalEndDate)
-                    }
-                },
-                enabled = datePickerState.selectedStartDateMillis != null && !uiState.isSaving,
-                modifier = Modifier.fillMaxWidth()
+                )
+            }
+        ) { paddingValues ->
+            Column(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(paddingValues)
+                    .padding(16.dp)
             ) {
-                if (uiState.isSaving) {
-                    CircularProgressIndicator(
-                        color = MaterialTheme.colorScheme.onPrimary,
-                        modifier = Modifier.height(24.dp)
-                    )
-                } else {
-                    Text("Save")
+                DateRangePicker(
+                    state = datePickerState,
+                    modifier = Modifier.weight(1f),
+                    title = { Text("Select dates") },
+                    headline = { Text("Select period range") },
+                    showModeToggle = false
+                )
+
+                Spacer(modifier = Modifier.height(16.dp))
+
+                Button(
+                    onClick = {
+                        val startDate = datePickerState.selectedStartDateMillis
+                        val endDate = datePickerState.selectedEndDateMillis
+
+                        if (startDate != null) {
+                            // If end date is not selected, assume it's a one-day period (start = end)
+                            val finalEndDate = endDate ?: startDate
+                            viewModel.savePeriod(startDate, finalEndDate)
+                        }
+                    },
+                    enabled = datePickerState.selectedStartDateMillis != null && !uiState.isSaving,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    if (uiState.isSaving) {
+                        CircularProgressIndicator(
+                            color = MaterialTheme.colorScheme.onPrimary,
+                            modifier = Modifier.height(24.dp)
+                        )
+                    } else {
+                        Text("Save")
+                    }
                 }
             }
+        }
+
+        if (showSuccess) {
+            SuccessOverlay(onAnimationFinished = {
+                viewModel.onNavigatedBack()
+                onBack()
+            })
         }
     }
 }

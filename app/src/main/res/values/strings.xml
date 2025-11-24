@@ -1,3 +1,12 @@
 <resources>
     <string name="app_name">LunarLog</string>
+    <string name="widget_description">Quick view of your cycle day and period logging.</string>
+
+    <!-- Shortcuts -->
+    <string name="shortcut_log_short">Log Period</string>
+    <string name="shortcut_log_long">Log your period or symptoms</string>
+    <string name="shortcut_calendar_short">Calendar</string>
+    <string name="shortcut_calendar_long">View your cycle calendar</string>
+    <string name="shortcut_analysis_short">Insights</string>
+    <string name="shortcut_analysis_long">View cycle trends and reports</string>
 </resources>

@@ -1,5 +1,8 @@
 package com.lunarlog.ui.calendar
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -21,7 +24,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ChevronLeft
 import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -35,19 +37,34 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.lunarlog.ui.theme.FertileGreen
+import com.lunarlog.ui.theme.OvulationBlue
+import com.lunarlog.ui.theme.PeriodRed
 import java.time.format.TextStyle
 import java.util.Locale
+import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.combinedClickable
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.PlainTooltip
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
+import androidx.compose.ui.platform.LocalView
+import android.view.HapticFeedbackConstants
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CalendarScreen(
     onDayClicked: (Long) -> Unit,
-    viewModel: CalendarViewModel = hiltViewModel()
+    viewModel: CalendarViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
 
@@ -71,7 +88,9 @@ fun CalendarScreen(
                 is CalendarUiState.Success -> {
                     CalendarContent(
                         days = state.days,
-                        onDayClicked = onDayClicked
+                        onDayClicked = onDayClicked,
+                        sharedTransitionScope = sharedTransitionScope,
+                        animatedVisibilityScope = animatedVisibilityScope
                     )
                 }
             }
@@ -108,10 +127,13 @@ fun CalendarHeader(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun CalendarContent(
     days: List<CalendarDayState>,
-    onDayClicked: (Long) -> Unit
+    onDayClicked: (Long) -> Unit,
+    sharedTransitionScope: SharedTransitionScope?,
+    animatedVisibilityScope: AnimatedVisibilityScope?
 ) {
     Column {
         // Weekday Headers
@@ -137,71 +159,123 @@ fun CalendarContent(
             items(days) { dayState ->
                 CalendarDay(
                     dayState = dayState,
-                    onClick = { onDayClicked(dayState.date.toEpochDay()) }
+                    onClick = { onDayClicked(dayState.date.toEpochDay()) },
+                    sharedTransitionScope = sharedTransitionScope,
+                    animatedVisibilityScope = animatedVisibilityScope
                 )
             }
         }
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
 fun CalendarDay(
     dayState: CalendarDayState,
-    onClick: () -> Unit
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope?,
+    animatedVisibilityScope: AnimatedVisibilityScope?
 ) {
-    Box(
-        modifier = Modifier
-            .aspectRatio(1f) // Square cells
-            .padding(2.dp)
-            .clip(CircleShape)
-            .clickable { onClick() }
-            .then(
-                if (dayState.isPeriod) {
-                    Modifier.background(Color.Red.copy(alpha = 0.8f))
-                } else if (dayState.isPredictedPeriod) {
-                    Modifier.border(2.dp, Color.Red.copy(alpha = 0.6f), CircleShape)
-                } else {
-                    Modifier
-                }
-            ),
-        contentAlignment = Alignment.Center
+    val tooltipState = rememberTooltipState()
+    val scope = rememberCoroutineScope()
+    val view = LocalView.current
+
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
+        tooltip = {
+            val summary = buildString {
+                if (dayState.isPeriod) append("Period")
+                if (dayState.isOvulation) { if (isNotEmpty()) append(", "); append("Ovulation") }
+                if (dayState.isFertile && !dayState.isOvulation) { if (isNotEmpty()) append(", "); append("Fertile") }
+                if (dayState.isPredictedPeriod) { if (isNotEmpty()) append(", "); append("Predicted") }
+                if (isEmpty()) append("Day ${dayState.date.dayOfMonth}")
+            }
+            PlainTooltip {
+                Text(summary)
+            }
+        },
+        state = tooltipState
     ) {
-        // Background indicators for fertility/ovulation
-        if (!dayState.isPeriod) { // Don't overlay fertility on period
-            if (dayState.isOvulation) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .border(2.dp, Color.Blue, CircleShape)
+        Box(
+            modifier = Modifier
+                .aspectRatio(1f) // Square cells
+                .padding(2.dp)
+                .clip(CircleShape)
+                .then(
+                    if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                        with(sharedTransitionScope) {
+                            Modifier.sharedElement(
+                                state = rememberSharedContentState(key = "day_${dayState.date.toEpochDay()}"),
+                                animatedVisibilityScope = animatedVisibilityScope
+                            )
+                        }
+                    } else Modifier
                 )
-            } else if (dayState.isFertile) {
+                .combinedClickable(
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        onClick()
+                    },
+                    onLongClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        scope.launch { tooltipState.show() }
+                    }
+                )
+                .then(
+                    if (dayState.isPeriod || dayState.flowIntensity > 0) {
+                        val alpha = when (dayState.flowIntensity) {
+                            1 -> 0.4f
+                            2 -> 0.6f
+                            3 -> 0.8f
+                            4 -> 1.0f
+                            else -> 0.6f // Default for "isPeriod" without specific flow log
+                        }
+                        Modifier.background(PeriodRed.copy(alpha = alpha))
+                    } else if (dayState.isPredictedPeriod) {
+                        Modifier.border(2.dp, PeriodRed.copy(alpha = 0.6f), CircleShape)
+                    } else {
+                        Modifier
+                    }
+                ),
+            contentAlignment = Alignment.Center
+        ) {
+            // Background indicators for fertility/ovulation
+            if (!dayState.isPeriod && dayState.flowIntensity == 0) { // Don't overlay fertility on period
+                if (dayState.isOvulation) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxSize()
+                            .border(2.dp, OvulationBlue, CircleShape)
+                    )
+                } else if (dayState.isFertile) {
+                    Box(
+                        modifier = Modifier
+                            .size(8.dp)
+                            .background(FertileGreen, CircleShape)
+                            .align(Alignment.TopCenter)
+                            .padding(top = 4.dp)
+                    )
+                }
+            }
+
+            // Log indicator
+            if (dayState.hasLog) {
                 Box(
                     modifier = Modifier
-                        .size(8.dp)
-                        .background(Color.Green, CircleShape)
-                        .align(Alignment.TopCenter)
-                        .padding(top = 4.dp)
+                        .size(4.dp)
+                        .background(MaterialTheme.colorScheme.onSurface, CircleShape)
+                        .align(Alignment.BottomCenter)
+                        .padding(bottom = 4.dp)
                 )
             }
-        }
 
-        // Log indicator
-        if (dayState.hasLog) {
-            Box(
-                modifier = Modifier
-                    .size(4.dp)
-                    .background(MaterialTheme.colorScheme.onSurface, CircleShape)
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 4.dp)
+            Text(
+                text = dayState.date.dayOfMonth.toString(),
+                color = if (dayState.isPeriod) Color.White 
+                       else if (!dayState.isCurrentMonth) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) 
+                       else MaterialTheme.colorScheme.onSurface,
+                style = MaterialTheme.typography.bodyMedium
             )
         }
-
-        Text(
-            text = dayState.date.dayOfMonth.toString(),
-            color = if (dayState.isPeriod) Color.White 
-                   else if (!dayState.isCurrentMonth) Color.Gray 
-                   else MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyMedium
-        )
     }
 }
