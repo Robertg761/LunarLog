@@ -1,5 +1,8 @@
 package com.lunarlog.ui.home
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -41,13 +44,17 @@ import android.content.Intent
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalContext
 
-@OptIn(ExperimentalMaterial3Api::class)
+import java.time.LocalDate
+
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeScreen(
     onLogPeriodClicked: () -> Unit,
     onLogDetailsClicked: () -> Unit,
     onSettingsClicked: () -> Unit,
-    viewModel: HomeViewModel = hiltViewModel()
+    viewModel: HomeViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
@@ -143,7 +150,15 @@ fun HomeScreen(
 
                     // Daily Summary Card
                     DailySummaryCard(
-                        onLogDetailsClicked = onLogDetailsClicked
+                        onLogDetailsClicked = onLogDetailsClicked,
+                        modifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                            with(sharedTransitionScope) {
+                                Modifier.sharedElement(
+                                    state = rememberSharedContentState(key = "day_${LocalDate.now().toEpochDay()}"),
+                                    animatedVisibilityScope = animatedVisibilityScope
+                                )
+                            }
+                        } else Modifier
                     )
 
                     Spacer(modifier = Modifier.height(24.dp))
@@ -284,10 +299,13 @@ fun CycleStatusCircle(day: Int, daysUntil: Int, scrollState: ScrollState? = null
 }
 
 @Composable
-fun DailySummaryCard(onLogDetailsClicked: () -> Unit) {
+fun DailySummaryCard(
+    onLogDetailsClicked: () -> Unit,
+    modifier: Modifier = Modifier
+) {
     ElevatedCard(
         onClick = onLogDetailsClicked,
-        modifier = Modifier.fillMaxWidth(),
+        modifier = modifier.fillMaxWidth(),
         shape = MaterialTheme.shapes.large,
  // More rounded
         colors = CardDefaults.elevatedCardColors(

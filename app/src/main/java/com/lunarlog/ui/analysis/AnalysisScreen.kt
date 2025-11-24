@@ -182,14 +182,19 @@ fun TrendsTab(uiState: AnalysisUiState) {
 
         if (uiState.cycleHistory.isNotEmpty()) {
             Text("Cycle Length History", style = MaterialTheme.typography.titleMedium)
-            val entries = uiState.cycleHistory.map { it.second.toFloat() }.toTypedArray()
-            val model = entryModelOf(*entries)
             
-            val cycleDates = uiState.cycleHistory.map { 
-                it.first.month.name.take(3) 
+            val model = remember(uiState.cycleHistory) {
+                entryModelOf(*uiState.cycleHistory.map { it.second.toFloat() }.toTypedArray())
             }
-            val cycleAxisFormatter = AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
-                cycleDates.getOrElse(value.toInt()) { "" }
+            
+            val cycleDates = remember(uiState.cycleHistory) {
+                 uiState.cycleHistory.map { it.first.month.name.take(3) }
+            }
+            
+            val cycleAxisFormatter = remember(cycleDates) {
+                AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
+                    cycleDates.getOrElse(value.toInt()) { "" }
+                }
             }
 
             Chart(
@@ -211,14 +216,21 @@ fun TrendsTab(uiState: AnalysisUiState) {
 
         if (uiState.symptomCounts.isNotEmpty()) {
             Text("Top Symptoms", style = MaterialTheme.typography.titleMedium)
-             val counts = uiState.symptomCounts.values.map { it.toFloat() }.toTypedArray()
-             val symptomNames = uiState.symptomCounts.keys.toList()
+             
+             val counts = remember(uiState.symptomCounts) {
+                 uiState.symptomCounts.values.map { it.toFloat() }.toTypedArray()
+             }
+             val symptomNames = remember(uiState.symptomCounts) {
+                 uiState.symptomCounts.keys.toList()
+             }
 
              if (counts.isNotEmpty()) {
-                 val model = entryModelOf(*counts)
+                 val model = remember(counts) { entryModelOf(*counts) }
                  
-                 val symptomAxisFormatter = AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
-                    symptomNames.getOrElse(value.toInt()) { "" }
+                 val symptomAxisFormatter = remember(symptomNames) {
+                     AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
+                        symptomNames.getOrElse(value.toInt()) { "" }
+                     }
                  }
 
                  Chart(

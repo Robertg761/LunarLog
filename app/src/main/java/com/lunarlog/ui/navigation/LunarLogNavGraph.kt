@@ -138,7 +138,9 @@ fun LunarLogNavGraph(
                             val today = LocalDate.now().toEpochDay()
                             navController.navigate(Screen.Details.createRoute(today))
                         },
-                        onSettingsClicked = { navController.navigate(Screen.Settings.route) }
+                        onSettingsClicked = { navController.navigate(Screen.Settings.route) },
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this
                     )
                 }
                 composable(
@@ -204,7 +206,9 @@ fun LunarLogNavGraph(
                         onBackClick = { navController.popBackStack() },
                         onLogClick = { date ->
                             navController.navigate(Screen.Details.createRoute(date))
-                        }
+                        },
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this
                     )
                 }
                 composable(Screen.Onboarding.route) {

@@ -55,8 +55,8 @@ import androidx.compose.material3.TooltipDefaults
 import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
-import androidx.compose.ui.platform.LocalView
-import android.view.HapticFeedbackConstants
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -156,7 +156,10 @@ fun CalendarContent(
             columns = GridCells.Fixed(7),
             modifier = Modifier.fillMaxSize()
         ) {
-            items(days) { dayState ->
+            items(
+                items = days,
+                key = { it.date.toEpochDay() }
+            ) { dayState ->
                 CalendarDay(
                     dayState = dayState,
                     onClick = { onDayClicked(dayState.date.toEpochDay()) },
@@ -178,7 +181,7 @@ fun CalendarDay(
 ) {
     val tooltipState = rememberTooltipState()
     val scope = rememberCoroutineScope()
-    val view = LocalView.current
+    val haptic = LocalHapticFeedback.current
 
     TooltipBox(
         positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
@@ -213,11 +216,11 @@ fun CalendarDay(
                 )
                 .combinedClickable(
                     onClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                         onClick()
                     },
                     onLongClick = {
-                        view.performHapticFeedback(HapticFeedbackConstants.LONG_PRESS)
+                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
                         scope.launch { tooltipState.show() }
                     }
                 )

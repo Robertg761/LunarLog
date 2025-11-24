@@ -1,5 +1,8 @@
 package com.lunarlog.ui.loghistory
 
+import androidx.compose.animation.AnimatedVisibilityScope
+import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
@@ -23,12 +26,14 @@ import java.time.format.DateTimeFormatter
 import java.time.format.FormatStyle
 import com.lunarlog.R
 
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun LogHistoryScreen(
     onBackClick: () -> Unit,
     onLogClick: (Long) -> Unit, // Navigate to details
-    viewModel: LogHistoryViewModel = hiltViewModel()
+    viewModel: LogHistoryViewModel = hiltViewModel(),
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
     val logs by viewModel.logs.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
@@ -102,7 +107,12 @@ fun LogHistoryScreen(
                     }
                 } else {
                     items(logs, key = { it.date }) { log ->
-                        LogHistoryItem(log = log, onClick = { onLogClick(log.date) })
+                        LogHistoryItem(
+                            log = log,
+                            onClick = { onLogClick(log.date) },
+                            sharedTransitionScope = sharedTransitionScope,
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
                         HorizontalDivider()
                     }
                 }
@@ -142,13 +152,30 @@ fun LogHistoryScreen(
     }
 }
 
+@OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
-fun LogHistoryItem(log: DailyLog, onClick: () -> Unit) {
+fun LogHistoryItem(
+    log: DailyLog, 
+    onClick: () -> Unit,
+    sharedTransitionScope: SharedTransitionScope? = null,
+    animatedVisibilityScope: AnimatedVisibilityScope? = null
+) {
     val date = LocalDate.ofEpochDay(log.date)
     val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
 
     ListItem(
-        modifier = Modifier.clickable(onClick = onClick),
+        modifier = Modifier
+            .then(
+                if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+                    with(sharedTransitionScope) {
+                        Modifier.sharedElement(
+                            state = rememberSharedContentState(key = "day_${log.date}"),
+                            animatedVisibilityScope = animatedVisibilityScope
+                        )
+                    }
+                } else Modifier
+            )
+            .clickable(onClick = onClick),
         headlineContent = { Text(date.format(formatter)) },
         supportingContent = {
             Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
