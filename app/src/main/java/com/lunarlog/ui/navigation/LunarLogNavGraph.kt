@@ -133,7 +133,6 @@ fun LunarLogNavGraph(
                     }
                 ) {
                     HomeScreen(
-                        onLogPeriodClicked = { navController.navigate(Screen.Logging.route) },
                         onLogDetailsClicked = {
                             val today = LocalDate.now().toEpochDay()
                             navController.navigate(Screen.Details.createRoute(today))

@@ -49,7 +49,6 @@ import java.time.LocalDate
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
 @Composable
 fun HomeScreen(
-    onLogPeriodClicked: () -> Unit,
     onLogDetailsClicked: () -> Unit,
     onSettingsClicked: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
