@@ -207,8 +207,8 @@
 - [x] **Weekly Digest**: View for the past week's trends.
 
 #### 6. Technical Polish
-- [ ] **Container Transforms**: Implement Material 3 Motion `ContainerTransform` for smooth Circle-to-Rect transitions (List to Detail).
-- [ ] **Performance**: Optimize haptic feedback calls and reduce composition overhead in grids.
+- [x] **Container Transforms**: Implement Material 3 Motion `ContainerTransform` for smooth Circle-to-Rect transitions (List to Detail).
+- [x] **Performance**: Optimize haptic feedback calls and reduce composition overhead in grids.
 
 ---
 

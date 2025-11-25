@@ -11,6 +11,9 @@ interface DailyLogDao {
     @Query("SELECT * FROM daily_logs WHERE date = :date")
     fun getLogForDate(date: Long): Flow<DailyLog?>
 
+    @Query("SELECT * FROM daily_logs WHERE date = :date")
+    suspend fun getLogForDateSync(date: Long): DailyLog?
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLog(dailyLog: DailyLog)
     

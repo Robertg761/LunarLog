@@ -71,6 +71,16 @@ class CycleNotificationWorker @AssistedInject constructor(
             .setAutoCancel(true)
             .build()
 
-        notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+             if (androidx.core.content.ContextCompat.checkSelfPermission(
+                     applicationContext,
+                     android.Manifest.permission.POST_NOTIFICATIONS
+                 ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+             ) {
+                 notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+             }
+        } else {
+            notificationManager.notify(System.currentTimeMillis().toInt(), notification)
+        }
     }
 }

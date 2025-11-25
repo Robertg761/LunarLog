@@ -62,4 +62,49 @@ class HomeViewModelTest {
         assertEquals(expectedDaysUntil, state.daysUntilPeriod)
         assertEquals(11, state.currentCycleDay)
     }
+
+    @Test
+    fun `uiState should calculate daysRemainingInPeriod for active period`() = runTest {
+        val today = LocalDate.now()
+        // Cycle started 2 days ago (Day 3 of cycle)
+        val lastCycleStart = today.minusDays(2)
+        val cycle = Cycle(id = 1, startDate = lastCycleStart.toEpochDay(), endDate = null)
+
+        every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
+        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+
+        viewModel = HomeViewModel(cycleRepository, dailyLogRepository)
+
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+
+        val state = viewModel.uiState.value
+        
+        // Default period length is 5. Current day is 3. Remaining: 5 - 3 = 2
+        assertEquals(true, state.isPeriodActive)
+        assertEquals(2, state.daysRemainingInPeriod)
+    }
+
+    @Test
+    fun `uiState should have null daysRemainingInPeriod for inactive period`() = runTest {
+        val today = LocalDate.now()
+        // Cycle started 20 days ago (Day 21 of cycle)
+        val lastCycleStart = today.minusDays(20)
+        val cycle = Cycle(id = 1, startDate = lastCycleStart.toEpochDay(), endDate = null)
+
+        every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
+        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+
+        viewModel = HomeViewModel(cycleRepository, dailyLogRepository)
+
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
+            viewModel.uiState.collect()
+        }
+
+        val state = viewModel.uiState.value
+
+        assertEquals(false, state.isPeriodActive)
+        assertEquals(null, state.daysRemainingInPeriod)
+    }
 }

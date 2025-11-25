@@ -34,6 +34,7 @@ import com.lunarlog.ui.analysis.AnalysisScreen
 import com.lunarlog.ui.calendar.CalendarScreen
 import com.lunarlog.ui.home.HomeScreen
 import com.lunarlog.ui.logdetails.LogDetailsScreen
+import com.lunarlog.ui.loglist.LogListScreen
 import com.lunarlog.ui.logperiod.LogPeriodScreen
 import com.lunarlog.ui.onboarding.OnboardingScreen
 import com.lunarlog.ui.settings.SettingsScreen
@@ -230,11 +231,11 @@ fun LunarLogNavGraph(
                 composable(
                     route = Screen.Details.route,
                     arguments = listOf(navArgument("date") { type = NavType.LongType })
-                ) {
-                    LogDetailsScreen(
-                        onBack = { navController.popBackStack() },
-                        sharedTransitionScope = this@SharedTransitionLayout,
-                        animatedVisibilityScope = this
+                ) { backStackEntry ->
+                    val date = backStackEntry.arguments?.getLong("date") ?: LocalDate.now().toEpochDay()
+                    LogListScreen(
+                        date = date,
+                        onBack = { navController.popBackStack() }
                     )
                 }
             }

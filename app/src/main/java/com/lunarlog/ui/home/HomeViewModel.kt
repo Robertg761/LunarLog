@@ -6,6 +6,8 @@ import com.lunarlog.data.Cycle
 import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLog
 import com.lunarlog.data.DailyLogRepository
+import com.lunarlog.data.LogEntry
+import com.lunarlog.data.LogEntryType
 import com.lunarlog.logic.CyclePredictionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
@@ -20,6 +22,7 @@ import javax.inject.Inject
 
 data class HomeUiState(
     val daysUntilPeriod: Int = 0,
+    val daysRemainingInPeriod: Int? = null,
     val currentCycleDay: Int = 0,
     val isFertile: Boolean = false,
     val isLoading: Boolean = true,
@@ -43,6 +46,7 @@ class HomeViewModel @Inject constructor(
             val sortedCycles = cycles.sortedByDescending { it.startDate }
             val lastCycle = sortedCycles.first()
             val averageLength = CyclePredictionUtils.calculateAverageCycleLength(cycles)
+            val averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
             val nextPeriodStart = CyclePredictionUtils.predictNextPeriod(lastCycle, averageLength)
             val today = LocalDate.now()
 
@@ -53,17 +57,28 @@ class HomeViewModel @Inject constructor(
             val (fertileStart, fertileEnd) = CyclePredictionUtils.predictFertileWindow(nextPeriodStart)
             val isFertile = today >= fertileStart && today <= fertileEnd
 
-            // Simple check if period is active (assuming 5 days default or checking endDate if exists)
+            // Check if period is active
             val isPeriodActive = if (lastCycle.endDate != null) {
                 !today.isAfter(LocalDate.ofEpochDay(lastCycle.endDate))
             } else {
-                currentCycleDay <= 5
+                currentCycleDay <= averagePeriodLength
+            }
+
+            val daysRemainingInPeriod = if (isPeriodActive) {
+                if (lastCycle.endDate != null) {
+                    ChronoUnit.DAYS.between(today, LocalDate.ofEpochDay(lastCycle.endDate)).toInt()
+                } else {
+                     averagePeriodLength - currentCycleDay
+                }
+            } else {
+                null
             }
 
             val quickLogSymptoms = getTopSymptomsForPhase(currentCycleDay, cycles, logs)
 
             HomeUiState(
                 daysUntilPeriod = daysUntil,
+                daysRemainingInPeriod = daysRemainingInPeriod,
                 currentCycleDay = currentCycleDay,
                 isFertile = isFertile,
                 isPeriodActive = isPeriodActive,
@@ -137,17 +152,17 @@ class HomeViewModel @Inject constructor(
     fun logQuickSymptom(symptom: String) {
         viewModelScope.launch {
             val today = LocalDate.now().toEpochDay()
-            // We need to collect the first value from the flow
-            val existingLog = dailyLogRepository.getLogForDate(today).first()
+            val time = System.currentTimeMillis()
             
-            val newLog = if (existingLog != null) {
-                if (existingLog.symptoms.contains(symptom)) return@launch
-                existingLog.copy(symptoms = existingLog.symptoms + symptom)
-            } else {
-                DailyLog(date = today, symptoms = listOf(symptom))
-            }
+            // Create a granular entry
+            val entry = LogEntry(
+                date = today,
+                time = time,
+                type = LogEntryType.SYMPTOM,
+                value = symptom
+            )
             
-            dailyLogRepository.saveLog(newLog)
+            dailyLogRepository.addEntry(entry)
         }
     }
 

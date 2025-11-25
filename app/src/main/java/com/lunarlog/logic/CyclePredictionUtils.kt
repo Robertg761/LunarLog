@@ -35,6 +35,22 @@ object CyclePredictionUtils {
         }
     }
 
+    fun calculateAveragePeriodLength(cycles: List<Cycle>): Int {
+        val lengths = cycles.mapNotNull { cycle ->
+            cycle.endDate?.let { endDate ->
+                val start = LocalDate.ofEpochDay(cycle.startDate)
+                val end = LocalDate.ofEpochDay(endDate)
+                ChronoUnit.DAYS.between(start, end).toInt() + 1
+            }
+        }.filter { it in 2..10 } // Basic sanity check for valid period lengths
+
+        return if (lengths.isEmpty()) {
+            5
+        } else {
+            lengths.average().toInt()
+        }
+    }
+
     fun calculateStandardDeviation(cycles: List<Cycle>): Double {
         val lengths = getValidCycleLengths(cycles)
         if (lengths.size < 2) return 0.0

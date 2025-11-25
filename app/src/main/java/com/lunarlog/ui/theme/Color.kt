@@ -29,10 +29,28 @@ val BackgroundDark = Color(0xFF1A1115)
 val OutlineLight = Color(0xFF857379)
 val OutlineDark = Color(0xFF9F8C93)
 
-// Semantic Colors
-val PeriodRed = Color(0xFFE91E63)
-val FertileGreen = Color(0xFF66BB6A)
-val OvulationBlue = Color(0xFF42A5F5)
+// Semantic Colors - Refined for "Beautiful" UI
+val PeriodRed = Color(0xFFFF5983) // Softer, more vibrant red-pink
+
+val PeriodSurface = Color(0xFFFFD9E2) // Light pink background for period days
+val OnPeriodSurface = Color(0xFF8C0032) // Dark text for period days
+
+val PeriodSurfaceDark = Color(0xFF5D001E) // Dark Red/Pink for Dark Mode
+val OnPeriodSurfaceDark = Color(0xFFFFD9E2) // Light Pink text for Dark Mode
+
+val FertileGreen = Color(0xFF81C784) // Soft Green
+val FertileSurface = Color(0xFFE8F5E9)
+val OnFertileSurface = Color(0xFF1B5E20)
+val FertileSurfaceDark = Color(0xFF003300) // Dark Green
+val OnFertileSurfaceDark = Color(0xFFC8E6C9)
+
+val OvulationBlue = Color(0xFF64B5F6) // Soft Blue
+val OvulationSurface = Color(0xFFE3F2FD)
+val OnOvulationSurface = Color(0xFF0D47A1)
+val OvulationSurfaceDark = Color(0xFF001F3F) // Dark Blue
+val OnOvulationSurfaceDark = Color(0xFFBBDEFB)
+
+val TodayRing = Color(0xFFFFB74D) // Warm orange/gold for "Today"
 
 // Gradients
 val GradientPinkStart = Color(0xFFFF80AB)

@@ -41,4 +41,19 @@ class Converters {
             com.lunarlog.data.SymptomCategory.OTHER
         }
     }
+
+    @TypeConverter
+    fun fromLogEntryType(value: com.lunarlog.data.LogEntryType): String {
+        return value.name
+    }
+
+    @TypeConverter
+    fun toLogEntryType(value: String): com.lunarlog.data.LogEntryType {
+        return try {
+            com.lunarlog.data.LogEntryType.valueOf(value)
+        } catch (e: IllegalArgumentException) {
+            // Default or fallback? Maybe NOTE is safest fallback?
+            com.lunarlog.data.LogEntryType.NOTE
+        }
+    }
 }

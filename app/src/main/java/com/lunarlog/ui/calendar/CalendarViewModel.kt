@@ -8,185 +8,187 @@ import com.lunarlog.data.DailyLog
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.logic.CyclePredictionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.flowOn
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
-import kotlinx.coroutines.flow.update
 import java.time.LocalDate
 import java.time.YearMonth
 import javax.inject.Inject
 
 @HiltViewModel
 class CalendarViewModel @Inject constructor(
-    private val cycleRepository: CycleRepository,
-    private val dailyLogRepository: DailyLogRepository
+    cycleRepository: CycleRepository,
+    dailyLogRepository: DailyLogRepository
 ) : ViewModel() {
 
-    private val _currentMonth = MutableStateFlow(YearMonth.now())
-    val currentMonth: StateFlow<YearMonth> = _currentMonth
-
-    val uiState: StateFlow<CalendarUiState> = combine(
-        _currentMonth,
+    // Global Source of Truth for the Calendar
+    val calendarState: StateFlow<CalendarDataState> = combine(
         cycleRepository.getAllCycles(),
-        dailyLogRepository.getLogsForRange(0, Long.MAX_VALUE)
-    ) { month, cycles, logs ->
-        generateCalendarUiState(month, cycles, logs)
-    }.stateIn(
+        dailyLogRepository.getAllLogs()
+    ) { cycles, logs ->
+        // Heavy computation on Default dispatcher
+        computeCalendarData(cycles, logs)
+    }
+    .flowOn(Dispatchers.Default)
+    .stateIn(
         viewModelScope,
         SharingStarted.WhileSubscribed(5000),
-        CalendarUiState.Loading
+        CalendarDataState.Loading
     )
 
-    fun onPreviousMonth() {
-        _currentMonth.update { it.minusMonths(1) }
-    }
+    private fun computeCalendarData(cycles: List<Cycle>, logs: List<DailyLog>): CalendarDataState {
+        val dayMap = HashMap<Long, DayData>()
 
-    fun onNextMonth() {
-        _currentMonth.update { it.plusMonths(1) }
-    }
-
-    private fun generateCalendarUiState(
-        month: YearMonth,
-        cycles: List<Cycle>,
-        logs: List<DailyLog>
-    ): CalendarUiState {
-        val days = mutableListOf<CalendarDayState>()
-        
-        val firstDayOfMonth = month.atDay(1)
-        val daysInMonth = month.lengthOfMonth()
-        
-        // Adjust for start of week (Sunday = 0)
-        // java.time DayOfWeek: Mon=1 ... Sun=7
-        // We want Sun=0, Mon=1 ... Sat=6
-        // So: (dayOfWeek.value % 7) gives Sun=0, Mon=1...
-        val startOffset = firstDayOfMonth.dayOfWeek.value % 7
-        
-        // Previous month padding
-        val prevMonth = month.minusMonths(1)
-        val daysInPrevMonth = prevMonth.lengthOfMonth()
-        for (i in 0 until startOffset) {
-            val date = prevMonth.atDay(daysInPrevMonth - startOffset + 1 + i)
-            days.add(createDayState(date, cycles, logs, false))
+        // 1. Map Logs (Fast lookup)
+        logs.forEach { log ->
+            dayMap[log.date] = DayData(
+                hasLog = true,
+                flowIntensity = log.flowLevel
+            )
         }
 
-        // Current month
-        for (i in 1..daysInMonth) {
-            val date = month.atDay(i)
-            days.add(createDayState(date, cycles, logs, true))
-        }
-
-        // Next month padding
-        // Ensure 6 rows (42 cells) to keep layout stable
-        val remaining = 42 - days.size
-        val nextMonth = month.plusMonths(1)
-        for (i in 1..remaining) {
-            val date = nextMonth.atDay(i)
-            days.add(createDayState(date, cycles, logs, false))
-        }
-
-        return CalendarUiState.Success(
-            currentMonth = month,
-            days = days
-        )
-    }
-
-    private fun createDayState(
-        date: LocalDate, 
-        cycles: List<Cycle>, 
-        logs: List<DailyLog>, 
-        isCurrentMonth: Boolean
-    ): CalendarDayState {
-        val epochDay = date.toEpochDay()
-        
-        // Confirmed Period
-        val isPeriod = cycles.any { cycle ->
+        // 2. Map Cycles (Actual)
+        val sortedCycles = cycles.sortedBy { it.startDate }
+        sortedCycles.forEach { cycle ->
             val start = cycle.startDate
-            val end = cycle.endDate
-            if (end != null) {
-                epochDay in start..end
+            val end = cycle.endDate ?: start // Default to start if null (in progress)
+            
+            // If in progress, assume active for today (or handled by logic), 
+            // but for historical view, we just render what's there.
+            // For the "Current" cycle that has no end, let's assume it goes until Today if Today > Start
+            val effectiveEnd = if (cycle.endDate == null) {
+                maxOf(LocalDate.now().toEpochDay(), start)
             } else {
-                epochDay == start
+                end
+            }
+
+            for (day in start..effectiveEnd) {
+                val current = dayMap[day] ?: DayData()
+                dayMap[day] = current.copy(isPeriod = true)
             }
         }
-        
-        // Predictions
-        var isPredictedPeriod = false
-        var isFertile = false
-        var isOvulation = false
 
-        if (cycles.isNotEmpty()) {
-             // For simplicity, we just look ahead from the VERY LAST cycle.
-             // A more robust implementation would project multiple future cycles.
-             val sortedCycles = cycles.sortedBy { it.startDate }
-             val latestCycle = sortedCycles.last()
-             val avgLength = CyclePredictionUtils.calculateAverageCycleLength(cycles)
-             
-             // Project up to 3 cycles ahead to cover the displayed month
-             var predictedStart = CyclePredictionUtils.predictNextPeriod(latestCycle, avgLength)
-             
-             // Loop a few times to find if this date matches a future cycle
-             for (k in 0..2) {
-                 val predictedEnd = predictedStart.plusDays(4) // Assume 5 days
-                 
-                 if (epochDay in predictedStart.toEpochDay()..predictedEnd.toEpochDay()) {
-                     isPredictedPeriod = true
-                 }
-                 
-                 val (fertileStart, fertileEnd) = CyclePredictionUtils.predictFertileWindow(predictedStart)
-                 if (date >= fertileStart && date <= fertileEnd) {
-                     isFertile = true
-                 }
-                 
-                 // Ovulation is roughly 14 days before period start
-                 val ovulationDate = predictedStart.minusDays(14)
-                 if (date == ovulationDate) {
-                     isOvulation = true
-                 }
-                 
-                 // Move to next cycle for next iteration
-                 predictedStart = predictedStart.plusDays(avgLength.toLong())
-             }
-        }
-        
-        // Don't predict if it's already a confirmed period
-        if (isPeriod) {
-            isPredictedPeriod = false
-            // Fertility/Ovulation logic usually stops during period, but let's keep it simple
+        // 3. Predictions (Future)
+        if (sortedCycles.isNotEmpty()) {
+            val lastCycle = sortedCycles.last()
+            val avgLength = CyclePredictionUtils.calculateAverageCycleLength(cycles)
+            
+            // Predict for next 12 months
+            val predictionLimit = LocalDate.now().plusMonths(12).toEpochDay()
+            
+            var currentStart = CyclePredictionUtils.predictNextPeriod(lastCycle, avgLength)
+            
+            while (currentStart.toEpochDay() < predictionLimit) {
+                // Period Prediction (Assuming 5 days for prediction visualization)
+                val pStart = currentStart.toEpochDay()
+                val pEnd = currentStart.plusDays(4).toEpochDay()
+                
+                for (day in pStart..pEnd) {
+                    val current = dayMap[day] ?: DayData()
+                    // Don't overwrite actual period data
+                    if (!current.isPeriod) {
+                        dayMap[day] = current.copy(isPredictedPeriod = true)
+                    }
+                }
+
+                // Fertile Window Prediction
+                val (fStart, fEnd) = CyclePredictionUtils.predictFertileWindow(currentStart)
+                val ovDate = currentStart.minusDays(14).toEpochDay()
+                
+                for (day in fStart.toEpochDay()..fEnd.toEpochDay()) {
+                    val current = dayMap[day] ?: DayData()
+                    if (!current.isPeriod) { // Don't show fertility on period days
+                        dayMap[day] = current.copy(
+                            isFertile = true,
+                            isOvulation = (day == ovDate)
+                        )
+                    }
+                }
+
+                currentStart = currentStart.plusDays(avgLength.toLong())
+            }
         }
 
-        val hasLog = logs.any { it.date == epochDay }
-        val flowIntensity = logs.find { it.date == epochDay }?.flowLevel ?: 0
+        // 4. Calculate PeriodType (Connectivity)
+        // We iterate through the map's keys that have isPeriod = true
+        // Optimally: Just iterate the cycles again? No, we need the map for random access
+        // actually, we can do this lazily or in a second pass over the known period days.
+        // For simplicity and speed in this cache building:
+        // We will just let the UI determine connectivity based on neighbors in the map.
+        // It's fast enough to look up (day-1) and (day+1) in the map.
 
-        return CalendarDayState(
-            date = date,
-            isCurrentMonth = isCurrentMonth,
-            isPeriod = isPeriod,
-            isPredictedPeriod = isPredictedPeriod,
-            isFertile = isFertile,
-            isOvulation = isOvulation,
-            hasLog = hasLog,
-            flowIntensity = flowIntensity
-        )
+        return CalendarDataState.Success(dayMap)
+    }
+
+    /**
+     * Helper to get data for a specific month page (42 days)
+     */
+    fun getPageData(yearMonth: YearMonth, state: CalendarDataState): List<CalendarDayUiModel> {
+        if (state !is CalendarDataState.Success) return emptyList()
+
+        val firstDayOfMonth = yearMonth.atDay(1)
+        val startOffset = firstDayOfMonth.dayOfWeek.value % 7
+        val startDate = firstDayOfMonth.minusDays(startOffset.toLong())
+
+        val days = ArrayList<CalendarDayUiModel>(42)
+        
+        for (i in 0 until 42) {
+            val date = startDate.plusDays(i.toLong())
+            val epoch = date.toEpochDay()
+            val data = state.data[epoch] ?: DayData()
+
+            // Calculate connectivity here for rendering
+            val type = if (data.isPeriod) {
+                val prev = state.data[epoch - 1]?.isPeriod == true
+                val next = state.data[epoch + 1]?.isPeriod == true
+                when {
+                    !prev && !next -> PeriodType.SINGLE
+                    !prev && next -> PeriodType.START
+                    prev && next -> PeriodType.MIDDLE
+                    prev && !next -> PeriodType.END
+                    else -> PeriodType.SINGLE
+                }
+            } else {
+                PeriodType.NONE
+            }
+
+            days.add(
+                CalendarDayUiModel(
+                    date = date,
+                    isCurrentMonth = date.month == yearMonth.month,
+                    data = data,
+                    periodType = type
+                )
+            )
+        }
+        return days
     }
 }
 
-sealed interface CalendarUiState {
-    object Loading : CalendarUiState
-    data class Success(
-        val currentMonth: YearMonth,
-        val days: List<CalendarDayState>
-    ) : CalendarUiState
+// Optimized Data Structures
+sealed interface CalendarDataState {
+    data object Loading : CalendarDataState
+    data class Success(val data: Map<Long, DayData>) : CalendarDataState
 }
 
-data class CalendarDayState(
-    val date: LocalDate,
-    val isCurrentMonth: Boolean,
+data class DayData(
     val isPeriod: Boolean = false,
     val isPredictedPeriod: Boolean = false,
     val isFertile: Boolean = false,
     val isOvulation: Boolean = false,
     val hasLog: Boolean = false,
-    val flowIntensity: Int = 0 // 0=None, 1-4=Intensity
+    val flowIntensity: Int = 0
 )
+
+data class CalendarDayUiModel(
+    val date: LocalDate,
+    val isCurrentMonth: Boolean,
+    val data: DayData,
+    val periodType: PeriodType
+)
+
+enum class PeriodType { NONE, START, MIDDLE, END, SINGLE }

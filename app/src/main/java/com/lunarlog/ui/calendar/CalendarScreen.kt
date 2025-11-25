@@ -3,60 +3,38 @@ package com.lunarlog.ui.calendar
 import androidx.compose.animation.AnimatedVisibilityScope
 import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.aspectRatio
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.lazy.grid.GridCells
-import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
-import androidx.compose.foundation.lazy.grid.items
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ChevronLeft
-import androidx.compose.material.icons.filled.ChevronRight
-import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Scaffold
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
-import androidx.compose.runtime.getValue
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.CornerRadius
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalHapticFeedback
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.lunarlog.ui.theme.FertileGreen
-import com.lunarlog.ui.theme.OvulationBlue
-import com.lunarlog.ui.theme.PeriodRed
+import com.lunarlog.ui.theme.*
+import java.time.LocalDate
+import java.time.YearMonth
 import java.time.format.TextStyle
 import java.util.Locale
-import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.combinedClickable
-import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.PlainTooltip
-import androidx.compose.material3.TooltipBox
-import androidx.compose.material3.TooltipDefaults
-import androidx.compose.material3.rememberTooltipState
-import androidx.compose.runtime.rememberCoroutineScope
 import kotlinx.coroutines.launch
-import androidx.compose.ui.platform.LocalHapticFeedback
-import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
@@ -66,31 +44,60 @@ fun CalendarScreen(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
-    val uiState by viewModel.uiState.collectAsState()
+    // Collect the GLOBAL data state
+    val calendarState by viewModel.calendarState.collectAsState()
+
+    // Pager Setup
+    val initialPage = 5000
+    val pagerState = rememberPagerState(initialPage = initialPage) { 10000 }
+    val scope = rememberCoroutineScope()
+    
+    // Calculate current visible month based on Pager
+    // Optimization: Derive state to avoid unnecessary recompositions
+    val currentMonth by remember {
+        derivedStateOf {
+            YearMonth.now().plusMonths((pagerState.currentPage - initialPage).toLong())
+        }
+    }
 
     Scaffold(
         topBar = {
-            if (uiState is CalendarUiState.Success) {
-                val state = uiState as CalendarUiState.Success
-                CalendarHeader(
-                    currentMonth = state.currentMonth,
-                    onPreviousMonth = viewModel::onPreviousMonth,
-                    onNextMonth = viewModel::onNextMonth
-                )
-            }
+            CalendarHeader(
+                currentMonth = currentMonth,
+                onPrevious = {
+                    scope.launch { pagerState.animateScrollToPage(pagerState.currentPage - 1) }
+                },
+                onNext = {
+                    scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                }
+            )
         }
     ) { padding ->
-        Box(modifier = Modifier.padding(padding).fillMaxSize()) {
-            when (val state = uiState) {
-                CalendarUiState.Loading -> {
-                    CircularProgressIndicator(modifier = Modifier.align(Alignment.Center))
+        Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            // Day Headers (S M T W T F S)
+            CalendarWeekDaysHeader()
+            
+            // The Infinite Pager
+            HorizontalPager(
+                state = pagerState,
+                modifier = Modifier.weight(1f) // Fill remaining space
+            ) { page ->
+                val pageMonth = YearMonth.now().plusMonths((page - initialPage).toLong())
+                
+                // Fetch the 42 days for this page from the global state
+                // This is a fast CPU operation
+                val days = remember(calendarState, pageMonth) {
+                    viewModel.getPageData(pageMonth, calendarState)
                 }
-                is CalendarUiState.Success -> {
-                    CalendarContent(
-                        days = state.days,
-                        onDayClicked = onDayClicked,
-                        sharedTransitionScope = sharedTransitionScope,
-                        animatedVisibilityScope = animatedVisibilityScope
+
+                if (calendarState is CalendarDataState.Loading) {
+                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                        CircularProgressIndicator()
+                    }
+                } else {
+                    CalendarMonthPage(
+                        days = days,
+                        onDayClicked = onDayClicked
                     )
                 }
             }
@@ -100,185 +107,248 @@ fun CalendarScreen(
 
 @Composable
 fun CalendarHeader(
-    currentMonth: java.time.YearMonth,
-    onPreviousMonth: () -> Unit,
-    onNextMonth: () -> Unit
+    currentMonth: YearMonth,
+    onPrevious: () -> Unit,
+    onNext: () -> Unit
 ) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(16.dp),
+            .padding(horizontal = 16.dp, vertical = 8.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically
     ) {
-        IconButton(onClick = onPreviousMonth) {
-            Icon(Icons.Default.ChevronLeft, contentDescription = "Previous Month")
+        IconButton(onClick = onPrevious) {
+            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Month")
         }
-        
-        Text(
-            text = "${currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault())} ${currentMonth.year}",
-            style = MaterialTheme.typography.headlineSmall,
-            fontWeight = FontWeight.Bold
-        )
 
-        IconButton(onClick = onNextMonth) {
-            Icon(Icons.Default.ChevronRight, contentDescription = "Next Month")
+        Column(horizontalAlignment = Alignment.CenterHorizontally) {
+            Text(
+                text = currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()),
+                style = MaterialTheme.typography.headlineSmall,
+                fontWeight = FontWeight.Bold
+            )
+            Text(
+                text = currentMonth.year.toString(),
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
         }
-    }
-}
 
-@OptIn(ExperimentalSharedTransitionApi::class)
-@Composable
-fun CalendarContent(
-    days: List<CalendarDayState>,
-    onDayClicked: (Long) -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?
-) {
-    Column {
-        // Weekday Headers
-        Row(modifier = Modifier.fillMaxWidth()) {
-            val weekDays = listOf("S", "M", "T", "W", "T", "F", "S")
-            weekDays.forEach { day ->
-                Text(
-                    text = day,
-                    modifier = Modifier.weight(1f),
-                    textAlign = TextAlign.Center,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-        }
-        
-        Spacer(modifier = Modifier.height(8.dp))
-
-        LazyVerticalGrid(
-            columns = GridCells.Fixed(7),
-            modifier = Modifier.fillMaxSize()
-        ) {
-            items(
-                items = days,
-                key = { it.date.toEpochDay() }
-            ) { dayState ->
-                CalendarDay(
-                    dayState = dayState,
-                    onClick = { onDayClicked(dayState.date.toEpochDay()) },
-                    sharedTransitionScope = sharedTransitionScope,
-                    animatedVisibilityScope = animatedVisibilityScope
-                )
-            }
+        IconButton(onClick = onNext) {
+            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Month")
         }
     }
 }
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class, ExperimentalFoundationApi::class)
 @Composable
-fun CalendarDay(
-    dayState: CalendarDayState,
-    onClick: () -> Unit,
-    sharedTransitionScope: SharedTransitionScope?,
-    animatedVisibilityScope: AnimatedVisibilityScope?
-) {
-    val tooltipState = rememberTooltipState()
-    val scope = rememberCoroutineScope()
-    val haptic = LocalHapticFeedback.current
+fun CalendarWeekDaysHeader() {
+    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+        val weekDays = listOf("S", "M", "T", "W", "T", "F", "S")
+        weekDays.forEach { day ->
+            Text(
+                text = day,
+                modifier = Modifier.weight(1f),
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.labelLarge,
+                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                fontWeight = FontWeight.SemiBold
+            )
+        }
+    }
+}
 
-    TooltipBox(
-        positionProvider = TooltipDefaults.rememberPlainTooltipPositionProvider(),
-        tooltip = {
-            val summary = buildString {
-                if (dayState.isPeriod) append("Period")
-                if (dayState.isOvulation) { if (isNotEmpty()) append(", "); append("Ovulation") }
-                if (dayState.isFertile && !dayState.isOvulation) { if (isNotEmpty()) append(", "); append("Fertile") }
-                if (dayState.isPredictedPeriod) { if (isNotEmpty()) append(", "); append("Predicted") }
-                if (isEmpty()) append("Day ${dayState.date.dayOfMonth}")
-            }
-            PlainTooltip {
-                Text(summary)
-            }
-        },
-        state = tooltipState
+@Composable
+fun CalendarMonthPage(
+    days: List<CalendarDayUiModel>,
+    onDayClicked: (Long) -> Unit
+) {
+    // Custom Layout: fixed 6 rows x 7 cols
+    Column(
+        modifier = Modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.SpaceEvenly
     ) {
-        Box(
-            modifier = Modifier
-                .aspectRatio(1f) // Square cells
-                .padding(2.dp)
-                .clip(CircleShape)
-                .then(
-                    if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-                        with(sharedTransitionScope) {
-                            Modifier.sharedElement(
-                                state = rememberSharedContentState(key = "day_${dayState.date.toEpochDay()}"),
-                                animatedVisibilityScope = animatedVisibilityScope
-                            )
-                        }
-                    } else Modifier
-                )
-                .combinedClickable(
-                    onClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                        onClick()
-                    },
-                    onLongClick = {
-                        haptic.performHapticFeedback(HapticFeedbackType.LongPress)
-                        scope.launch { tooltipState.show() }
-                    }
-                )
-                .then(
-                    if (dayState.isPeriod || dayState.flowIntensity > 0) {
-                        val alpha = when (dayState.flowIntensity) {
-                            1 -> 0.4f
-                            2 -> 0.6f
-                            3 -> 0.8f
-                            4 -> 1.0f
-                            else -> 0.6f // Default for "isPeriod" without specific flow log
-                        }
-                        Modifier.background(PeriodRed.copy(alpha = alpha))
-                    } else if (dayState.isPredictedPeriod) {
-                        Modifier.border(2.dp, PeriodRed.copy(alpha = 0.6f), CircleShape)
+        for (weekIndex in 0 until 6) {
+            Row(
+                modifier = Modifier.fillMaxWidth().weight(1f),
+                horizontalArrangement = Arrangement.SpaceEvenly
+            ) {
+                for (dayIndex in 0 until 7) {
+                    val day = days.getOrNull(weekIndex * 7 + dayIndex)
+                    if (day != null) {
+                        CalendarDayCell(
+                            day = day,
+                            modifier = Modifier.weight(1f).fillMaxHeight(),
+                            onClick = { onDayClicked(day.date.toEpochDay()) }
+                        )
                     } else {
-                        Modifier
+                        Spacer(Modifier.weight(1f))
                     }
-                ),
-            contentAlignment = Alignment.Center
-        ) {
-            // Background indicators for fertility/ovulation
-            if (!dayState.isPeriod && dayState.flowIntensity == 0) { // Don't overlay fertility on period
-                if (dayState.isOvulation) {
-                    Box(
-                        modifier = Modifier
-                            .fillMaxSize()
-                            .border(2.dp, OvulationBlue, CircleShape)
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CalendarDayCell(
+    day: CalendarDayUiModel,
+    modifier: Modifier,
+    onClick: () -> Unit
+) {
+    val haptic = LocalHapticFeedback.current
+    val isToday = day.date == LocalDate.now()
+    
+    // Theme Colors
+    val periodColor = PeriodRed
+    val periodBgColor = PeriodSurface
+    val fertileColor = FertileGreen
+    val ovulationColor = OvulationBlue
+    val onPeriodSurface = OnPeriodSurface
+    val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val primaryColor = MaterialTheme.colorScheme.primary
+
+    Box(
+        modifier = modifier
+            .clickable(onClick = {
+                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                onClick()
+            }),
+        contentAlignment = Alignment.Center
+    ) {
+        // Custom Drawing for Connected Periods
+        Canvas(modifier = Modifier.fillMaxSize()) {
+            val w = size.width
+            val h = size.height
+            val cx = w / 2
+            val cy = h / 2
+            // Adjusted Diameter for better spacing (0.8f instead of 0.85f)
+            val diameter = minOf(w, h) * 0.8f
+            val radius = diameter / 2
+            val barTop = cy - radius
+            val barHeight = diameter
+
+            // 1. Draw Period Background (Connected Pill)
+            if (day.data.isPeriod) {
+                when (day.periodType) {
+                    PeriodType.START -> {
+                        // Rounded Left (Circle), Flat Right (Rect)
+                        drawCircle(
+                            color = periodBgColor,
+                            radius = radius,
+                            center = center
+                        )
+                        drawRect(
+                            color = periodBgColor,
+                            topLeft = Offset(cx, barTop),
+                            size = Size(w - cx, barHeight)
+                        )
+                    }
+                    PeriodType.MIDDLE -> {
+                        // Flat Left, Flat Right
+                        drawRect(
+                            color = periodBgColor,
+                            topLeft = Offset(0f, barTop),
+                            size = Size(w, barHeight)
+                        )
+                    }
+                    PeriodType.END -> {
+                        // Flat Left (Rect), Rounded Right (Circle)
+                        drawRect(
+                            color = periodBgColor,
+                            topLeft = Offset(0f, barTop),
+                            size = Size(cx, barHeight)
+                        )
+                        drawCircle(
+                            color = periodBgColor,
+                            radius = radius,
+                            center = center
+                        )
+                    }
+                    PeriodType.SINGLE -> {
+                        // Rounded All (Circle)
+                        drawCircle(
+                            color = periodBgColor,
+                            radius = radius,
+                            center = center
+                        )
+                    }
+                    PeriodType.NONE -> {}
+                }
+            }
+
+            // 2. Draw Today Ring (Refined)
+            if (isToday) {
+                // If period active, draw a ring outside? Or just a solid ring behind?
+                // Let's do a solid circle behind the text but distinct from period logic
+                if (!day.data.isPeriod) {
+                    drawCircle(
+                        color = TodayRing.copy(alpha = 0.2f),
+                        radius = radius
                     )
-                } else if (dayState.isFertile) {
-                    Box(
-                        modifier = Modifier
-                            .size(8.dp)
-                            .background(FertileGreen, CircleShape)
-                            .align(Alignment.TopCenter)
-                            .padding(top = 4.dp)
+                    drawCircle(
+                        color = TodayRing,
+                        style = Stroke(width = 2.dp.toPx()),
+                        radius = radius
+                    )
+                } else {
+                    // If on period, just a white ring to contrast
+                    drawCircle(
+                        color = Color.White,
+                        style = Stroke(width = 2.dp.toPx()),
+                        radius = radius * 0.9f
                     )
                 }
             }
 
-            // Log indicator
-            if (dayState.hasLog) {
-                Box(
-                    modifier = Modifier
-                        .size(4.dp)
-                        .background(MaterialTheme.colorScheme.onSurface, CircleShape)
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 4.dp)
-                )
+            // 3. Draw Indicators (Fertile/Ovulation/Predicted)
+            if (!day.data.isPeriod) {
+                if (day.data.isOvulation) {
+                    drawCircle(
+                        color = ovulationColor.copy(alpha = 0.2f),
+                        radius = radius
+                    )
+                    drawCircle(
+                        color = ovulationColor,
+                        radius = 4.dp.toPx(),
+                        center = Offset(cx, cy - radius - 6.dp.toPx()) // Top Dot
+                    )
+                } else if (day.data.isFertile) {
+                    drawCircle(
+                        color = fertileColor,
+                        radius = 3.dp.toPx(),
+                        center = Offset(cx, cy - radius - 6.dp.toPx())
+                    )
+                } else if (day.data.isPredictedPeriod) {
+                    drawCircle(
+                        color = periodColor.copy(alpha = 0.5f),
+                        radius = radius,
+                        style = Stroke(
+                            width = 2.dp.toPx(),
+                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                        )
+                    )
+                }
             }
 
-            Text(
-                text = dayState.date.dayOfMonth.toString(),
-                color = if (dayState.isPeriod) Color.White 
-                       else if (!dayState.isCurrentMonth) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) 
-                       else MaterialTheme.colorScheme.onSurface,
-                style = MaterialTheme.typography.bodyMedium
-            )
+            // 4. Log Indicator (Bottom Dot)
+            if (day.data.hasLog) {
+                drawCircle(
+                    color = if (day.data.isPeriod) onPeriodSurface else onSurfaceVariant,
+                    radius = 2.dp.toPx(),
+                    center = Offset(cx, cy + radius - 6.dp.toPx())
+                )
+            }
         }
+
+        // 5. Date Text
+        Text(
+            text = day.date.dayOfMonth.toString(),
+            color = if (day.data.isPeriod) OnPeriodSurface 
+                   else if (!day.isCurrentMonth) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) 
+                   else MaterialTheme.colorScheme.onSurface,
+            style = MaterialTheme.typography.bodyMedium,
+            fontWeight = if (day.data.isPeriod || isToday) FontWeight.Bold else FontWeight.Normal
+        )
     }
 }

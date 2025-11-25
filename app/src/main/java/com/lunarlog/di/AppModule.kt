@@ -30,36 +30,7 @@ object AppModule {
             AppDatabase::class.java,
             "lunar_log_database"
         )
-        .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5)
-        .addCallback(object : RoomDatabase.Callback() {
-            override fun onCreate(db: SupportSQLiteDatabase) {
-                super.onCreate(db)
-                insertDefaultSymptoms(db)
-            }
-
-            override fun onOpen(db: SupportSQLiteDatabase) {
-                super.onOpen(db)
-                // Check if table is empty (e.g. after migration)
-                val cursor = db.query("SELECT count(*) FROM symptom_definitions")
-                if (cursor.moveToFirst() && cursor.getInt(0) == 0) {
-                    insertDefaultSymptoms(db)
-                }
-                cursor.close()
-            }
-
-            private fun insertDefaultSymptoms(db: SupportSQLiteDatabase) {
-                db.beginTransaction()
-                try {
-                    val sql = "INSERT OR IGNORE INTO symptom_definitions (name, displayName, category, isCustom) VALUES (?, ?, ?, 0)"
-                    SymptomData.defaultSymptoms.forEach { symptom ->
-                        db.execSQL(sql, arrayOf(symptom.name, symptom.displayName, symptom.category.name))
-                    }
-                    db.setTransactionSuccessful()
-                } finally {
-                    db.endTransaction()
-                }
-            }
-        })
+        .addMigrations(AppDatabase.MIGRATION_3_4, AppDatabase.MIGRATION_4_5, AppDatabase.MIGRATION_5_6, AppDatabase.MIGRATION_6_7, AppDatabase.MIGRATION_7_8)
         .fallbackToDestructiveMigration() // Keep this for safety if manual migration fails or for dev
         .build()
     }
@@ -82,6 +53,11 @@ object AppModule {
     @Provides
     fun provideSymptomDao(database: AppDatabase): SymptomDefinitionDao {
         return database.symptomDefinitionDao()
+    }
+
+    @Provides
+    fun provideLogEntryDao(database: AppDatabase): com.lunarlog.data.LogEntryDao {
+        return database.logEntryDao()
     }
 
     @Provides

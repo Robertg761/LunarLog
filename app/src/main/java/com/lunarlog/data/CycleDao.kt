@@ -23,4 +23,7 @@ interface CycleDao {
     
     @Query("SELECT * FROM cycles WHERE startDate = :date LIMIT 1")
     fun getCycleForDateSync(date: Long): Cycle?
+
+    @Query("SELECT * FROM cycles WHERE startDate <= :endDate AND (endDate >= :startDate OR endDate IS NULL) ORDER BY startDate DESC")
+    fun getCyclesInRange(startDate: Long, endDate: Long): Flow<List<Cycle>>
 }

@@ -8,4 +8,5 @@ class CycleRepository @Inject constructor(private val cycleDao: CycleDao) {
     suspend fun updateCycle(cycle: Cycle) = cycleDao.updateCycle(cycle)
     fun getAllCycles(): Flow<List<Cycle>> = cycleDao.getAllCycles()
     suspend fun getAllCyclesSync(): List<Cycle> = cycleDao.getAllCyclesSync()
+    fun getCyclesInRange(startDate: Long, endDate: Long): Flow<List<Cycle>> = cycleDao.getCyclesInRange(startDate, endDate)
 }
