@@ -98,7 +98,7 @@
 #### 1. Architecture: Foundation
 *Establish a clean build system before adding complex dependencies.*
 - [x] **Version Catalog Migration**: Migrate dependencies to `gradle/libs.versions.toml`.
-- [ ] **Strict Mode**: Enable Compose compiler metrics for performance benchmarking.
+- [x] **Strict Mode**: Enable Compose compiler metrics for performance benchmarking.
 
 #### 2. Feature: Advanced Intelligence (Logic)
 *Build the "brain" so the UI has something to show.*
@@ -119,16 +119,10 @@
 - [x] **Animated Transitions**: Shared Element Transitions between screens.
 - [x] **Partner Sync (Privacy-First)**: Static/encrypted snapshots (QR code/Link).
 
-#### 5. Security & Privacy
-*Harden the application.*
-- [ ] **Database Encryption**: Migrate to SQLCipher.
-- [ ] **Encrypted Backups**: AES-256 encryption for exports.
-- [ ] **Incognito Mode**: Disguise app icon and hide data.
-
-#### 6. Architecture: Scalability & Maintenance
-*Refactor for long-term growth.*
-- [ ] **Extract `core-logic` & `core-data`**: Modularize the codebase.
-- [ ] **Testing Suite**: Screenshot testing, fake repositories, and automated checks.
+#### 5. Architecture: Scalability & Quality
+*Refactor for long-term growth and stability.*
+- [ ] **Testing Suite**: Focus on Unit Tests for logic engines and Fake Repositories.
+- [ ] **Extract `core-logic` & `core-data`**: (Optional) Modularize the codebase for potential WearOS expansion.
 
 ### 💎 Phase 8: UI/UX Master Polish
 *Goal: Elevate the app from functional to premium with detailed interactions and visual consistency.*

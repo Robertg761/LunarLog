@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.1.4] - 2025-11-26
+
+### Added
+- Enabled Compose compiler metrics for performance benchmarking (optional via `-PenableComposeCompilerMetrics=true`).
+
 ## [0.1.3] - 2025-11-26
 
 ### Changed

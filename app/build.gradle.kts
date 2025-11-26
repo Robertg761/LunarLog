@@ -13,8 +13,8 @@ android {
         applicationId = "com.lunarlog"
         minSdk = 26
         targetSdk = 34
-        versionCode = 4
-        versionName = "0.1.3"
+        versionCode = 5
+        versionName = "0.1.4"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -33,6 +33,14 @@ android {
 
     kotlinOptions {
         jvmTarget = "17"
+        if (project.findProperty("enableComposeCompilerMetrics") == "true") {
+            freeCompilerArgs += listOf(
+                "-P",
+                "plugin:androidx.compose.compiler.plugins.kotlin:metricsDestination=" + project.layout.buildDirectory.get().asFile.absolutePath + "/compose_metrics",
+                "-P",
+                "plugin:androidx.compose.compiler.plugins.kotlin:reportsDestination=" + project.layout.buildDirectory.get().asFile.absolutePath + "/compose_metrics"
+            )
+        }
     }
 
     buildFeatures {
