@@ -209,11 +209,11 @@
 
 #### 1. Critical Stabilization (Safety & Architecture)
 *High priority fixes to prevent data loss and build failures.*
-- [ ] **Fix Circular Dependencies**: 
+- [x] **Fix Circular Dependencies**: 
     - Move `Converters.kt` from `logic` to `data` package.
     - Extract shared data models (`Cycle`, `DailyLog`) to `com.lunarlog.core.model`.
-- [ ] **Secure Database Migration**: Remove `fallbackToDestructiveMigration()` from production configuration to prevent data loss.
-- [ ] **Harden Data Serialization**: Refactor `Converters.kt` to use safer delimiters (or JSON) to prevent corruption from user inputs containing semicolons.
+- [x] **Secure Database Migration**: Remove `fallbackToDestructiveMigration()` from production configuration to prevent data loss.
+- [x] **Harden Data Serialization**: Refactor `Converters.kt` to use safer delimiters (or JSON) to prevent corruption from user inputs containing semicolons.
 
 #### 2. Performance Optimization
 *Resolve bottlenecks causing UI lag and battery drain.*
