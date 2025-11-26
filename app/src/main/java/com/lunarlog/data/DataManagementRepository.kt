@@ -1,7 +1,10 @@
 package com.lunarlog.data
 
+import androidx.room.withTransaction
 import com.google.gson.Gson
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.withContext
 import javax.inject.Inject
 import javax.inject.Singleton
 
@@ -19,7 +22,7 @@ class DataManagementRepository @Inject constructor(
 ) {
     private val gson = Gson()
 
-    suspend fun createBackupJson(): String {
+    suspend fun createBackupJson(): String = withContext(Dispatchers.IO) {
         val cycles = cycleRepository.getAllCycles().first()
         // We need a way to get *all* logs. Currently repo only has range or date.
         // I should add getAllLogs to DailyLogDao/Repository or just use a wide range.
@@ -29,33 +32,23 @@ class DataManagementRepository @Inject constructor(
         val logs = dailyLogRepository.getAllLogsSync()
         
         val backup = BackupData(cycles, logs)
-        return gson.toJson(backup)
+        gson.toJson(backup)
     }
 
-    suspend fun restoreFromJson(json: String) {
+    suspend fun restoreFromJson(json: String) = withContext(Dispatchers.IO) {
         val backup = gson.fromJson(json, BackupData::class.java)
         
-        appDatabase.runInTransaction {
+        appDatabase.withTransaction {
             // Nuke first
             appDatabase.clearAllTables() // This is drastic but "Restore" usually implies state replacement
+            
             // Re-insert
-            // We need Dao methods for bulk insert.
-            // Using loops for now as we don't have bulk insert methods yet, and data is likely small.
-            // Actually, for a Phase 6 polish, we should probably add bulk insert.
-            // But strict mandates say "Mimic style". 
-            // I will use what I have or extend.
+            backup.cycles.forEach { cycleRepository.insertCycle(it) }
+            backup.dailyLogs.forEach { dailyLogRepository.saveLog(it) }
         }
-        // Since I can't call suspend functions in runInTransaction easily without blocking, 
-        // and Room's clearAllTables is allowed on background thread.
-        
-        // I'll do manual clear via DAOs if available, or clearAllTables()
-        appDatabase.clearAllTables()
-        
-        backup.cycles.forEach { cycleRepository.insertCycle(it) }
-        backup.dailyLogs.forEach { dailyLogRepository.saveLog(it) }
     }
 
-    suspend fun nukeData() {
+    suspend fun nukeData() = withContext(Dispatchers.IO) {
         appDatabase.clearAllTables()
     }
 }

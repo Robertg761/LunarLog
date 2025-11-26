@@ -84,6 +84,7 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 dataManagementRepository.nukeData()
+                userPreferencesRepository.clearAll()
                 _message.value = "All data cleared."
             } catch (e: Exception) {
                 _message.value = "Failed to clear data: ${e.localizedMessage}"

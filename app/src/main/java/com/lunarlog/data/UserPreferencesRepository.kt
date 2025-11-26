@@ -55,4 +55,10 @@ class UserPreferencesRepository @Inject constructor(
             preferences[THEME_SEED_COLOR] = color
         }
     }
+
+    suspend fun clearAll() {
+        context.dataStore.edit { preferences ->
+            preferences.clear()
+        }
+    }
 }
