@@ -66,7 +66,9 @@ import androidx.hilt.navigation.compose.hiltViewModel
 @Composable
 fun SettingsScreen(
     onBack: () -> Unit,
-    viewModel: SettingsViewModel = hiltViewModel()
+    viewModel: SettingsViewModel = hiltViewModel(),
+    isUpdateAvailable: Boolean = false,
+    onInstallUpdate: () -> Unit = {}
 ) {
     val isAppLockEnabled by viewModel.isAppLockEnabled.collectAsState()
     val themeSeedColor by viewModel.themeSeedColor.collectAsState()
@@ -250,6 +252,39 @@ fun SettingsScreen(
             }
 
             Spacer(modifier = Modifier.height(32.dp))
+
+            if (isUpdateAvailable) {
+                Text(
+                    "Update Available",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.primary
+                )
+                Spacer(modifier = Modifier.height(8.dp))
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = androidx.compose.material3.CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer
+                    )
+                ) {
+                    Column(modifier = Modifier.padding(16.dp)) {
+                        Text(
+                            "A new version of LunarLog is available.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Spacer(modifier = Modifier.height(16.dp))
+                        Button(
+                            onClick = onInstallUpdate,
+                            modifier = Modifier.align(Alignment.End)
+                        ) {
+                            Icon(Icons.Filled.Download, contentDescription = null)
+                            Spacer(modifier = Modifier.padding(4.dp))
+                            Text("Install Update")
+                        }
+                    }
+                }
+                Spacer(modifier = Modifier.height(32.dp))
+            }
 
             // Data Management
             Text(

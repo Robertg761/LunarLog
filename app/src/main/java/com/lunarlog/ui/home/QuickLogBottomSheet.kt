@@ -18,6 +18,8 @@ import androidx.compose.ui.unit.dp
 @Composable
 fun QuickLogContent(
     isPeriodActive: Boolean,
+    isPeriodOngoing: Boolean = false,
+    isEndedToday: Boolean = false,
     onTogglePeriod: () -> Unit,
     quickSymptoms: List<String>,
     onSymptomClick: (String) -> Unit,
@@ -49,23 +51,41 @@ fun QuickLogContent(
         Spacer(modifier = Modifier.height(24.dp))
         
         // Period Toggle Button
+        val buttonText = when {
+            isPeriodOngoing -> "End Period"
+            isEndedToday -> "Period Ended" // Or "Resume Period"
+            else -> "Start Period"
+        }
+        
+        val buttonIcon = when {
+             isPeriodOngoing -> Icons.Default.Close
+             isEndedToday -> Icons.Default.Edit // Icon for editing/resuming
+             else -> Icons.Default.WaterDrop
+        }
+        
+        val buttonColor = when {
+            isPeriodOngoing -> MaterialTheme.colorScheme.error
+            isEndedToday -> MaterialTheme.colorScheme.tertiary // Distinct color for ended state
+            else -> MaterialTheme.colorScheme.primary
+        }
+
         Button(
             onClick = onTogglePeriod,
             modifier = Modifier
                 .fillMaxWidth()
                 .height(56.dp),
             colors = ButtonDefaults.buttonColors(
-                containerColor = if (isPeriodActive) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                containerColor = buttonColor
             ),
             shape = MaterialTheme.shapes.medium
         ) {
             Icon(
-                imageVector = if (isPeriodActive) Icons.Default.Close else Icons.Default.WaterDrop,
+                imageVector = buttonIcon,
                 contentDescription = null
             )
             Spacer(modifier = Modifier.width(8.dp))
             Text(
-                text = if (isPeriodActive) "End Period" else "Start Period",
+                text = buttonText,
                 style = MaterialTheme.typography.titleMedium
             )
         }

@@ -70,7 +70,9 @@ private fun getScreenOrder(route: String?): Int {
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LunarLogNavGraph(
-    startDestination: String = Screen.Home.route
+    startDestination: String = Screen.Home.route,
+    isUpdateAvailable: Boolean = false,
+    onInstallUpdate: () -> Unit = {}
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -87,10 +89,21 @@ fun LunarLogNavGraph(
                         val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
                         NavigationBarItem(
                             icon = {
-                                Icon(
-                                    imageVector = if (selected) screen.selectedIcon!! else screen.unselectedIcon!!,
-                                    contentDescription = screen.label
-                                )
+                                if (screen == Screen.Home && isUpdateAvailable) {
+                                    androidx.compose.material3.BadgedBox(
+                                        badge = { androidx.compose.material3.Badge() }
+                                    ) {
+                                        Icon(
+                                            imageVector = if (selected) screen.selectedIcon!! else screen.unselectedIcon!!,
+                                            contentDescription = screen.label
+                                        )
+                                    }
+                                } else {
+                                    Icon(
+                                        imageVector = if (selected) screen.selectedIcon!! else screen.unselectedIcon!!,
+                                        contentDescription = screen.label
+                                    )
+                                }
                             },
                             label = { Text(screen.label!!) },
                             selected = selected,
@@ -139,6 +152,7 @@ fun LunarLogNavGraph(
                             navController.navigate(Screen.Details.createRoute(today))
                         },
                         onSettingsClicked = { navController.navigate(Screen.Settings.route) },
+                        isUpdateAvailable = isUpdateAvailable,
                         sharedTransitionScope = this@SharedTransitionLayout,
                         animatedVisibilityScope = this
                     )
@@ -198,7 +212,9 @@ fun LunarLogNavGraph(
                 }
                 composable(Screen.Settings.route) {
                     SettingsScreen(
-                        onBack = { navController.popBackStack() }
+                        onBack = { navController.popBackStack() },
+                        isUpdateAvailable = isUpdateAvailable,
+                        onInstallUpdate = onInstallUpdate
                     )
                 }
                 composable(Screen.LogHistory.route) {

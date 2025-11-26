@@ -38,6 +38,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.blur
@@ -70,6 +71,7 @@ fun HomeScreen(
     onLogDetailsClicked: () -> Unit,
     onSettingsClicked: () -> Unit,
     viewModel: HomeViewModel = hiltViewModel(),
+    isUpdateAvailable: Boolean = false,
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
@@ -77,8 +79,15 @@ fun HomeScreen(
     val scrollState = rememberScrollState()
     val context = LocalContext.current
     val scrollBehavior = TopAppBarDefaults.enterAlwaysScrollBehavior()
+    val snackbarHostState = remember { SnackbarHostState() }
     
     var showQuickLog by remember { mutableStateOf(false) }
+
+    LaunchedEffect(Unit) {
+        viewModel.message.collect { message ->
+            snackbarHostState.showSnackbar(message)
+        }
+    }
 
     // Organic Background Colors
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
@@ -143,7 +152,13 @@ fun HomeScreen(
                              Icon(Icons.Default.Share, contentDescription = "Share Status", tint = MaterialTheme.colorScheme.onSurfaceVariant)
                         }
                         IconButton(onClick = onSettingsClicked) {
-                            Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            if (isUpdateAvailable) {
+                                BadgedBox(badge = { Badge() }) {
+                                    Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                                }
+                            } else {
+                                Icon(Icons.Default.Settings, contentDescription = "Settings", tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
                         }
                     },
                     scrollBehavior = scrollBehavior,
@@ -253,6 +268,8 @@ fun HomeScreen(
                     ) {
                         QuickLogContent(
                             isPeriodActive = uiState.isPeriodActive,
+                            isPeriodOngoing = uiState.isPeriodOngoing,
+                            isEndedToday = uiState.isEndedToday,
                             onTogglePeriod = { viewModel.togglePeriod() },
                             quickSymptoms = uiState.quickLogSymptoms,
                             onSymptomClick = { viewModel.logQuickSymptom(it) },
@@ -274,6 +291,13 @@ fun HomeScreen(
                 }
             }
         }
+        
+        SnackbarHost(
+            hostState = snackbarHostState,
+            modifier = Modifier
+                .align(Alignment.BottomCenter)
+                .padding(bottom = 100.dp) // Avoid FAB and bottom nav
+        )
     }
 }
 

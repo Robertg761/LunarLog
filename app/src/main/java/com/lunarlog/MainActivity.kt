@@ -36,16 +36,26 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 
 import androidx.activity.enableEdgeToEdge
 
 import com.github.javiersantos.appupdater.AppUpdater
+import com.github.javiersantos.appupdater.AppUpdaterUtils
 import com.github.javiersantos.appupdater.enums.UpdateFrom
 import com.github.javiersantos.appupdater.enums.Display
+import com.github.javiersantos.appupdater.enums.AppUpdaterError
+import com.github.javiersantos.appupdater.objects.Update
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.SnackbarResult
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.runtime.remember
 
 @AndroidEntryPoint
-class MainActivity : FragmentActivity() {
+class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainViewModel by viewModels()
 
@@ -54,13 +64,21 @@ class MainActivity : FragmentActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // App Updater
-        val appUpdater = AppUpdater(this)
+        // App Updater (Silent Check)
+        val appUpdaterUtils = AppUpdaterUtils(this)
             .setUpdateFrom(UpdateFrom.GITHUB)
             .setGitHubUserAndRepo("Robertg761", "Period-Tracker")
-            .setDisplay(Display.DIALOG)
-            .showAppUpdated(true) // For testing purposes
-        appUpdater.start()
+            .withListener(object : AppUpdaterUtils.UpdateListener {
+                override fun onSuccess(update: Update?, isUpdateAvailable: Boolean?) {
+                    if (isUpdateAvailable == true) {
+                        viewModel.setUpdateAvailable(true)
+                    }
+                }
+                override fun onFailed(error: AppUpdaterError?) {
+                    // Log error if needed
+                }
+            })
+        appUpdaterUtils.start()
         
         // Keep splash screen until data is loaded
         splashScreen.setKeepOnScreenCondition {
@@ -72,6 +90,33 @@ class MainActivity : FragmentActivity() {
         setContent {
             val uiState by viewModel.uiState.collectAsState()
             val isLocked by viewModel.isLocked.collectAsState()
+            val snackbarHostState = remember { SnackbarHostState() }
+
+            // Handle Install Trigger
+            LaunchedEffect(Unit) {
+                viewModel.installUpdateTrigger.collect {
+                    AppUpdater(this@MainActivity)
+                        .setUpdateFrom(UpdateFrom.GITHUB)
+                        .setGitHubUserAndRepo("Robertg761", "Period-Tracker")
+                        .setDisplay(Display.DIALOG)
+                        .showAppUpdated(false)
+                        .start()
+                }
+            }
+            
+            // Show Snackbar on Update
+            LaunchedEffect(uiState.isUpdateAvailable) {
+                if (uiState.isUpdateAvailable) {
+                    val result = snackbarHostState.showSnackbar(
+                        message = "New update available",
+                        actionLabel = "Install",
+                        duration = SnackbarDuration.Long
+                    )
+                    if (result == SnackbarResult.ActionPerformed) {
+                        viewModel.triggerInstallUpdate()
+                    }
+                }
+            }
 
             LunarLogTheme(
                 seedColor = uiState.themeSeedColor
@@ -91,7 +136,17 @@ class MainActivity : FragmentActivity() {
                                 authenticateUser()
                             }
                         } else {
-                            LunarLogNavGraph(startDestination = uiState.startDestination)
+                            Box(modifier = Modifier.fillMaxSize()) {
+                                LunarLogNavGraph(
+                                    startDestination = uiState.startDestination,
+                                    isUpdateAvailable = uiState.isUpdateAvailable,
+                                    onInstallUpdate = { viewModel.triggerInstallUpdate() }
+                                )
+                                SnackbarHost(
+                                    hostState = snackbarHostState,
+                                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp) // Avoid covering nav bar
+                                )
+                            }
                         }
                     } else {
                          // Fallback, though splash screen should cover this

@@ -10,6 +10,8 @@ import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
 import com.lunarlog.logic.CyclePredictionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
@@ -26,7 +28,9 @@ data class HomeUiState(
     val currentCycleDay: Int = 0,
     val isFertile: Boolean = false,
     val isLoading: Boolean = true,
-    val isPeriodActive: Boolean = false,
+    val isPeriodActive: Boolean = false, // Visual: Is today a period day?
+    val isPeriodOngoing: Boolean = false, // Logic: Is the period open?
+    val isEndedToday: Boolean = false, // Logic: Did it end today?
     val quickLogSymptoms: List<String> = emptyList()
 )
 
@@ -35,6 +39,9 @@ class HomeViewModel @Inject constructor(
     private val cycleRepository: CycleRepository,
     private val dailyLogRepository: DailyLogRepository
 ) : ViewModel() {
+
+    private val _message = Channel<String>(Channel.CONFLATED)
+    val message = _message.receiveAsFlow()
 
     val uiState: StateFlow<HomeUiState> = combine(
         cycleRepository.getAllCycles(),
@@ -57,12 +64,18 @@ class HomeViewModel @Inject constructor(
             val (fertileStart, fertileEnd) = CyclePredictionUtils.predictFertileWindow(nextPeriodStart)
             val isFertile = today >= fertileStart && today <= fertileEnd
 
-            // Check if period is active
+            // Check if period is active (Visual)
             val isPeriodActive = if (lastCycle.endDate != null) {
                 !today.isAfter(LocalDate.ofEpochDay(lastCycle.endDate))
             } else {
                 currentCycleDay <= averagePeriodLength
             }
+
+            // Check if period is ongoing (Logic: Open)
+            val isPeriodOngoing = lastCycle.endDate == null
+            
+            // Check if ended today
+            val isEndedToday = lastCycle.endDate == today.toEpochDay()
 
             val daysRemainingInPeriod = if (isPeriodActive) {
                 if (lastCycle.endDate != null) {
@@ -82,6 +95,8 @@ class HomeViewModel @Inject constructor(
                 currentCycleDay = currentCycleDay,
                 isFertile = isFertile,
                 isPeriodActive = isPeriodActive,
+                isPeriodOngoing = isPeriodOngoing,
+                isEndedToday = isEndedToday,
                 isLoading = false,
                 quickLogSymptoms = quickLogSymptoms
             )
@@ -129,22 +144,35 @@ class HomeViewModel @Inject constructor(
 
     fun togglePeriod() {
         viewModelScope.launch {
-            val isActive = uiState.value.isPeriodActive
             val today = LocalDate.now().toEpochDay()
-            
-            if (isActive) {
-                // End period
-                val cycles = cycleRepository.getAllCyclesSync()
-                val latestCycle = cycles.maxByOrNull { it.startDate }
-                
-                if (latestCycle != null && latestCycle.endDate == null) {
-                    val updatedCycle = latestCycle.copy(endDate = today)
-                    cycleRepository.updateCycle(updatedCycle)
-                }
+            val cycles = cycleRepository.getAllCyclesSync()
+            val latestCycle = cycles.maxByOrNull { it.startDate }
+
+            if (latestCycle != null && latestCycle.endDate == null) {
+                // Case 1: Open -> End it
+                val updatedCycle = latestCycle.copy(endDate = today)
+                cycleRepository.updateCycle(updatedCycle)
+                _message.trySend("Period ended")
+            } else if (latestCycle != null && latestCycle.endDate == today) {
+                // Case 2: Closed Today -> Re-open (Resume)
+                val updatedCycle = latestCycle.copy(endDate = null)
+                cycleRepository.updateCycle(updatedCycle)
+                _message.trySend("Period resumed")
             } else {
-                // Start period
-                val newCycle = Cycle(startDate = today, endDate = null)
-                cycleRepository.insertCycle(newCycle)
+                // Case 3: Closed Past (or No Cycle) -> Start New
+                // Check if we already have a cycle starting today to be safe (shouldn't happen if covered by Case 1/2)
+                if (latestCycle != null && latestCycle.startDate == today) {
+                    // It started today and ended (Case 2 covers if ended today).
+                    // If it started today and is open, Case 1 covers.
+                    // So this else block is for cycles starting BEFORE today.
+                    val newCycle = Cycle(startDate = today, endDate = null)
+                    cycleRepository.insertCycle(newCycle)
+                    _message.trySend("Period started")
+                } else {
+                    val newCycle = Cycle(startDate = today, endDate = null)
+                    cycleRepository.insertCycle(newCycle)
+                    _message.trySend("Period started")
+                }
             }
         }
     }

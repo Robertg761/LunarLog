@@ -5,6 +5,8 @@ import androidx.lifecycle.viewModelScope
 import com.lunarlog.data.UserPreferencesRepository
 import com.lunarlog.ui.navigation.Screen
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.channels.Channel
+import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
@@ -16,7 +18,8 @@ data class MainActivityUiState(
     val isLoading: Boolean = true,
     val startDestination: String = Screen.Home.route,
     val isAppLockEnabled: Boolean = false,
-    val themeSeedColor: Int? = null
+    val themeSeedColor: Int? = null,
+    val isUpdateAvailable: Boolean = false
 )
 
 @HiltViewModel
@@ -24,16 +27,22 @@ class MainViewModel @Inject constructor(
     userPreferencesRepository: UserPreferencesRepository
 ) : ViewModel() {
 
+    private val _isUpdateAvailable = MutableStateFlow(false)
+    private val _installUpdateTrigger = Channel<Unit>(Channel.CONFLATED)
+    val installUpdateTrigger = _installUpdateTrigger.receiveAsFlow()
+
     val uiState = combine(
         userPreferencesRepository.isFirstRun,
         userPreferencesRepository.isAppLockEnabled,
-        userPreferencesRepository.themeSeedColor
-    ) { isFirstRun, isAppLockEnabled, themeSeedColor ->
+        userPreferencesRepository.themeSeedColor,
+        _isUpdateAvailable
+    ) { isFirstRun, isAppLockEnabled, themeSeedColor, isUpdateAvailable ->
         MainActivityUiState(
             isLoading = false,
             startDestination = if (isFirstRun) Screen.Onboarding.route else Screen.Home.route,
             isAppLockEnabled = isAppLockEnabled,
-            themeSeedColor = themeSeedColor?.toInt()
+            themeSeedColor = themeSeedColor?.toInt(),
+            isUpdateAvailable = isUpdateAvailable
         )
     }.stateIn(
         scope = viewModelScope,
@@ -46,5 +55,13 @@ class MainViewModel @Inject constructor(
 
     fun unlock() {
         _isLocked.value = false
+    }
+
+    fun setUpdateAvailable(available: Boolean) {
+        _isUpdateAvailable.value = available
+    }
+
+    fun triggerInstallUpdate() {
+        _installUpdateTrigger.trySend(Unit)
     }
 }
