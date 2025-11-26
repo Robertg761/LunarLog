@@ -101,7 +101,66 @@ fun CalendarScreen(
                     )
                 }
             }
+            
+            // Legend
+            CalendarLegend(modifier = Modifier.padding(16.dp))
         }
+    }
+}
+
+@Composable
+fun CalendarLegend(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceEvenly,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        LegendItem(text = "Period") {
+            drawCircle(color = PeriodSurface)
+        }
+        LegendItem(text = "Predicted") {
+            drawCircle(
+                color = PeriodRed.copy(alpha = 0.5f),
+                style = Stroke(
+                    width = 2.dp.toPx(),
+                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                )
+            )
+        }
+        LegendItem(text = "Fertile") {
+            drawCircle(
+                color = FertileGreen,
+                radius = size.minDimension / 4
+            )
+        }
+        LegendItem(text = "Ovulation") {
+            drawCircle(color = OvulationBlue.copy(alpha = 0.2f))
+            drawCircle(
+                color = OvulationBlue,
+                radius = size.minDimension / 4,
+                center = Offset(center.x, center.y - size.minDimension / 3)
+            )
+        }
+    }
+}
+
+@Composable
+fun LegendItem(
+    text: String,
+    icon: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit
+) {
+    Column(
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        Canvas(modifier = Modifier.size(20.dp)) {
+            icon()
+        }
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
     }
 }
 
@@ -206,7 +265,6 @@ fun CalendarDayCell(
     val ovulationColor = OvulationBlue
     val onPeriodSurface = OnPeriodSurface
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
-    val primaryColor = MaterialTheme.colorScheme.primary
 
     Box(
         modifier = modifier
