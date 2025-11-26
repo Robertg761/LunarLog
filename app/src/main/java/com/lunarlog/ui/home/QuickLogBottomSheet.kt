@@ -53,7 +53,7 @@ fun QuickLogContent(
         // Period Toggle Button
         val buttonText = when {
             isPeriodOngoing -> "End Period"
-            isEndedToday -> "Period Ended" // Or "Resume Period"
+            isEndedToday -> "Resume Period" // Or "Resume Period"
             else -> "Start Period"
         }
         

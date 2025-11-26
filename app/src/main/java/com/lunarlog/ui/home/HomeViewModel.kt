@@ -156,7 +156,6 @@ class HomeViewModel @Inject constructor(
                 // Case 2: Closed Today -> Re-open (Resume)
                 val updatedCycle = latestCycle.copy(endDate = null)
                 cycleRepository.updateCycle(updatedCycle)
-                _message.trySend("Period resumed")
             } else {
                 // Case 3: Closed Past (or No Cycle) -> Start New
                 // Check if we already have a cycle starting today to be safe (shouldn't happen if covered by Case 1/2)
