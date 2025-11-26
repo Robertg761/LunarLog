@@ -31,7 +31,7 @@
 
 ## 📝 Development Conventions
 
-### Update & Release Workflow
+### Update & Release Workflow (ONLY IF INSTRUCTED TO CREATE A NEW RELEASE)
 1.  **Code Updates:** Update code and bump `versionName`/`versionCode` in `app/build.gradle.kts`.
 2.  **Changelog:** Update `CHANGELOG.md` with new version details.
 3.  **Commit:** Commit and push changes.

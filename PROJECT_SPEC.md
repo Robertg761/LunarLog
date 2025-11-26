@@ -217,9 +217,9 @@
 
 #### 2. Performance Optimization
 *Resolve bottlenecks causing UI lag and battery drain.*
-- [ ] **Refactor DailyLogRepository**: Decouple the "Aggregate Write" logic to run asynchronously (Fire & Forget) or optimize to update only changed fields.
-- [ ] **Optimize HomeViewModel**: Move `getTopSymptomsForPhase` and other heavy logic off the Main Thread (`Dispatchers.Default`).
-- [ ] **Efficient Querying**: Replace linear O(N) in-memory filtering with optimized Maps or SQL queries where possible.
+- [x] **Refactor DailyLogRepository**: Decouple the "Aggregate Write" logic to run asynchronously (Fire & Forget) or optimize to update only changed fields.
+- [x] **Optimize HomeViewModel**: Move `getTopSymptomsForPhase` and other heavy logic off the Main Thread (`Dispatchers.Default`).
+- [x] **Efficient Querying**: Replace linear O(N) in-memory filtering with optimized Maps or SQL queries where possible.
 
 #### 3. Code Quality & Clean Architecture
 - [ ] **Extract Business Logic**: Move logic like `togglePeriod` out of ViewModels into `CycleRepository` or UseCases.

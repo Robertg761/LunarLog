@@ -120,12 +120,12 @@ class DailyLogRepository @Inject constructor(
         }
     }
 
-    private suspend fun updateDailyLogAggregate(date: Long) {
+    private suspend fun updateDailyLogAggregate(date: Long) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
         val entries = logEntryDao.getEntriesForDateSync(date)
         
         if (entries.isEmpty()) {
             dailyLogDao.insertLog(DailyLog(date = date))
-            return
+            return@withContext
         }
 
         val symptoms = entries.filter { it.type == LogEntryType.SYMPTOM }.map { it.value }.distinct()

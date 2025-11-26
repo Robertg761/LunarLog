@@ -1,6 +1,7 @@
 package com.lunarlog.ui.home
 
-import com.lunarlog.core.model.Cycleimport com.lunarlog.data.CycleRepository
+import com.lunarlog.core.model.Cycle
+import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
 import io.mockk.every
 import io.mockk.mockk
@@ -47,7 +48,7 @@ class HomeViewModelTest {
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
         every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
 
-        viewModel = HomeViewModel(cycleRepository, dailyLogRepository)
+        viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
         
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect()
@@ -72,7 +73,7 @@ class HomeViewModelTest {
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
         every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
 
-        viewModel = HomeViewModel(cycleRepository, dailyLogRepository)
+        viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
 
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect()
@@ -95,7 +96,7 @@ class HomeViewModelTest {
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
         every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
 
-        viewModel = HomeViewModel(cycleRepository, dailyLogRepository)
+        viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
 
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect()
