@@ -152,7 +152,6 @@ class HomeViewModel @Inject constructor(
                 // Case 1: Open -> End it
                 val updatedCycle = latestCycle.copy(endDate = today)
                 cycleRepository.updateCycle(updatedCycle)
-                _message.trySend("Period ended")
             } else if (latestCycle != null && latestCycle.endDate == today) {
                 // Case 2: Closed Today -> Re-open (Resume)
                 val updatedCycle = latestCycle.copy(endDate = null)
