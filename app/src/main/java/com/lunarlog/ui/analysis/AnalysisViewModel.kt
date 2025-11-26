@@ -22,6 +22,8 @@ data class AnalysisUiState(
     val moodCounts: Map<String, Int> = emptyMap(),
     val recentCycleSummaries: List<CycleSummary> = emptyList(),
     val weeklyDigest: WeeklyDigest? = null,
+    val symptomCorrelations: List<com.lunarlog.logic.SymptomCorrelation> = emptyList(),
+    val anomalies: List<com.lunarlog.logic.CycleAnomaly> = emptyList(),
     val isLoading: Boolean = true
 )
 
@@ -79,12 +81,18 @@ class AnalysisViewModel @Inject constructor(
 
             val weeklyDigest = NarrativeGenerator.generateWeeklyDigest(logs)
 
+            // Intelligence
+            val symptomCorrelations = com.lunarlog.logic.SymptomCorrelationEngine.analyzeCorrelations(cycles, logs)
+            val anomalies = com.lunarlog.logic.SmartAnomalyDetector.detectAnomalies(cycles)
+
             _uiState.value = AnalysisUiState(
                 cycleHistory = cycleHistory,
                 symptomCounts = symptomCounts,
                 moodCounts = moodCounts,
                 recentCycleSummaries = cycleSummaries,
                 weeklyDigest = weeklyDigest,
+                symptomCorrelations = symptomCorrelations,
+                anomalies = anomalies,
                 isLoading = false
             )
         }

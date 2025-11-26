@@ -31,7 +31,8 @@ data class HomeUiState(
     val isPeriodActive: Boolean = false, // Visual: Is today a period day?
     val isPeriodOngoing: Boolean = false, // Logic: Is the period open?
     val isEndedToday: Boolean = false, // Logic: Did it end today?
-    val quickLogSymptoms: List<String> = emptyList()
+    val quickLogSymptoms: List<String> = emptyList(),
+    val anomalies: List<com.lunarlog.logic.CycleAnomaly> = emptyList()
 )
 
 @HiltViewModel
@@ -60,9 +61,17 @@ class HomeViewModel @Inject constructor(
             val daysUntil = ChronoUnit.DAYS.between(today, nextPeriodStart).toInt()
             val currentCycleDay = ChronoUnit.DAYS.between(LocalDate.ofEpochDay(lastCycle.startDate), today).toInt() + 1
 
-            // Check fertile window
-            val (fertileStart, fertileEnd) = CyclePredictionUtils.predictFertileWindow(nextPeriodStart)
-            val isFertile = today >= fertileStart && today <= fertileEnd
+            // Check fertile window (Advanced)
+            val ovulationByBBT = com.lunarlog.logic.AdvancedCycleIntelligence.detectOvulationFromBBT(lastCycle.startDate, logs)
+            val peakMucus = com.lunarlog.logic.AdvancedCycleIntelligence.detectPeakMucusDay(lastCycle.startDate, logs)
+            val refinedOvulation = ovulationByBBT ?: peakMucus ?: CyclePredictionUtils.predictOvulation(nextPeriodStart)
+            
+            val refinedFertileStart = refinedOvulation.minusDays(5)
+            val refinedFertileEnd = refinedOvulation.plusDays(1)
+            val isFertile = today >= refinedFertileStart && today <= refinedFertileEnd
+
+            // Check anomalies
+            val anomalies = com.lunarlog.logic.SmartAnomalyDetector.detectAnomalies(cycles)
 
             // Check if period is active (Visual)
             val isPeriodActive = if (lastCycle.endDate != null) {
@@ -98,7 +107,8 @@ class HomeViewModel @Inject constructor(
                 isPeriodOngoing = isPeriodOngoing,
                 isEndedToday = isEndedToday,
                 isLoading = false,
-                quickLogSymptoms = quickLogSymptoms
+                quickLogSymptoms = quickLogSymptoms,
+                anomalies = anomalies
             )
         }
     }
