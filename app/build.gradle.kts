@@ -13,8 +13,8 @@ android {
         applicationId = "com.lunarlog"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "0.1.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -102,4 +102,7 @@ dependencies {
     // Widgets
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
+
+    // App Updater
+    implementation("com.github.javiersantos:AppUpdater:2.7")
 }

@@ -40,6 +40,10 @@ import androidx.compose.ui.unit.dp
 
 import androidx.activity.enableEdgeToEdge
 
+import com.github.javiersantos.appupdater.AppUpdater
+import com.github.javiersantos.appupdater.enums.UpdateFrom
+import com.github.javiersantos.appupdater.enums.Display
+
 @AndroidEntryPoint
 class MainActivity : FragmentActivity() {
 
@@ -49,6 +53,14 @@ class MainActivity : FragmentActivity() {
         val splashScreen = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // App Updater
+        val appUpdater = AppUpdater(this)
+            .setUpdateFrom(UpdateFrom.GITHUB)
+            .setGitHubUserAndRepo("Robertg761", "Period-Tracker")
+            .setDisplay(Display.DIALOG)
+            .showAppUpdated(true) // For testing purposes
+        appUpdater.start()
         
         // Keep splash screen until data is loaded
         splashScreen.setKeepOnScreenCondition {
