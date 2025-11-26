@@ -67,15 +67,18 @@ class MainActivity : AppCompatActivity() {
         // App Updater (Silent Check)
         val appUpdaterUtils = AppUpdaterUtils(this)
             .setUpdateFrom(UpdateFrom.GITHUB)
-            .setGitHubUserAndRepo("Robertg761", "Period-Tracker")
+            .setGitHubUserAndRepo("Robertg761", "LunarLog")
             .withListener(object : AppUpdaterUtils.UpdateListener {
                 override fun onSuccess(update: Update?, isUpdateAvailable: Boolean?) {
                     if (isUpdateAvailable == true) {
                         viewModel.setUpdateAvailable(true)
+                    } else {
+                        android.util.Log.d("AppUpdater", "No update found. Latest: ${update?.latestVersion}")
                     }
                 }
                 override fun onFailed(error: AppUpdaterError?) {
-                    // Log error if needed
+                    android.util.Log.e("AppUpdater", "Update check failed: $error")
+                    Toast.makeText(this@MainActivity, "Update check failed: $error", Toast.LENGTH_SHORT).show()
                 }
             })
         appUpdaterUtils.start()
@@ -97,7 +100,7 @@ class MainActivity : AppCompatActivity() {
                 viewModel.installUpdateTrigger.collect {
                     AppUpdater(this@MainActivity)
                         .setUpdateFrom(UpdateFrom.GITHUB)
-                        .setGitHubUserAndRepo("Robertg761", "Period-Tracker")
+                        .setGitHubUserAndRepo("Robertg761", "LunarLog")
                         .setDisplay(Display.DIALOG)
                         .showAppUpdated(false)
                         .start()

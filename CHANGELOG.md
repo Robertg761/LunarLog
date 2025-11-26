@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.1.3] - 2025-11-26
+
+### Changed
+- Switched in-app update mechanism to check GitHub Releases directly instead of Gist JSON.
+- Updated repository URL to `Robertg761/LunarLog`.
+
 ## [0.1.1] - 2025-11-25
 
 ### Added
