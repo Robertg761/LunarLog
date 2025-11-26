@@ -27,8 +27,8 @@ object SmartAnomalyDetector {
         val sortedCycles = cycles.sortedBy { it.startDate }
         val lengths = mutableListOf<Int>()
         for (i in 0 until sortedCycles.size - 1) {
-            val start = LocalDate.ofEpochDay(sortedCycles[i].startDate)
-            val nextStart = LocalDate.ofEpochDay(sortedCycles[i+1].startDate)
+            val start = sortedCycles[i].startDate
+            val nextStart = sortedCycles[i+1].startDate
             lengths.add(ChronoUnit.DAYS.between(start, nextStart).toInt())
         }
 

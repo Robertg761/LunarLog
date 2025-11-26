@@ -109,7 +109,7 @@ fun LogHistoryScreen(
                     items(logs, key = { it.date }) { log ->
                         LogHistoryItem(
                             log = log,
-                            onClick = { onLogClick(log.date) },
+                            onClick = { onLogClick(log.date.toEpochDay()) },
                             sharedTransitionScope = sharedTransitionScope,
                             animatedVisibilityScope = animatedVisibilityScope
                         )
@@ -160,7 +160,7 @@ fun LogHistoryItem(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
-    val date = LocalDate.ofEpochDay(log.date)
+    val date = log.date
     val formatter = DateTimeFormatter.ofLocalizedDate(FormatStyle.MEDIUM)
 
     ListItem(

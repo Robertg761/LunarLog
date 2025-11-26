@@ -5,18 +5,13 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.pdf.PdfDocument
-import android.os.Environment
-import android.widget.Toast
-import java.io.File
-import java.io.FileOutputStream
-import java.io.IOException
+import java.io.OutputStream
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 
 object ReportGenerator {
 
     fun generatePdf(
-        context: Context,
+        outputStream: OutputStream,
         cycleHistory: List<Pair<LocalDate, Int>>,
         symptomCounts: Map<String, Int>,
         moodCounts: Map<String, Int>
@@ -98,41 +93,26 @@ object ReportGenerator {
 
         pdfDocument.finishPage(page)
 
-        // Save
-        val fileName = "LunarLog_Report_${System.currentTimeMillis()}.pdf"
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), fileName)
-
         try {
-            pdfDocument.writeTo(FileOutputStream(file))
-            Toast.makeText(context, "Saved to ${file.absolutePath}", Toast.LENGTH_LONG).show()
-        } catch (e: IOException) {
-            e.printStackTrace()
-            Toast.makeText(context, "Error saving PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+            pdfDocument.writeTo(outputStream)
         } finally {
             pdfDocument.close()
+            outputStream.close()
         }
     }
 
     fun generateCsv(
-        context: Context,
+        outputStream: OutputStream,
         cycleHistory: List<Pair<LocalDate, Int>>
     ) {
-        val fileName = "LunarLog_Data_${System.currentTimeMillis()}.csv"
-        val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOCUMENTS), fileName)
-        
-        try {
-            FileOutputStream(file).use { output ->
-                val header = "Date,Type,Value\n"
-                output.write(header.toByteArray())
-                
-                cycleHistory.forEach { (date, length) ->
-                    val line = "$date,CycleLength,$length\n"
-                    output.write(line.toByteArray())
-                }
+        outputStream.use { output ->
+            val header = "Date,Type,Value\n"
+            output.write(header.toByteArray())
+            
+            cycleHistory.forEach { (date, length) ->
+                val line = "$date,CycleLength,$length\n"
+                output.write(line.toByteArray())
             }
-            Toast.makeText(context, "CSV exported to ${file.absolutePath}", Toast.LENGTH_LONG).show()
-        } catch (e: IOException) {
-             Toast.makeText(context, "Error saving CSV", Toast.LENGTH_SHORT).show()
         }
     }
 }

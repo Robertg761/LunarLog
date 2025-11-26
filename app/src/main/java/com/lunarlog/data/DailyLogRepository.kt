@@ -12,11 +12,11 @@ class DailyLogRepository @Inject constructor(
     private val dailyLogDao: DailyLogDao,
     private val logEntryDao: LogEntryDao
 ) {
-    fun getLogForDate(date: Long): Flow<DailyLog?> {
+    fun getLogForDate(date: LocalDate): Flow<DailyLog?> {
         return dailyLogDao.getLogForDate(date)
     }
 
-    fun getLogsForRange(startDate: Long, endDate: Long): Flow<List<DailyLog>> {
+    fun getLogsForRange(startDate: LocalDate, endDate: LocalDate): Flow<List<DailyLog>> {
         return dailyLogDao.getLogsForRange(startDate, endDate)
     }
 
@@ -70,7 +70,7 @@ class DailyLogRepository @Inject constructor(
         val existingEntries = logEntryDao.getEntriesForDateSync(date)
         if (existingEntries.isNotEmpty()) return
 
-        val legacyLog = dailyLogDao.getLogForDateSync(date) ?: return
+        val legacyLog = dailyLogDao.getLogForDateSync(LocalDate.ofEpochDay(date)) ?: return
 
         // Create default timestamp (Noon)
         val defaultTime = LocalDate.ofEpochDay(date)
@@ -124,7 +124,7 @@ class DailyLogRepository @Inject constructor(
         val entries = logEntryDao.getEntriesForDateSync(date)
         
         if (entries.isEmpty()) {
-            dailyLogDao.insertLog(DailyLog(date = date))
+            dailyLogDao.insertLog(DailyLog(date = LocalDate.ofEpochDay(date)))
             return@withContext
         }
 
@@ -158,7 +158,7 @@ class DailyLogRepository @Inject constructor(
         val cervicalMucus = mucusEntries.maxOfOrNull { it.value.toIntOrNull() ?: 0 } ?: 0
 
         val aggregate = DailyLog(
-            date = date,
+            date = LocalDate.ofEpochDay(date),
             flowLevel = flowLevel,
             mood = moods,
             symptoms = symptoms,

@@ -7,6 +7,10 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import android.widget.Toast
+import java.time.LocalDate
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -64,6 +68,43 @@ fun AnalysisScreen(
     var selectedTab by remember { mutableIntStateOf(0) }
     val context = LocalContext.current
 
+    val pdfLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("application/pdf")
+    ) { uri ->
+        uri?.let {
+            try {
+                context.contentResolver.openOutputStream(it)?.use { stream ->
+                    ReportGenerator.generatePdf(
+                        stream,
+                        uiState.cycleHistory,
+                        uiState.symptomCounts,
+                        uiState.moodCounts
+                    )
+                }
+                Toast.makeText(context, "PDF saved successfully", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(context, "Error saving PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    val csvLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.CreateDocument("text/csv")
+    ) { uri ->
+        uri?.let {
+            try {
+                context.contentResolver.openOutputStream(it)?.use { stream ->
+                    ReportGenerator.generateCsv(stream, uiState.cycleHistory)
+                }
+                Toast.makeText(context, "CSV saved successfully", Toast.LENGTH_LONG).show()
+            } catch (e: Exception) {
+                e.printStackTrace()
+                Toast.makeText(context, "Error saving CSV: ${e.message}", Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
     Scaffold(
         topBar = {
             TopAppBar(
@@ -104,15 +145,10 @@ fun AnalysisScreen(
                     0 -> TrendsTab(uiState)
                     1 -> ReportsTab(
                         onGeneratePdf = {
-                            ReportGenerator.generatePdf(
-                                context,
-                                uiState.cycleHistory,
-                                uiState.symptomCounts,
-                                uiState.moodCounts
-                            )
+                            pdfLauncher.launch("LunarLog_Report_${LocalDate.now()}.pdf")
                         },
                         onGenerateCsv = {
-                            ReportGenerator.generateCsv(context, uiState.cycleHistory)
+                            csvLauncher.launch("LunarLog_Data_${LocalDate.now()}.csv")
                         }
                     )
                 }
@@ -279,9 +315,10 @@ fun ReportsTab(onGeneratePdf: () -> Unit, onGenerateCsv: () -> Unit) {
         
         Spacer(modifier = Modifier.height(16.dp))
         Text(
-            "Documents are saved to your device's Documents folder.",
+            "You can choose where to save your reports (e.g., Downloads or Google Drive).",
             style = MaterialTheme.typography.bodySmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center
         )
     }
 }

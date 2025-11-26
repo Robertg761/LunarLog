@@ -3,6 +3,7 @@ package com.lunarlog.logic
 import com.lunarlog.core.model.Cycle
 import com.lunarlog.core.model.DailyLog
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 
 data class CycleSummary(
     val cycleId: Int,
@@ -26,12 +27,12 @@ object NarrativeGenerator {
     fun generateCycleSummary(cycle: Cycle, logs: List<DailyLog>): CycleSummary? {
         if (cycle.endDate == null) return null
 
-        val startDate = LocalDate.ofEpochDay(cycle.startDate)
-        val endDate = LocalDate.ofEpochDay(cycle.endDate)
-        val length = (cycle.endDate - cycle.startDate + 1).toInt()
+        val startDate = cycle.startDate
+        val endDate = cycle.endDate
+        val length = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
         
         // Filter logs specifically for this cycle
-        val cycleLogs = logs.filter { it.date in cycle.startDate..cycle.endDate }
+        val cycleLogs = logs.filter { !it.date.isBefore(startDate) && !it.date.isAfter(endDate) }
 
         val narrativeBuilder = StringBuilder()
         val insights = mutableListOf<String>()
@@ -84,14 +85,14 @@ object NarrativeGenerator {
     }
 
     fun generateWeeklyDigest(logs: List<DailyLog>, referenceDate: LocalDate = LocalDate.now()): WeeklyDigest {
-        val endDay = referenceDate.toEpochDay()
-        val startDay = referenceDate.minusDays(6).toEpochDay()
+        val endDay = referenceDate
+        val startDay = referenceDate.minusDays(6)
         
-        val weeklyLogs = logs.filter { it.date in startDay..endDay }
+        val weeklyLogs = logs.filter { !it.date.isBefore(startDay) && !it.date.isAfter(endDay) }
         
         if (weeklyLogs.isEmpty()) {
             return WeeklyDigest(
-                startDate = LocalDate.ofEpochDay(startDay),
+                startDate = startDay,
                 endDate = referenceDate,
                 narrative = "No logs recorded this week.",
                 dominantMood = null,
@@ -130,7 +131,7 @@ object NarrativeGenerator {
         }
 
         return WeeklyDigest(
-            startDate = LocalDate.ofEpochDay(startDay),
+            startDate = startDay,
             endDate = referenceDate,
             narrative = narrativeBuilder.toString(),
             dominantMood = dominantMood,

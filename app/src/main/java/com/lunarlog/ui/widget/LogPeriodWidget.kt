@@ -55,7 +55,7 @@ class LogPeriodWidget : GlanceAppWidget() {
         val latestCycle = cycles.maxByOrNull { it.startDate }
         
         val dayOfCycle = if (latestCycle != null) {
-            val start = LocalDate.ofEpochDay(latestCycle.startDate)
+            val start = latestCycle.startDate
             ChronoUnit.DAYS.between(start, today).toInt() + 1
         } else {
             1
@@ -154,7 +154,7 @@ class LogPeriodAction : ActionCallback {
         val db = Room.databaseBuilder(context, AppDatabase::class.java, "lunar_log_database").build()
         val cycleDao = db.cycleDao()
         
-        val today = LocalDate.now().toEpochDay()
+        val today = LocalDate.now()
         
         // Simple logic: Start a new cycle today
         // Check if cycle already exists for today to avoid dupes
@@ -165,7 +165,7 @@ class LogPeriodAction : ActionCallback {
             val lastCycle = cycles.maxByOrNull { it.startDate }
             
             if (lastCycle != null && lastCycle.endDate == null) {
-                cycleDao.updateCycle(lastCycle.copy(endDate = today - 1))
+                cycleDao.updateCycle(lastCycle.copy(endDate = today.minusDays(1)))
             }
             
             cycleDao.insertCycle(Cycle(startDate = today))

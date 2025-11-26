@@ -1,13 +1,14 @@
 # Changelog
 
-## [0.1.5] - 2025-11-26
+## [0.1.4] - 2025-11-26
+
+### Fixed
+- **Reports**: Resolved issue where PDF/CSV exports were saved to hidden private storage. Now uses the System File Picker (Storage Access Framework) to allow users to choose the save location (e.g., Downloads, Documents).
 
 ### Changed
 - **Architecture**: Moved `Cycle` and `DailyLog` models to `com.lunarlog.core.model` for better modularity.
 - **Architecture**: Moved `Converters` to `com.lunarlog.data` and refactored to use Gson for safer serialization.
 - **Safety**: Removed `fallbackToDestructiveMigration()` from production database configuration to prevent accidental data loss.
-
-## [0.1.4] - 2025-11-26
 
 ### Added
 - Enabled Compose compiler metrics for performance benchmarking (optional via `-PenableComposeCompilerMetrics=true`).

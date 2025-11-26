@@ -11,9 +11,9 @@ object AdvancedCycleIntelligence {
      * Uses a simplified "3 over 6" rule:
      * Ovulation is likely occurred the day BEFORE the temperature shift started.
      */
-    fun detectOvulationFromBBT(cycleStartDate: Long, logs: List<DailyLog>): LocalDate? {
+    fun detectOvulationFromBBT(cycleStartDate: LocalDate, logs: List<DailyLog>): LocalDate? {
         // Filter logs for this cycle
-        val cycleLogs = logs.filter { it.date >= cycleStartDate }
+        val cycleLogs = logs.filter { !it.date.isBefore(cycleStartDate) }
             .sortedBy { it.date }
             .filter { it.temperature != null }
 
@@ -36,7 +36,9 @@ object AdvancedCycleIntelligence {
                     // Potential shift detected at index i
                     // Ovulation is usually the day of the last low temp (index i-1) or day of shift (index i)
                     // We'll return the day of the last low temp (index i-1)
-                    return LocalDate.ofEpochDay(cycleLogs[i].date).minusDays(1)
+                    // cycleLogs[i].date is the first high temp day. So day before is index i-1.
+                    // But cycleLogs is filtered by temp != null, so index i-1 IS the last low temp day.
+                    return cycleLogs[i].date.minusDays(1)
                 }
             }
         }
@@ -47,14 +49,14 @@ object AdvancedCycleIntelligence {
      * Detects "Peak Day" based on Cervical Mucus.
      * Peak Day is the last day of "Egg White" (4) or "Watery" (3) mucus before drying up.
      */
-    fun detectPeakMucusDay(cycleStartDate: Long, logs: List<DailyLog>): LocalDate? {
-        val cycleLogs = logs.filter { it.date >= cycleStartDate }
+    fun detectPeakMucusDay(cycleStartDate: LocalDate, logs: List<DailyLog>): LocalDate? {
+        val cycleLogs = logs.filter { !it.date.isBefore(cycleStartDate) }
             .sortedBy { it.date }
         
         // Find the last day with highly fertile mucus (3 or 4)
         // followed by a day of lower fertility (0, 1, 2)
         
-        var potentialPeak: Long? = null
+        var potentialPeak: LocalDate? = null
         
         for (i in 0 until cycleLogs.size - 1) {
             val current = cycleLogs[i]
@@ -65,11 +67,11 @@ object AdvancedCycleIntelligence {
             }
             
             // If we had a peak candidate, and now it's drying up, confirm it
-            if (potentialPeak != null && next.cervicalMucus < 3 && next.date == current.date + 1) {
+            if (potentialPeak != null && next.cervicalMucus < 3 && next.date == current.date.plusDays(1)) {
                 // Confirming this block as a peak
             }
         }
         
-        return potentialPeak?.let { LocalDate.ofEpochDay(it) }
+        return potentialPeak
     }
 }

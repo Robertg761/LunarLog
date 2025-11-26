@@ -23,11 +23,12 @@ object SymptomCorrelationEngine {
 
         // 1. Map logs to cycle days
         for (log in logs) {
-            val logDate = LocalDate.ofEpochDay(log.date)
+            val logDate = log.date
             // Find the cycle this log belongs to
-            val cycle = sortedCycles.findLast { it.startDate <= log.date } ?: continue
+            // findLast implies we want the latest cycle that started before or on the log date
+            val cycle = sortedCycles.findLast { !it.startDate.isAfter(log.date) } ?: continue
             
-            val cycleStart = LocalDate.ofEpochDay(cycle.startDate)
+            val cycleStart = cycle.startDate
             val dayOfCycle = ChronoUnit.DAYS.between(cycleStart, logDate).toInt() + 1
 
             if (dayOfCycle > 50) continue // Ignore extremely long outlier days
@@ -44,8 +45,8 @@ object SymptomCorrelationEngine {
         // However, this is complex because we need to know if the cycle *ended* before that day.
         // Simplified approach: Count how many cycles have a duration >= X.
         val cycleLengths = sortedCycles.map { 
-             val start = LocalDate.ofEpochDay(it.startDate)
-             val end = if (it.endDate != null) LocalDate.ofEpochDay(it.endDate) else LocalDate.now()
+             val start = it.startDate
+             val end = it.endDate ?: LocalDate.now()
              ChronoUnit.DAYS.between(start, end).toInt() + 1
         }
         

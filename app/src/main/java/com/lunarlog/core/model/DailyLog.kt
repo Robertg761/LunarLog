@@ -2,10 +2,11 @@ package com.lunarlog.core.model
 
 import androidx.room.Entity
 import androidx.room.PrimaryKey
+import java.time.LocalDate
 
 @Entity(tableName = "daily_logs")
 data class DailyLog(
-    @PrimaryKey val date: Long, // Epoch Day
+    @PrimaryKey val date: LocalDate,
     val flowLevel: Int = 0, // 0=None, 1=Spotting, 2=Light, 3=Medium, 4=Heavy
     val mood: List<String> = emptyList(),
     val symptoms: List<String> = emptyList(),

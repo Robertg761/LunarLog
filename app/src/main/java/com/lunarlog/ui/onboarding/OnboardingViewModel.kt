@@ -28,7 +28,7 @@ class OnboardingViewModel @Inject constructor(
             // We assume it ended? No, if it's the *last* period, it might be the start of the current cycle.
             // Usually trackers ask for "Start date of last period".
             cycleRepository.insertCycle(
-                Cycle(startDate = lastPeriodDate.toEpochDay())
+                Cycle(startDate = lastPeriodDate)
             )
             userPreferencesRepository.setFirstRunComplete()
             _isLoading.value = false

@@ -3,6 +3,7 @@ package com.lunarlog.ui.calendar
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lunarlog.core.model.Cycle
+import com.lunarlog.core.config.AppConfig
 import com.lunarlog.data.CycleRepository
 import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.DailyLogRepository
@@ -36,7 +37,7 @@ class CalendarViewModel @Inject constructor(
     .flowOn(Dispatchers.Default)
     .stateIn(
         viewModelScope,
-        SharingStarted.WhileSubscribed(5000),
+        SharingStarted.WhileSubscribed(AppConfig.FLOW_SUBSCRIPTION_TIMEOUT),
         CalendarDataState.Loading
     )
 
@@ -45,7 +46,7 @@ class CalendarViewModel @Inject constructor(
 
         // 1. Map Logs (Fast lookup)
         logs.forEach { log ->
-            dayMap[log.date] = DayData(
+            dayMap[log.date.toEpochDay()] = DayData(
                 hasLog = true,
                 flowIntensity = log.flowLevel
             )
@@ -54,8 +55,8 @@ class CalendarViewModel @Inject constructor(
         // 2. Map Cycles (Actual)
         val sortedCycles = cycles.sortedBy { it.startDate }
         sortedCycles.forEach { cycle ->
-            val start = cycle.startDate
-            val end = cycle.endDate ?: start // Default to start if null (in progress)
+            val start = cycle.startDate.toEpochDay()
+            val end = cycle.endDate?.toEpochDay() ?: start // Default to start if null (in progress)
             
             // If in progress, assume active for today (or handled by logic), 
             // but for historical view, we just render what's there.
@@ -97,7 +98,7 @@ class CalendarViewModel @Inject constructor(
 
                 // Fertile Window Prediction
                 val (fStart, fEnd) = CyclePredictionUtils.predictFertileWindow(currentStart)
-                val ovDate = currentStart.minusDays(14).toEpochDay()
+                val ovDate = currentStart.minusDays(AppConfig.DEFAULT_LUTEAL_PHASE_LENGTH.toLong()).toEpochDay() // Fixed 14 to Config
                 
                 for (day in fStart.toEpochDay()..fEnd.toEpochDay()) {
                     val current = dayMap[day] ?: DayData()
@@ -112,14 +113,6 @@ class CalendarViewModel @Inject constructor(
                 currentStart = currentStart.plusDays(avgLength.toLong())
             }
         }
-
-        // 4. Calculate PeriodType (Connectivity)
-        // We iterate through the map's keys that have isPeriod = true
-        // Optimally: Just iterate the cycles again? No, we need the map for random access
-        // actually, we can do this lazily or in a second pass over the known period days.
-        // For simplicity and speed in this cache building:
-        // We will just let the UI determine connectivity based on neighbors in the map.
-        // It's fast enough to look up (day-1) and (day+1) in the map.
 
         return CalendarDataState.Success(dayMap)
     }

@@ -60,8 +60,8 @@ class LogDetailsViewModel @Inject constructor(
 
     private fun loadSymptoms() {
         viewModelScope.launch {
-            val endDate = LocalDate.now().toEpochDay()
-            val startDate = LocalDate.now().minusDays(90).toEpochDay()
+            val endDate = LocalDate.now()
+            val startDate = LocalDate.now().minusDays(90)
 
             combine(
                 symptomRepository.getAllSymptoms(),
@@ -102,7 +102,7 @@ class LogDetailsViewModel @Inject constructor(
             _uiState.value = _uiState.value.copy(isLoading = true, date = date)
             try {
                 // We use firstOrNull to get the current state from DB once for editing
-                val log = repository.getLogForDate(date.toEpochDay()).firstOrNull()
+                val log = repository.getLogForDate(date).firstOrNull()
                 
                 if (log != null) {
                     _uiState.value = _uiState.value.copy(
@@ -187,7 +187,7 @@ class LogDetailsViewModel @Inject constructor(
             try {
                 repository.saveLog(
                     DailyLog(
-                        date = state.date.toEpochDay(),
+                        date = state.date,
                         flowLevel = state.flowLevel,
                         symptoms = state.selectedSymptoms,
                         mood = state.selectedMoods,

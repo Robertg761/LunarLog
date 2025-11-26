@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import javax.inject.Inject
 
 data class AnalysisUiState(
@@ -48,15 +49,15 @@ class AnalysisViewModel @Inject constructor(
             val cycles = cycleRepository.getAllCycles().first()
             val cycleHistory = cycles.filter { it.endDate != null }
                 .map { 
-                    val start = LocalDate.ofEpochDay(it.startDate)
-                    val length = (it.endDate!! - it.startDate + 1).toInt()
+                    val start = it.startDate
+                    val length = (ChronoUnit.DAYS.between(start, it.endDate!!) + 1).toInt()
                     start to length
                 }
                 .sortedBy { it.first }
 
             // Load Logs (Last 6 months)
-            val endDay = LocalDate.now().toEpochDay()
-            val startDay = LocalDate.now().minusMonths(6).toEpochDay()
+            val endDay = LocalDate.now()
+            val startDay = LocalDate.now().minusMonths(6)
             val logs = dailyLogRepository.getLogsForRange(startDay, endDay).first()
 
             val symptomCounts = logs.flatMap { it.symptoms }
