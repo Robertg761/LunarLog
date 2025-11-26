@@ -2,9 +2,9 @@ package com.lunarlog.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lunarlog.data.Cycle
+import com.lunarlog.core.model.Cycle
 import com.lunarlog.data.CycleRepository
-import com.lunarlog.data.DailyLog
+import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType

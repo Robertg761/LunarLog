@@ -32,8 +32,8 @@ import androidx.glance.unit.ColorProvider
 import androidx.room.Room
 import com.lunarlog.R
 import com.lunarlog.data.AppDatabase
-import com.lunarlog.data.Cycle
-import com.lunarlog.data.DailyLog
+import com.lunarlog.core.model.Cycle
+import com.lunarlog.core.model.DailyLog
 import com.lunarlog.logic.CyclePredictionUtils
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

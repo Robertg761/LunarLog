@@ -1,6 +1,6 @@
 package com.lunarlog.logic
 
-import com.lunarlog.data.Cycle
+import com.lunarlog.core.model.Cycle
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 

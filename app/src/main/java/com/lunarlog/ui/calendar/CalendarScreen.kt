@@ -6,6 +6,7 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
@@ -22,6 +23,7 @@ import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
@@ -257,13 +259,30 @@ fun CalendarDayCell(
 ) {
     val haptic = LocalHapticFeedback.current
     val isToday = day.date == LocalDate.now()
+    val isDark = isSystemInDarkTheme()
     
     // Theme Colors
     val periodColor = PeriodRed
-    val periodBgColor = PeriodSurface
+    // Dynamic Base Color
+    val periodBaseColor = if (isDark) PeriodSurfaceDark else PeriodSurface
+    // Interpolate Color based on Flow
+    val finalPeriodColor = if (day.data.hasLog && day.data.flowIntensity > 0) {
+        val t = day.data.flowIntensity / 4f // 0.25, 0.5, 0.75, 1.0
+        lerp(periodBaseColor, periodColor, t)
+    } else {
+        periodBaseColor
+    }
+    
     val fertileColor = FertileGreen
     val ovulationColor = OvulationBlue
-    val onPeriodSurface = OnPeriodSurface
+    
+    // Text Color Logic
+    val onPeriodSurface = if (isDark && (day.data.flowIntensity < 3)) {
+        OnPeriodSurfaceDark 
+    } else {
+        OnPeriodSurface
+    }
+    
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
 
     Box(
@@ -288,16 +307,19 @@ fun CalendarDayCell(
 
             // 1. Draw Period Background (Connected Pill)
             if (day.data.isPeriod) {
+                // Use finalPeriodColor here
+                val color = finalPeriodColor 
+
                 when (day.periodType) {
                     PeriodType.START -> {
                         // Rounded Left (Circle), Flat Right (Rect)
                         drawCircle(
-                            color = periodBgColor,
+                            color = color,
                             radius = radius,
                             center = center
                         )
                         drawRect(
-                            color = periodBgColor,
+                            color = color,
                             topLeft = Offset(cx, barTop),
                             size = Size(w - cx, barHeight)
                         )
@@ -305,7 +327,7 @@ fun CalendarDayCell(
                     PeriodType.MIDDLE -> {
                         // Flat Left, Flat Right
                         drawRect(
-                            color = periodBgColor,
+                            color = color,
                             topLeft = Offset(0f, barTop),
                             size = Size(w, barHeight)
                         )
@@ -313,12 +335,12 @@ fun CalendarDayCell(
                     PeriodType.END -> {
                         // Flat Left (Rect), Rounded Right (Circle)
                         drawRect(
-                            color = periodBgColor,
+                            color = color,
                             topLeft = Offset(0f, barTop),
                             size = Size(cx, barHeight)
                         )
                         drawCircle(
-                            color = periodBgColor,
+                            color = color,
                             radius = radius,
                             center = center
                         )
@@ -326,7 +348,7 @@ fun CalendarDayCell(
                     PeriodType.SINGLE -> {
                         // Rounded All (Circle)
                         drawCircle(
-                            color = periodBgColor,
+                            color = color,
                             radius = radius,
                             center = center
                         )
@@ -402,7 +424,7 @@ fun CalendarDayCell(
         // 5. Date Text
         Text(
             text = day.date.dayOfMonth.toString(),
-            color = if (day.data.isPeriod) OnPeriodSurface 
+            color = if (day.data.isPeriod) onPeriodSurface 
                    else if (!day.isCurrentMonth) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) 
                    else MaterialTheme.colorScheme.onSurface,
             style = MaterialTheme.typography.bodyMedium,

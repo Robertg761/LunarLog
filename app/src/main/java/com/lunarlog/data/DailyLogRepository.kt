@@ -1,6 +1,7 @@
 package com.lunarlog.data
 
 import kotlinx.coroutines.flow.Flow
+import com.lunarlog.core.model.DailyLog
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject

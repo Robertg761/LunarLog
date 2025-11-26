@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.1.5] - 2025-11-26
+
+### Changed
+- **Architecture**: Moved `Cycle` and `DailyLog` models to `com.lunarlog.core.model` for better modularity.
+- **Architecture**: Moved `Converters` to `com.lunarlog.data` and refactored to use Gson for safer serialization.
+- **Safety**: Removed `fallbackToDestructiveMigration()` from production database configuration to prevent accidental data loss.
+
 ## [0.1.4] - 2025-11-26
 
 ### Added

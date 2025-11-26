@@ -1,6 +1,7 @@
 package com.lunarlog.data
 
 import javax.inject.Inject
+import com.lunarlog.core.model.Cycle
 import kotlinx.coroutines.flow.Flow
 
 class CycleRepository @Inject constructor(private val cycleDao: CycleDao) {

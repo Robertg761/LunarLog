@@ -1,7 +1,7 @@
 package com.lunarlog.logic
 
-import com.lunarlog.data.Cycle
-import com.lunarlog.data.DailyLog
+import com.lunarlog.core.model.Cycle
+import com.lunarlog.core.model.DailyLog
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Test

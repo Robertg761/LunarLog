@@ -2,7 +2,7 @@ package com.lunarlog.ui.loghistory
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lunarlog.data.DailyLog
+import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.data.SymptomDefinition
 import com.lunarlog.data.SymptomRepository

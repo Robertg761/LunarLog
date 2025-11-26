@@ -19,7 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.lunarlog.data.DailyLog
+import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.SymptomDefinition
 import java.time.LocalDate
 import java.time.format.DateTimeFormatter

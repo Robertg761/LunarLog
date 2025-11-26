@@ -1,7 +1,6 @@
 package com.lunarlog.ui.home
 
-import com.lunarlog.data.Cycle
-import com.lunarlog.data.CycleRepository
+import com.lunarlog.core.model.Cycleimport com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
 import io.mockk.every
 import io.mockk.mockk

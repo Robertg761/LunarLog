@@ -2,7 +2,7 @@ package com.lunarlog.ui.onboarding
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lunarlog.data.Cycle
+import com.lunarlog.core.model.Cycle
 import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.UserPreferencesRepository
 import dagger.hilt.android.lifecycle.HiltViewModel

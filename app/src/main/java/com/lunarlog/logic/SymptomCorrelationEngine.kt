@@ -1,7 +1,7 @@
 package com.lunarlog.logic
 
-import com.lunarlog.data.Cycle
-import com.lunarlog.data.DailyLog
+import com.lunarlog.core.model.Cycle
+import com.lunarlog.core.model.DailyLog
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 

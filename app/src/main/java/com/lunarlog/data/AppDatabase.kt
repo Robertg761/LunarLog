@@ -5,7 +5,9 @@ import androidx.room.RoomDatabase
 import androidx.room.TypeConverters
 import androidx.room.migration.Migration
 import androidx.sqlite.db.SupportSQLiteDatabase
-import com.lunarlog.logic.Converters
+import com.lunarlog.core.model.Cycle
+import com.lunarlog.core.model.DailyLog
+import com.lunarlog.data.Converters
 
 @Database(
     entities = [

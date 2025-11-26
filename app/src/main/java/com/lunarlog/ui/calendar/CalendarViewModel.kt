@@ -2,9 +2,9 @@ package com.lunarlog.ui.calendar
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lunarlog.data.Cycle
+import com.lunarlog.core.model.Cycle
 import com.lunarlog.data.CycleRepository
-import com.lunarlog.data.DailyLog
+import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.logic.CyclePredictionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel

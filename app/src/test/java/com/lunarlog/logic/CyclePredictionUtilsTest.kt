@@ -1,6 +1,6 @@
 package com.lunarlog.logic
 
-import com.lunarlog.data.Cycle
+import com.lunarlog.core.model.Cycle
 import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.LocalDate

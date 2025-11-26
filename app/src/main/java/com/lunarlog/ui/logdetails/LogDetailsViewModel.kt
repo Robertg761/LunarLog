@@ -3,7 +3,7 @@ package com.lunarlog.ui.logdetails
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lunarlog.data.DailyLog
+import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.data.SymptomCategory
 import com.lunarlog.data.SymptomDefinition

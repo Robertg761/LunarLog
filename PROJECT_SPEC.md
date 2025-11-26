@@ -204,10 +204,33 @@
 - [x] **Container Transforms**: Implement Material 3 Motion `ContainerTransform` for smooth Circle-to-Rect transitions (List to Detail).
 - [x] **Performance**: Optimize haptic feedback calls and reduce composition overhead in grids.
 
+### 🚧 Phase 10: Technical Debt & Architecture Remediation (Nov 2025)
+*Goal: Eliminate critical stability risks, fix circular dependencies, and optimize data layer performance.*
+
+#### 1. Critical Stabilization (Safety & Architecture)
+*High priority fixes to prevent data loss and build failures.*
+- [ ] **Fix Circular Dependencies**: 
+    - Move `Converters.kt` from `logic` to `data` package.
+    - Extract shared data models (`Cycle`, `DailyLog`) to `com.lunarlog.core.model`.
+- [ ] **Secure Database Migration**: Remove `fallbackToDestructiveMigration()` from production configuration to prevent data loss.
+- [ ] **Harden Data Serialization**: Refactor `Converters.kt` to use safer delimiters (or JSON) to prevent corruption from user inputs containing semicolons.
+
+#### 2. Performance Optimization
+*Resolve bottlenecks causing UI lag and battery drain.*
+- [ ] **Refactor DailyLogRepository**: Decouple the "Aggregate Write" logic to run asynchronously (Fire & Forget) or optimize to update only changed fields.
+- [ ] **Optimize HomeViewModel**: Move `getTopSymptomsForPhase` and other heavy logic off the Main Thread (`Dispatchers.Default`).
+- [ ] **Efficient Querying**: Replace linear O(N) in-memory filtering with optimized Maps or SQL queries where possible.
+
+#### 3. Code Quality & Clean Architecture
+- [ ] **Extract Business Logic**: Move logic like `togglePeriod` out of ViewModels into `CycleRepository` or UseCases.
+- [ ] **Centralize Config**: Create `AppConfig` or `BusinessRules` to house magic numbers (e.g., "28 days" default).
+- [ ] **Strict Typing**: Reduce primitive obsession by using `LocalDate` in Repositories instead of raw `Long` timestamps.
+
 ---
 
 ## 📂 File Structure & Conventions
-*   **`data/`**: Entities, DAOs, Repositories, Database.
+*   **`core/model`**: Shared entities and domain objects.
+*   **`data/`**: DAOs, Repositories, Database.
 *   **`logic/`**: Pure Kotlin business logic (predictions, math).
 *   **`ui/`**: Composable screens, ViewModels, Theme.
     *   `ui/home/`
