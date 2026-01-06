@@ -3,7 +3,9 @@ package com.lunarlog.ui.logdetails
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lunarlog.core.model.Cycle
 import com.lunarlog.core.model.DailyLog
+import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.data.SymptomCategory
 import com.lunarlog.data.SymptomDefinition
@@ -33,13 +35,16 @@ data class LogDetailsUiState(
     val isLoading: Boolean = true,
     val isSaving: Boolean = false,
     val isSaved: Boolean = false,
-    val errorMessage: String? = null
+    val errorMessage: String? = null,
+    val isPeriodDay: Boolean = false,
+    val periodMessage: String? = null
 )
 
 @HiltViewModel
 class LogDetailsViewModel @Inject constructor(
     private val repository: DailyLogRepository,
     private val symptomRepository: SymptomRepository,
+    private val cycleRepository: CycleRepository,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -56,6 +61,7 @@ class LogDetailsViewModel @Inject constructor(
         }
         loadLog(date)
         loadSymptoms()
+        loadPeriodStatus(date)
     }
 
     private fun loadSymptoms() {
@@ -214,5 +220,30 @@ class LogDetailsViewModel @Inject constructor(
     
     fun onErrorShown() {
         _uiState.value = _uiState.value.copy(errorMessage = null)
+    }
+
+    fun onPeriodMessageShown() {
+        _uiState.value = _uiState.value.copy(periodMessage = null)
+    }
+
+    private fun loadPeriodStatus(date: LocalDate) {
+        viewModelScope.launch {
+            val cycles = cycleRepository.getAllCyclesSync()
+            val isPeriod = cycles.any { cycle ->
+                val start = cycle.startDate
+                val end = cycle.endDate ?: LocalDate.now()
+                !date.isBefore(start) && !date.isAfter(end)
+            }
+            _uiState.value = _uiState.value.copy(isPeriodDay = isPeriod)
+        }
+    }
+
+    fun togglePeriod() {
+        viewModelScope.launch {
+            val date = _uiState.value.date
+            val message = cycleRepository.togglePeriod(date)
+            loadPeriodStatus(date)
+            _uiState.value = _uiState.value.copy(periodMessage = message)
+        }
     }
 }

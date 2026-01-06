@@ -13,8 +13,8 @@ android {
         applicationId = "com.lunarlog"
         minSdk = 26
         targetSdk = 34
-        versionCode = 7
-        versionName = "0.1.4"
+        versionCode = 8
+        versionName = "1.4.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -45,6 +45,7 @@ android {
 
     buildFeatures {
         compose = true
+        buildConfig = true
     }
 
     composeOptions {

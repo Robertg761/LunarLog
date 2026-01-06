@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.lunarlog.BuildConfig
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -324,6 +325,32 @@ fun SettingsScreen(
                 Icon(Icons.Filled.DeleteForever, "Delete Icon")
                 Spacer(modifier = Modifier.padding(4.dp))
                 Text("Nuke Data (Factory Reset)")
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
+            // About Section
+            Text(
+                "About",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Text("LunarLog", style = MaterialTheme.typography.titleLarge)
+                    Text(
+                        "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
+                        style = MaterialTheme.typography.bodyMedium,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "A privacy-first period tracker.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
             }
         }
     }

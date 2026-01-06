@@ -39,9 +39,17 @@ fun LogListScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showAddSheet by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<LogEntry?>(null) }
+    val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(date) {
         viewModel.loadDate(date)
+    }
+
+    LaunchedEffect(uiState.periodMessage) {
+        uiState.periodMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.onPeriodMessageShown()
+        }
     }
 
     Scaffold(
@@ -73,32 +81,48 @@ fun LogListScreen(
             }) {
                 Icon(Icons.Default.Add, "Add Log")
             }
-        }
+        },
+        snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
         if (uiState.isLoading) {
             Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                 CircularProgressIndicator()
             }
         } else if (uiState.entries.isEmpty()) {
-            Box(Modifier.fillMaxSize().padding(padding), contentAlignment = Alignment.Center) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Outlined.Timeline,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        text = "No logs for this day",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Tap + to add an entry",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
+            Column(
+                modifier = Modifier.fillMaxSize().padding(padding),
+                horizontalAlignment = Alignment.CenterHorizontally
+            ) {
+                // Period Toggle Card
+                PeriodToggleCard(
+                    isPeriodDay = uiState.isPeriodDay,
+                    onToggle = { viewModel.togglePeriod() }
+                )
+                
+                // Empty State
+                Box(
+                    modifier = Modifier.weight(1f),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Icon(
+                            imageVector = Icons.Outlined.Timeline,
+                            contentDescription = null,
+                            modifier = Modifier.size(48.dp),
+                            tint = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(Modifier.height(16.dp))
+                        Text(
+                            text = "No logs for this day",
+                            style = MaterialTheme.typography.bodyLarge,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "Tap + to add an entry",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        )
+                    }
                 }
             }
         } else {
@@ -107,6 +131,13 @@ fun LogListScreen(
                 contentPadding = PaddingValues(16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
+                item {
+                    PeriodToggleCard(
+                        isPeriodDay = uiState.isPeriodDay,
+                        onToggle = { viewModel.togglePeriod() },
+                        modifier = Modifier.padding(bottom = 8.dp)
+                    )
+                }
                 items(uiState.entries) { entry ->
                     LogEntryCard(
                         entry = entry,
@@ -188,6 +219,60 @@ fun LogEntryCard(
             IconButton(onClick = onDelete) {
                 Icon(Icons.Default.Delete, "Delete", tint = MaterialTheme.colorScheme.error)
             }
+        }
+    }
+}
+
+@Composable
+fun PeriodToggleCard(
+    isPeriodDay: Boolean,
+    onToggle: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 8.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = if (isPeriodDay) 
+                MaterialTheme.colorScheme.primaryContainer 
+            else 
+                MaterialTheme.colorScheme.surfaceVariant
+        )
+    ) {
+        Row(
+            modifier = Modifier.padding(16.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Default.WaterDrop,
+                contentDescription = "Period",
+                tint = if (isPeriodDay) 
+                    MaterialTheme.colorScheme.primary 
+                else 
+                    MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.width(16.dp))
+            Column(modifier = Modifier.weight(1f)) {
+                Text(
+                    "Period",
+                    style = MaterialTheme.typography.titleMedium,
+                    color = if (isPeriodDay) 
+                        MaterialTheme.colorScheme.onPrimaryContainer 
+                    else 
+                        MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    if (isPeriodDay) "This day is marked as period" else "Tap to mark as period day",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = if (isPeriodDay) 
+                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) 
+                    else 
+                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                )
+            }
+            Switch(
+                checked = isPeriodDay,
+                onCheckedChange = { onToggle() }
+            )
         }
     }
 }

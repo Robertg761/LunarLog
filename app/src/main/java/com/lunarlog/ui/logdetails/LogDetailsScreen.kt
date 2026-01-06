@@ -25,6 +25,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Remove
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.outlined.StarBorder
 import androidx.compose.material3.AlertDialog
@@ -99,6 +100,13 @@ fun LogDetailsScreen(
         }
     }
 
+    LaunchedEffect(uiState.periodMessage) {
+        uiState.periodMessage?.let { message ->
+            snackbarHostState.showSnackbar(message)
+            viewModel.onPeriodMessageShown()
+        }
+    }
+
     Box(modifier = Modifier.fillMaxSize()) {
     Scaffold(
         modifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
@@ -155,6 +163,29 @@ fun LogDetailsScreen(
                     .verticalScroll(rememberScrollState())
                     .padding(16.dp)
             ) {
+                // Period Section
+                SectionHeader("Period")
+                val view = LocalView.current
+                FilterChip(
+                    selected = uiState.isPeriodDay,
+                    onClick = {
+                        view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
+                        viewModel.togglePeriod()
+                    },
+                    label = {
+                        Text(if (uiState.isPeriodDay) "Period Day" else "Mark as Period")
+                    },
+                    leadingIcon = {
+                        Icon(
+                            imageVector = Icons.Filled.WaterDrop,
+                            contentDescription = null,
+                            tint = if (uiState.isPeriodDay) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                )
+
+                Spacer(modifier = Modifier.height(24.dp))
+
                 // Flow Section
                 SectionHeader("Flow Intensity")
                 Text(

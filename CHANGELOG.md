@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.4.1] - 2026-01-06
+
+### Added
+- **Retroactive Period Logging**: Tap any past date in Calendar to mark it as a period day with the new Period toggle switch.
+- **Version Display**: Settings now shows app version in the About section.
+
+### Fixed
+- **Crash on Startup**: Fixed theme incompatibility crash (Theme.AppCompat required by AppCompatActivity).
+- **Duplicate Resources**: Removed duplicate `Theme.LunarLog` definition that caused release build failures.
+
 ## [0.1.4] - 2025-11-26
 
 ### Fixed

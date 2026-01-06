@@ -2,6 +2,7 @@ package com.lunarlog.ui.loglist
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
@@ -17,14 +18,17 @@ import javax.inject.Inject
 
 @HiltViewModel
 class LogListViewModel @Inject constructor(
-    private val repository: DailyLogRepository
+    private val repository: DailyLogRepository,
+    private val cycleRepository: CycleRepository
 ) : ViewModel() {
 
     // UI State
     data class UiState(
         val date: LocalDate = LocalDate.now(),
         val entries: List<LogEntry> = emptyList(),
-        val isLoading: Boolean = false
+        val isLoading: Boolean = false,
+        val isPeriodDay: Boolean = false,
+        val periodMessage: String? = null
     )
     
     private val _uiState = MutableStateFlow(UiState())
@@ -37,6 +41,8 @@ class LogListViewModel @Inject constructor(
             entries = emptyList(), // Clear old entries
             isLoading = true
         )
+        
+        loadPeriodStatus(localDate)
         
         viewModelScope.launch {
             try {
@@ -136,5 +142,30 @@ class LogListViewModel @Inject constructor(
                 }
             }
         }
+    }
+
+    private fun loadPeriodStatus(date: LocalDate) {
+        viewModelScope.launch {
+            val cycles = cycleRepository.getAllCyclesSync()
+            val isPeriod = cycles.any { cycle ->
+                val start = cycle.startDate
+                val end = cycle.endDate ?: LocalDate.now()
+                !date.isBefore(start) && !date.isAfter(end)
+            }
+            _uiState.value = _uiState.value.copy(isPeriodDay = isPeriod)
+        }
+    }
+
+    fun togglePeriod() {
+        viewModelScope.launch {
+            val date = _uiState.value.date
+            val message = cycleRepository.togglePeriod(date)
+            loadPeriodStatus(date)
+            _uiState.value = _uiState.value.copy(periodMessage = message)
+        }
+    }
+
+    fun onPeriodMessageShown() {
+        _uiState.value = _uiState.value.copy(periodMessage = null)
     }
 }
