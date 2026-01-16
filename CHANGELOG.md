@@ -1,5 +1,17 @@
 # Changelog
 
+## [1.5.0] - 2026-01-16
+
+### Added
+- **Period History View**: New "Periods" tab in bottom navigation to view all recorded periods in a list format (most recent first).
+- **Period Details**: Tap any period to view and edit start/end dates, see logged symptoms for each day, or delete the period.
+- **Period Management**: FAB in Period History to log new periods quickly.
+
+### Fixed
+- **Period Toggle Bug**: Fixed race condition where toggling a period day wouldn't update the UI correctly.
+
+---
+
 ## [1.4.1] - 2026-01-06
 
 ### Added

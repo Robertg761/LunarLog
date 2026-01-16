@@ -9,9 +9,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Timeline
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material.icons.outlined.Home
 import androidx.compose.material.icons.outlined.Timeline
+import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
 import androidx.compose.material3.NavigationBarItem
@@ -47,11 +49,15 @@ sealed class Screen(
     val label: String? = null
 ) {
     object Home : Screen("home", Icons.Default.Home, Icons.Outlined.Home, "Home")
+    object PeriodHistory : Screen("period_history", Icons.Default.WaterDrop, Icons.Outlined.WaterDrop, "Periods")
     object Calendar : Screen("calendar", Icons.Default.DateRange, Icons.Outlined.DateRange, "Calendar")
     object Analysis : Screen("analysis", Icons.Default.Timeline, Icons.Outlined.Timeline, "Insights")
     object Logging : Screen("logging")
     object Details : Screen("details/{date}") {
         fun createRoute(date: Long) = "details/$date"
+    }
+    object PeriodDetail : Screen("period_detail/{cycleId}") {
+        fun createRoute(cycleId: Int) = "period_detail/$cycleId"
     }
     object Settings : Screen("settings")
     object LogHistory : Screen("log_history")
@@ -61,8 +67,9 @@ sealed class Screen(
 private fun getScreenOrder(route: String?): Int {
     return when (route) {
         Screen.Home.route -> 0
-        Screen.Calendar.route -> 1
-        Screen.Analysis.route -> 2
+        Screen.PeriodHistory.route -> 1
+        Screen.Calendar.route -> 2
+        Screen.Analysis.route -> 3
         else -> -1
     }
 }
@@ -78,7 +85,7 @@ fun LunarLogNavGraph(
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    val bottomNavItems = listOf(Screen.Home, Screen.Calendar, Screen.Analysis)
+    val bottomNavItems = listOf(Screen.Home, Screen.PeriodHistory, Screen.Calendar, Screen.Analysis)
     val showBottomBar = bottomNavItems.any { it.route == currentDestination?.route }
 
     Scaffold(
@@ -252,6 +259,47 @@ fun LunarLogNavGraph(
                     LogListScreen(
                         date = date,
                         onBack = { navController.popBackStack() }
+                    )
+                }
+                composable(
+                    route = Screen.PeriodHistory.route,
+                    enterTransition = {
+                        val initial = getScreenOrder(initialState.destination.route)
+                        val target = getScreenOrder(targetState.destination.route)
+                        if (initial != -1 && target != -1) {
+                            if (initial < target) slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
+                            else slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
+                        } else null
+                    },
+                    exitTransition = {
+                        val initial = getScreenOrder(initialState.destination.route)
+                        val target = getScreenOrder(targetState.destination.route)
+                        if (initial != -1 && target != -1) {
+                            if (initial < target) slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
+                            else slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
+                        } else null
+                    }
+                ) {
+                    com.lunarlog.ui.periodhistory.PeriodHistoryScreen(
+                        onCycleClick = { cycleId ->
+                            navController.navigate(Screen.PeriodDetail.createRoute(cycleId))
+                        },
+                        onAddPeriodClick = {
+                            navController.navigate(Screen.Logging.route)
+                        },
+                        sharedTransitionScope = this@SharedTransitionLayout,
+                        animatedVisibilityScope = this
+                    )
+                }
+                composable(
+                    route = Screen.PeriodDetail.route,
+                    arguments = listOf(navArgument("cycleId") { type = NavType.IntType })
+                ) {
+                    com.lunarlog.ui.periodhistory.PeriodDetailScreen(
+                        onBack = { navController.popBackStack() },
+                        onDayClick = { date ->
+                            navController.navigate(Screen.Details.createRoute(date))
+                        }
                     )
                 }
             }

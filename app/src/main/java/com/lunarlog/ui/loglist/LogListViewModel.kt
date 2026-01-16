@@ -42,10 +42,12 @@ class LogListViewModel @Inject constructor(
             isLoading = true
         )
         
-        loadPeriodStatus(localDate)
-        
         viewModelScope.launch {
             try {
+                // Load period status first
+                val isPeriod = checkPeriodStatus(localDate)
+                _uiState.value = _uiState.value.copy(isPeriodDay = isPeriod)
+                
                 repository.ensureLegacyDataHydrated(date)
                 
                 repository.getEntriesForDate(date).collect { list ->
@@ -144,15 +146,12 @@ class LogListViewModel @Inject constructor(
         }
     }
 
-    private fun loadPeriodStatus(date: LocalDate) {
-        viewModelScope.launch {
-            val cycles = cycleRepository.getAllCyclesSync()
-            val isPeriod = cycles.any { cycle ->
-                val start = cycle.startDate
-                val end = cycle.endDate ?: LocalDate.now()
-                !date.isBefore(start) && !date.isAfter(end)
-            }
-            _uiState.value = _uiState.value.copy(isPeriodDay = isPeriod)
+    private suspend fun checkPeriodStatus(date: LocalDate): Boolean {
+        val cycles = cycleRepository.getAllCyclesSync()
+        return cycles.any { cycle ->
+            val start = cycle.startDate
+            val end = cycle.endDate ?: LocalDate.now()
+            !date.isBefore(start) && !date.isAfter(end)
         }
     }
 
@@ -160,8 +159,11 @@ class LogListViewModel @Inject constructor(
         viewModelScope.launch {
             val date = _uiState.value.date
             val message = cycleRepository.togglePeriod(date)
-            loadPeriodStatus(date)
-            _uiState.value = _uiState.value.copy(periodMessage = message)
+            val isPeriod = checkPeriodStatus(date)
+            _uiState.value = _uiState.value.copy(
+                isPeriodDay = isPeriod,
+                periodMessage = message
+            )
         }
     }
 

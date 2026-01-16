@@ -22,6 +22,10 @@ interface DailyLogDao {
     @Query("SELECT * FROM daily_logs WHERE date BETWEEN :startDate AND :endDate")
     fun getLogsForRange(startDate: LocalDate, endDate: LocalDate): Flow<List<DailyLog>>
 
+    @Query("SELECT * FROM daily_logs WHERE date BETWEEN :startDate AND :endDate ORDER BY date ASC")
+    suspend fun getLogsForRangeSync(startDate: LocalDate, endDate: LocalDate): List<DailyLog>
+
+
     @Query("SELECT * FROM daily_logs")
     suspend fun getAllLogsSync(): List<DailyLog>
 

@@ -8,6 +8,8 @@ import java.time.LocalDate
 class CycleRepository @Inject constructor(private val cycleDao: CycleDao) {
     suspend fun insertCycle(cycle: Cycle) = cycleDao.insertCycle(cycle)
     suspend fun updateCycle(cycle: Cycle) = cycleDao.updateCycle(cycle)
+    suspend fun deleteCycle(cycle: Cycle) = cycleDao.deleteCycle(cycle)
+    suspend fun getCycleById(id: Int): Cycle? = cycleDao.getCycleById(id)
     fun getAllCycles(): Flow<List<Cycle>> = cycleDao.getAllCycles()
     suspend fun getAllCyclesSync(): List<Cycle> = cycleDao.getAllCyclesSync()
     fun getCyclesInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<Cycle>> = cycleDao.getCyclesInRange(startDate, endDate)

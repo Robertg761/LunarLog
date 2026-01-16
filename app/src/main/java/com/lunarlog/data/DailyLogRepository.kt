@@ -20,6 +20,10 @@ class DailyLogRepository @Inject constructor(
         return dailyLogDao.getLogsForRange(startDate, endDate)
     }
 
+    suspend fun getLogsForRangeSync(startDate: LocalDate, endDate: LocalDate): List<DailyLog> {
+        return dailyLogDao.getLogsForRangeSync(startDate, endDate)
+    }
+
     suspend fun getAllLogsSync(): List<DailyLog> {
         return dailyLogDao.getAllLogsSync()
     }

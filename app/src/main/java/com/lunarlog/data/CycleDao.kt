@@ -1,6 +1,7 @@
 package com.lunarlog.data
 
 import androidx.room.Dao
+import androidx.room.Delete
 import androidx.room.Insert
 import androidx.room.OnConflictStrategy
 import androidx.room.Query
@@ -22,6 +23,12 @@ interface CycleDao {
     
     @Update
     suspend fun updateCycle(cycle: Cycle)
+    
+    @Delete
+    suspend fun deleteCycle(cycle: Cycle)
+    
+    @Query("SELECT * FROM cycles WHERE id = :id LIMIT 1")
+    suspend fun getCycleById(id: Int): Cycle?
     
     @Query("SELECT * FROM cycles WHERE startDate = :date LIMIT 1")
     fun getCycleForDateSync(date: LocalDate): Cycle?
