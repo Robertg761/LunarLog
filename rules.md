@@ -16,4 +16,4 @@
 
 ## Project Structure
 - **Repository:** `Robertg761/LunarLog` (Public)
-- **Updates:** App checks GitHub Releases directly via `AppUpdater` library.
+- **Updates:** App checks GitHub Releases directly and downloads updates via `DownloadManager` (APK install prompt via `FileProvider`).

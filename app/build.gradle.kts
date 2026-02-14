@@ -112,7 +112,4 @@ dependencies {
     // Widgets
     implementation(libs.androidx.glance.appwidget)
     implementation(libs.androidx.glance.material3)
-
-    // App Updater
-    implementation("com.github.javiersantos:AppUpdater:2.7")
 }

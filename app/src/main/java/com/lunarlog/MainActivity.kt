@@ -1,8 +1,6 @@
 package com.lunarlog
 
 import android.os.Bundle
-import android.widget.Toast
-import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
@@ -20,7 +18,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import androidx.fragment.app.FragmentActivity
 import com.lunarlog.ui.navigation.LunarLogNavGraph
 import com.lunarlog.ui.theme.LunarLogTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -40,48 +37,31 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 
 import androidx.activity.enableEdgeToEdge
-
-import com.github.javiersantos.appupdater.AppUpdater
-import com.github.javiersantos.appupdater.AppUpdaterUtils
-import com.github.javiersantos.appupdater.enums.UpdateFrom
-import com.github.javiersantos.appupdater.enums.Display
-import com.github.javiersantos.appupdater.enums.AppUpdaterError
-import com.github.javiersantos.appupdater.objects.Update
 import androidx.appcompat.app.AppCompatActivity
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.remember
+import com.lunarlog.update.ApkUpdateManager
+import kotlinx.coroutines.delay
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainViewModel by viewModels()
+    private val apkUpdateManager = ApkUpdateManager()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // App Updater (Silent Check)
-        val appUpdaterUtils = AppUpdaterUtils(this)
-            .setUpdateFrom(UpdateFrom.GITHUB)
-            .setGitHubUserAndRepo("Robertg761", "LunarLog")
-            .withListener(object : AppUpdaterUtils.UpdateListener {
-                override fun onSuccess(update: Update?, isUpdateAvailable: Boolean?) {
-                    if (isUpdateAvailable == true) {
-                        viewModel.setUpdateAvailable(true)
-                    } else {
-                        android.util.Log.d("AppUpdater", "No update found. Latest: ${update?.latestVersion}")
-                    }
-                }
-                override fun onFailed(error: AppUpdaterError?) {
-                    android.util.Log.e("AppUpdater", "Update check failed: $error")
-                    Toast.makeText(this@MainActivity, "Update check failed: $error", Toast.LENGTH_SHORT).show()
-                }
-            })
-        appUpdaterUtils.start()
+        // Silent update check (GitHub Releases).
+        viewModel.checkForUpdates()
+
+        // If a previous download completed, prompt install on next launch.
+        apkUpdateManager.maybePromptInstallDownloadedApk(this)
         
         // Keep splash screen until data is loaded
         splashScreen.setKeepOnScreenCondition {
@@ -97,13 +77,14 @@ class MainActivity : AppCompatActivity() {
 
             // Handle Install Trigger
             LaunchedEffect(Unit) {
-                viewModel.installUpdateTrigger.collect {
-                    AppUpdater(this@MainActivity)
-                        .setUpdateFrom(UpdateFrom.GITHUB)
-                        .setGitHubUserAndRepo("Robertg761", "LunarLog")
-                        .setDisplay(Display.DIALOG)
-                        .showAppUpdated(false)
-                        .start()
+                viewModel.installUpdateTrigger.collect { info ->
+                    apkUpdateManager.startDownload(this@MainActivity, info)
+                    // Poll briefly so we can prompt install as soon as the download completes
+                    // while the user remains in the app.
+                    repeat(120) {
+                        delay(1_000)
+                        if (apkUpdateManager.maybePromptInstallDownloadedApk(this@MainActivity)) return@repeat
+                    }
                 }
             }
             
@@ -158,6 +139,11 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        apkUpdateManager.maybePromptInstallDownloadedApk(this)
     }
 
     private fun authenticateUser() {

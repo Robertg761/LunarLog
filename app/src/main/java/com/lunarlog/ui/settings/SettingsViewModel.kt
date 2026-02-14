@@ -11,9 +11,10 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.io.BufferedReader
-import java.io.FileOutputStream
 import java.io.InputStreamReader
 import javax.inject.Inject
 
@@ -49,8 +50,10 @@ class SettingsViewModel @Inject constructor(
         viewModelScope.launch {
             try {
                 val json = dataManagementRepository.createBackupJson()
-                context.contentResolver.openOutputStream(uri)?.use { outputStream ->
-                    outputStream.write(json.toByteArray())
+                withContext(Dispatchers.IO) {
+                    context.contentResolver.openOutputStream(uri)?.use { outputStream ->
+                        outputStream.write(json.toByteArray())
+                    }
                 }
                 _message.value = "Backup saved successfully."
             } catch (e: Exception) {
@@ -62,17 +65,20 @@ class SettingsViewModel @Inject constructor(
     fun importData(uri: Uri) {
         viewModelScope.launch {
             try {
-                val json = StringBuilder()
-                context.contentResolver.openInputStream(uri)?.use { inputStream ->
-                    BufferedReader(InputStreamReader(inputStream)).use { reader ->
-                        var line = reader.readLine()
-                        while (line != null) {
-                            json.append(line)
-                            line = reader.readLine()
+                val jsonString = withContext(Dispatchers.IO) {
+                    val json = StringBuilder()
+                    context.contentResolver.openInputStream(uri)?.use { inputStream ->
+                        BufferedReader(InputStreamReader(inputStream)).use { reader ->
+                            var line = reader.readLine()
+                            while (line != null) {
+                                json.append(line)
+                                line = reader.readLine()
+                            }
                         }
                     }
+                    json.toString()
                 }
-                dataManagementRepository.restoreFromJson(json.toString())
+                dataManagementRepository.restoreFromJson(jsonString)
                 _message.value = "Data restored successfully."
             } catch (e: Exception) {
                 _message.value = "Restore failed: ${e.localizedMessage}"

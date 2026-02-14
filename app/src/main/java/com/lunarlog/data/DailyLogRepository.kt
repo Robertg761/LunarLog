@@ -6,6 +6,8 @@ import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 @Singleton
 class DailyLogRepository @Inject constructor(
@@ -58,6 +60,16 @@ class DailyLogRepository @Inject constructor(
         ensureLegacyDataHydrated(entry.date)
         logEntryDao.insertEntry(entry)
         updateDailyLogAggregate(entry.date)
+    }
+
+    /**
+     * Variant intended to be called from within a Room `withTransaction {}` block.
+     * It must not change coroutine context, otherwise Room's transaction context can be lost.
+     */
+    suspend fun addEntryInTransaction(entry: LogEntry) {
+        ensureLegacyDataHydrated(entry.date)
+        logEntryDao.insertEntry(entry)
+        updateDailyLogAggregateInTransaction(entry.date)
     }
     
     suspend fun deleteEntry(entry: LogEntry) {
@@ -124,12 +136,28 @@ class DailyLogRepository @Inject constructor(
         }
     }
 
-    private suspend fun updateDailyLogAggregate(date: Long) = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.Default) {
+    suspend fun rebuildDailyLogAggregate(date: Long) {
+        updateDailyLogAggregate(date)
+    }
+
+    suspend fun rebuildDailyLogAggregateInTransaction(date: Long) {
+        updateDailyLogAggregateInTransaction(date)
+    }
+
+    private suspend fun updateDailyLogAggregate(date: Long) = withContext(Dispatchers.Default) {
+        updateDailyLogAggregateInternal(date)
+    }
+
+    private suspend fun updateDailyLogAggregateInTransaction(date: Long) {
+        updateDailyLogAggregateInternal(date)
+    }
+
+    private suspend fun updateDailyLogAggregateInternal(date: Long) {
         val entries = logEntryDao.getEntriesForDateSync(date)
         
         if (entries.isEmpty()) {
             dailyLogDao.insertLog(DailyLog(date = LocalDate.ofEpochDay(date)))
-            return@withContext
+            return
         }
 
         val symptoms = entries.filter { it.type == LogEntryType.SYMPTOM }.map { it.value }.distinct()
@@ -176,4 +204,4 @@ class DailyLogRepository @Inject constructor(
         )
         dailyLogDao.insertLog(aggregate)
     }
-}
+} 

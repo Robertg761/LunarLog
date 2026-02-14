@@ -17,13 +17,21 @@ import org.junit.Test
 class DataManagementRepositoryTest {
 
     private lateinit var repository: DataManagementRepository
-    private val cycleRepository: CycleRepository = mockk(relaxed = true)
     private val dailyLogRepository: DailyLogRepository = mockk(relaxed = true)
     private val appDatabase: AppDatabase = mockk(relaxed = true)
+    private val cycleDao: CycleDao = mockk(relaxed = true)
+    private val medicationDao: MedicationDao = mockk(relaxed = true)
+    private val symptomDao: SymptomDefinitionDao = mockk(relaxed = true)
+    private val logEntryDao: LogEntryDao = mockk(relaxed = true)
 
     @Before
     fun setUp() {
-        repository = DataManagementRepository(cycleRepository, dailyLogRepository, appDatabase)
+        every { appDatabase.cycleDao() } returns cycleDao
+        every { appDatabase.medicationDao() } returns medicationDao
+        every { appDatabase.symptomDefinitionDao() } returns symptomDao
+        every { appDatabase.logEntryDao() } returns logEntryDao
+
+        repository = DataManagementRepository(dailyLogRepository, appDatabase)
         mockkStatic("androidx.room.RoomDatabaseKt")
     }
 
@@ -42,9 +50,17 @@ class DataManagementRepositoryTest {
     fun `restoreFromJson calls clearAllTables and inserts data`() = runTest {
         val json = """
             {
-                "cycles": [{"id": 1, "startDate": 123}],
-                "dailyLogs": [{"date": 456}],
-                "version": 1
+                "version": 2,
+                "exportedAtMillis": 0,
+                "appVersionName": "1.0.0",
+                "data": {
+                    "cycles": [],
+                    "dailyLogs": [{"dateEpochDay": 456}],
+                    "logEntries": [],
+                    "medications": [],
+                    "medicationLogs": [],
+                    "symptomDefinitions": []
+                }
             }
         """.trimIndent()
 
@@ -57,7 +73,6 @@ class DataManagementRepositoryTest {
         repository.restoreFromJson(json)
 
         coVerify { appDatabase.clearAllTables() }
-        coVerify { cycleRepository.insertCycle(any()) }
-        coVerify { dailyLogRepository.saveLog(any()) }
+        coVerify { dailyLogRepository.rebuildDailyLogAggregateInTransaction(any()) }
     }
 }

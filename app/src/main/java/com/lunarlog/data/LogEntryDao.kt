@@ -15,6 +15,9 @@ interface LogEntryDao {
     @Query("SELECT * FROM log_entries WHERE date = :date ORDER BY time ASC")
     suspend fun getEntriesForDateSync(date: Long): List<LogEntry>
 
+    @Query("SELECT * FROM log_entries ORDER BY date ASC, time ASC")
+    suspend fun getAllEntriesSync(): List<LogEntry>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntry(entry: LogEntry): Long
 

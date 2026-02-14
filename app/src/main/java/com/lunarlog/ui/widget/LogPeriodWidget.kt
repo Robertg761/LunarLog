@@ -5,10 +5,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
-import androidx.glance.Image
-import androidx.glance.ImageProvider
-import androidx.glance.action.ActionParameters
-import androidx.glance.action.actionParametersOf
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
 import androidx.glance.appwidget.GlanceAppWidgetReceiver
@@ -23,33 +19,36 @@ import androidx.glance.layout.Spacer
 import androidx.glance.layout.fillMaxSize
 import androidx.glance.layout.height
 import androidx.glance.layout.padding
-import androidx.glance.layout.size
 import androidx.glance.layout.width
 import androidx.glance.text.FontWeight
 import androidx.glance.text.Text
 import androidx.glance.text.TextStyle
 import androidx.glance.unit.ColorProvider
-import androidx.room.Room
 import com.lunarlog.R
-import com.lunarlog.data.AppDatabase
+import com.lunarlog.data.LogEntry
+import com.lunarlog.data.LogEntryType
+import com.lunarlog.di.WidgetEntryPoint
 import com.lunarlog.core.model.Cycle
-import com.lunarlog.core.model.DailyLog
 import com.lunarlog.logic.CyclePredictionUtils
+import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
+import androidx.room.withTransaction
 
 class LogPeriodWidget : GlanceAppWidget() {
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
-        // Fetch data manually since Hilt injection is tricky in GlanceAppWidget
-        val db = Room.databaseBuilder(context, AppDatabase::class.java, "lunar_log_database").build()
-        val cycleDao = db.cycleDao()
-        
-        // This is a simplified fetch on the main thread (Glance uses suspend but we need to be careful)
-        // Ideally we use a repository pattern but for a simple widget this works
-        val cycles = withContext(Dispatchers.IO) { cycleDao.getAllCyclesSync() }
+        val entryPoint = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            WidgetEntryPoint::class.java
+        )
+        val cycleRepository = entryPoint.cycleRepository()
+
+        val cycles = withContext(Dispatchers.IO) {
+            cycleRepository.getAllCyclesSync()
+        }
         
         val today = LocalDate.now()
         val latestCycle = cycles.maxByOrNull { it.startDate }
@@ -68,8 +67,6 @@ class LogPeriodWidget : GlanceAppWidget() {
         } else {
             28
         }
-        
-        db.close()
 
         provideContent {
             WidgetContent(dayOfCycle, daysUntil)
@@ -148,34 +145,46 @@ class LogPeriodAction : ActionCallback {
     override suspend fun onAction(
         context: Context,
         glanceId: GlanceId,
-        parameters: ActionParameters
+        parameters: androidx.glance.action.ActionParameters
     ) {
-        // Log Period Logic
-        val db = Room.databaseBuilder(context, AppDatabase::class.java, "lunar_log_database").build()
+        val entryPoint = EntryPointAccessors.fromApplication(
+            context.applicationContext,
+            WidgetEntryPoint::class.java
+        )
+
+        val db = entryPoint.appDatabase()
         val cycleDao = db.cycleDao()
-        
+        val dailyLogRepository = entryPoint.dailyLogRepository()
+
         val today = LocalDate.now()
+        val todayEpochDay = today.toEpochDay()
         
-        // Simple logic: Start a new cycle today
-        // Check if cycle already exists for today to avoid dupes
-        val existing = cycleDao.getCycleForDateSync(today) // We need to add this method or reuse logic
-        if (existing == null) {
-            // Close previous cycle if needed
-            val cycles = cycleDao.getAllCyclesSync()
-            val lastCycle = cycles.maxByOrNull { it.startDate }
-            
-            if (lastCycle != null && lastCycle.endDate == null) {
-                cycleDao.updateCycle(lastCycle.copy(endDate = today.minusDays(1)))
+        withContext(Dispatchers.IO) {
+            db.withTransaction {
+                // Start a new cycle today (if one doesn't already start today).
+                val existing = cycleDao.getCycleForStartDate(today)
+                if (existing == null) {
+                    val cycles = cycleDao.getAllCyclesSync()
+                    val lastCycle = cycles.maxByOrNull { it.startDate }
+
+                    if (lastCycle != null && lastCycle.endDate == null) {
+                        cycleDao.updateCycle(lastCycle.copy(endDate = today.minusDays(1)))
+                    }
+
+                    cycleDao.insertCycle(Cycle(startDate = today))
+
+                    // Log flow as a granular entry so we don't overwrite other fields on the aggregate DailyLog row.
+                    dailyLogRepository.addEntryInTransaction(
+                        LogEntry(
+                            date = todayEpochDay,
+                            time = System.currentTimeMillis(),
+                            type = LogEntryType.FLOW,
+                            value = "2"
+                        )
+                    )
+                }
             }
-            
-            cycleDao.insertCycle(Cycle(startDate = today))
-            
-            // Log flow for today too
-            val dailyLogDao = db.dailyLogDao()
-            dailyLogDao.insertLog(DailyLog(date = today, flowLevel = 2)) // Default medium flow
         }
-        
-        db.close()
         
         // Refresh widget
         LogPeriodWidget().update(context, glanceId)
