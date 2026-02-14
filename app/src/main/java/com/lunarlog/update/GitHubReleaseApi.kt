@@ -19,7 +19,7 @@ internal data class GitHubAssetDto(
 class GitHubReleaseApi(
     private val gson: Gson = Gson()
 ) {
-    fun fetchLatestRelease(owner: String, repo: String): GitHubLatestReleaseDto {
+    internal fun fetchLatestRelease(owner: String, repo: String): GitHubLatestReleaseDto {
         val url = URL("https://api.github.com/repos/$owner/$repo/releases/latest")
         val conn = (url.openConnection() as HttpURLConnection).apply {
             requestMethod = "GET"

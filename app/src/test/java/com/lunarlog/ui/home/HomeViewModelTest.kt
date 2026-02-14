@@ -43,7 +43,7 @@ class HomeViewModelTest {
         val today = LocalDate.now()
         // Create a cycle starting 10 days ago
         val lastCycleStart = today.minusDays(10)
-        val cycle = Cycle(id = 1, startDate = lastCycleStart.toEpochDay())
+        val cycle = Cycle(id = 1, startDate = lastCycleStart)
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
         every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
@@ -68,7 +68,7 @@ class HomeViewModelTest {
         val today = LocalDate.now()
         // Cycle started 2 days ago (Day 3 of cycle)
         val lastCycleStart = today.minusDays(2)
-        val cycle = Cycle(id = 1, startDate = lastCycleStart.toEpochDay(), endDate = null)
+        val cycle = Cycle(id = 1, startDate = lastCycleStart, endDate = null)
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
         every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
@@ -91,7 +91,7 @@ class HomeViewModelTest {
         val today = LocalDate.now()
         // Cycle started 20 days ago (Day 21 of cycle)
         val lastCycleStart = today.minusDays(20)
-        val cycle = Cycle(id = 1, startDate = lastCycleStart.toEpochDay(), endDate = null)
+        val cycle = Cycle(id = 1, startDate = lastCycleStart, endDate = null)
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
         every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())

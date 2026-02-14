@@ -221,7 +221,7 @@ class DataManagementRepository @Inject constructor(
                     .toInstant()
                     .toEpochMilli()
 
-                fun add(type: LogEntryType, value: String) {
+                suspend fun add(type: LogEntryType, value: String) {
                     logEntryDao.insertEntry(
                         LogEntry(
                             date = dl.dateEpochDay,
@@ -233,26 +233,27 @@ class DataManagementRepository @Inject constructor(
                 }
 
                 if (dl.flowLevel > 0) add(LogEntryType.FLOW, dl.flowLevel.toString())
-                dl.symptoms.forEach { add(LogEntryType.SYMPTOM, it) }
-                dl.mood.forEach { add(LogEntryType.MOOD, it) }
+                dl.symptoms.orEmpty().forEach { add(LogEntryType.SYMPTOM, it) }
+                dl.mood.orEmpty().forEach { add(LogEntryType.MOOD, it) }
                 if (dl.waterIntake > 0) add(LogEntryType.WATER, dl.waterIntake.toString())
                 if (dl.sleepHours > 0f) add(LogEntryType.SLEEP, dl.sleepHours.toString())
                 if (dl.sleepQuality > 0) add(LogEntryType.SLEEP_QUALITY, dl.sleepQuality.toString())
                 if (dl.sexDrive > 0) add(LogEntryType.SEX, dl.sexDrive.toString())
-                if (dl.notes.isNotEmpty()) add(LogEntryType.NOTE, dl.notes)
+                val notes = dl.notes.orEmpty()
+                if (notes.isNotEmpty()) add(LogEntryType.NOTE, notes)
                 if (dl.temperature != null) add(LogEntryType.TEMPERATURE, dl.temperature.toString())
                 if (dl.cervicalMucus > 0) add(LogEntryType.MUCUS, dl.cervicalMucus.toString())
 
                 // If the daily log was completely empty, we still want a row to exist.
                 if (
                     dl.flowLevel == 0 &&
-                    dl.symptoms.isEmpty() &&
-                    dl.mood.isEmpty() &&
+                    dl.symptoms.isNullOrEmpty() &&
+                    dl.mood.isNullOrEmpty() &&
                     dl.waterIntake == 0 &&
                     dl.sleepHours == 0f &&
                     dl.sleepQuality == 0 &&
                     dl.sexDrive == 0 &&
-                    dl.notes.isEmpty() &&
+                    notes.isEmpty() &&
                     dl.temperature == null &&
                     dl.cervicalMucus == 0
                 ) {

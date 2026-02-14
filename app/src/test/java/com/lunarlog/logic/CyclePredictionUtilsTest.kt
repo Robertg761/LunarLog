@@ -10,7 +10,7 @@ class CyclePredictionUtilsTest {
     @Test
     fun calculateAverageCycleLength_returnsDefault_whenNotEnoughData() {
         val cycles = listOf(
-            Cycle(startDate = LocalDate.of(2023, 1, 1).toEpochDay())
+            Cycle(startDate = LocalDate.of(2023, 1, 1))
         )
         val result = CyclePredictionUtils.calculateAverageCycleLength(cycles)
         assertEquals(28, result)
@@ -24,9 +24,9 @@ class CyclePredictionUtilsTest {
         // Average: (31 + 28) / 2 = 29.5 -> 29
 
         val cycles = listOf(
-            Cycle(startDate = LocalDate.of(2023, 3, 1).toEpochDay()),
-            Cycle(startDate = LocalDate.of(2023, 2, 1).toEpochDay()),
-            Cycle(startDate = LocalDate.of(2023, 1, 1).toEpochDay())
+            Cycle(startDate = LocalDate.of(2023, 3, 1)),
+            Cycle(startDate = LocalDate.of(2023, 2, 1)),
+            Cycle(startDate = LocalDate.of(2023, 1, 1))
         )
 
         val result = CyclePredictionUtils.calculateAverageCycleLength(cycles)
@@ -35,7 +35,7 @@ class CyclePredictionUtilsTest {
 
     @Test
     fun predictNextPeriod_addsAverageLength() {
-        val lastCycle = Cycle(startDate = LocalDate.of(2023, 1, 1).toEpochDay())
+        val lastCycle = Cycle(startDate = LocalDate.of(2023, 1, 1))
         val averageLength = 30
 
         val result = CyclePredictionUtils.predictNextPeriod(lastCycle, averageLength)
@@ -58,7 +58,7 @@ class CyclePredictionUtilsTest {
 
     @Test
     fun calculateStandardDeviation_returnsZero_forSingleOrNoCycle() {
-        val cycles = listOf(Cycle(startDate = LocalDate.of(2023, 1, 1).toEpochDay()))
+        val cycles = listOf(Cycle(startDate = LocalDate.of(2023, 1, 1)))
         assertEquals(0.0, CyclePredictionUtils.calculateStandardDeviation(cycles), 0.01)
     }
 
@@ -72,10 +72,10 @@ class CyclePredictionUtilsTest {
         // SD = sqrt(3) ~= 1.732
 
         val cycles = listOf(
-            Cycle(startDate = LocalDate.of(2023, 4, 1).toEpochDay()),
-            Cycle(startDate = LocalDate.of(2023, 3, 1).toEpochDay()),
-            Cycle(startDate = LocalDate.of(2023, 2, 1).toEpochDay()),
-            Cycle(startDate = LocalDate.of(2023, 1, 1).toEpochDay())
+            Cycle(startDate = LocalDate.of(2023, 4, 1)),
+            Cycle(startDate = LocalDate.of(2023, 3, 1)),
+            Cycle(startDate = LocalDate.of(2023, 2, 1)),
+            Cycle(startDate = LocalDate.of(2023, 1, 1))
         )
 
         assertEquals(1.732, CyclePredictionUtils.calculateStandardDeviation(cycles), 0.01)
@@ -91,11 +91,11 @@ class CyclePredictionUtilsTest {
         // Threshold: 5.0 (Assumption)
 
         val cycles = listOf(
-            Cycle(startDate = LocalDate.of(2023, 5, 1).toEpochDay()), // Gap
-            Cycle(startDate = LocalDate.of(2023, 3, 27).toEpochDay()), // 35 days from Feb 20
-            Cycle(startDate = LocalDate.of(2023, 2, 20).toEpochDay()), // 21 days from Jan 30
-            Cycle(startDate = LocalDate.of(2023, 1, 30).toEpochDay()), // 35 days from Dec 26
-            Cycle(startDate = LocalDate.of(2022, 12, 26).toEpochDay())
+            Cycle(startDate = LocalDate.of(2023, 5, 1)), // Gap
+            Cycle(startDate = LocalDate.of(2023, 3, 27)), // 35 days from Feb 20
+            Cycle(startDate = LocalDate.of(2023, 2, 20)), // 21 days from Jan 30
+            Cycle(startDate = LocalDate.of(2023, 1, 30)), // 35 days from Dec 26
+            Cycle(startDate = LocalDate.of(2022, 12, 26))
         )
         // Note: The logic inside utils filters 15..50. 21 and 35 are valid.
 
@@ -107,10 +107,10 @@ class CyclePredictionUtilsTest {
     fun isCycleIrregular_returnsFalseForRegularCycles() {
         // Low variance: 28, 29, 28
         val cycles = listOf(
-            Cycle(startDate = LocalDate.of(2023, 3, 29).toEpochDay()),
-            Cycle(startDate = LocalDate.of(2023, 2, 28).toEpochDay()),
-            Cycle(startDate = LocalDate.of(2023, 1, 31).toEpochDay()),
-            Cycle(startDate = LocalDate.of(2023, 1, 3).toEpochDay())
+            Cycle(startDate = LocalDate.of(2023, 3, 29)),
+            Cycle(startDate = LocalDate.of(2023, 2, 28)),
+            Cycle(startDate = LocalDate.of(2023, 1, 31)),
+            Cycle(startDate = LocalDate.of(2023, 1, 3))
         )
         assertEquals(false, CyclePredictionUtils.isCycleIrregular(cycles))
     }

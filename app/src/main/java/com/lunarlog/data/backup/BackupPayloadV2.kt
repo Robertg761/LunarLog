@@ -25,13 +25,15 @@ data class CycleDto(
 data class DailyLogDto(
     val dateEpochDay: Long,
     val flowLevel: Int = 0,
-    val mood: List<String> = emptyList(),
-    val symptoms: List<String> = emptyList(),
+    // Gson does not apply Kotlin default values for absent fields, so these may deserialize as null.
+    val mood: List<String>? = emptyList(),
+    val symptoms: List<String>? = emptyList(),
     val waterIntake: Int = 0,
     val sleepHours: Float = 0f,
     val sleepQuality: Int = 0,
     val sexDrive: Int = 0,
-    val notes: String = "",
+    // See note above about Gson + Kotlin defaults.
+    val notes: String? = "",
     val temperature: Float? = null,
     val cervicalMucus: Int = 0
 )

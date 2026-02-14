@@ -11,15 +11,15 @@ class NarrativeGeneratorTest {
 
     @Test
     fun `generateCycleSummary returns valid summary for typical cycle`() {
-        val startDate = LocalDate.of(2023, 1, 1).toEpochDay()
-        val endDate = LocalDate.of(2023, 1, 28).toEpochDay()
+        val startDate = LocalDate.of(2023, 1, 1)
+        val endDate = LocalDate.of(2023, 1, 28)
         val cycle = Cycle(id = 1, startDate = startDate, endDate = endDate)
         
         val logs = listOf(
             DailyLog(date = startDate, flowLevel = 3, symptoms = listOf("Cramps")),
-            DailyLog(date = startDate + 1, flowLevel = 3, symptoms = listOf("Cramps")),
-            DailyLog(date = startDate + 2, flowLevel = 2, mood = listOf("Happy")),
-            DailyLog(date = startDate + 14, mood = listOf("Happy"))
+            DailyLog(date = startDate.plusDays(1), flowLevel = 3, symptoms = listOf("Cramps")),
+            DailyLog(date = startDate.plusDays(2), flowLevel = 2, mood = listOf("Happy")),
+            DailyLog(date = startDate.plusDays(14), mood = listOf("Happy"))
         )
 
         val summary = NarrativeGenerator.generateCycleSummary(cycle, logs)
@@ -32,8 +32,8 @@ class NarrativeGeneratorTest {
 
     @Test
     fun `generateCycleSummary identifies short cycle`() {
-        val startDate = LocalDate.of(2023, 1, 1).toEpochDay()
-        val endDate = LocalDate.of(2023, 1, 18).toEpochDay() // 18 days
+        val startDate = LocalDate.of(2023, 1, 1)
+        val endDate = LocalDate.of(2023, 1, 18) // 18 days
         val cycle = Cycle(id = 2, startDate = startDate, endDate = endDate)
         
         val summary = NarrativeGenerator.generateCycleSummary(cycle, emptyList())
@@ -54,12 +54,11 @@ class NarrativeGeneratorTest {
     @Test
     fun `generateWeeklyDigest calculates dominant mood and symptom`() {
         val today = LocalDate.now()
-        val todayEpoch = today.toEpochDay()
         
         val logs = listOf(
-            DailyLog(date = todayEpoch, mood = listOf("Happy"), symptoms = listOf("Headache")),
-            DailyLog(date = todayEpoch - 1, mood = listOf("Happy"), symptoms = listOf("Headache")),
-            DailyLog(date = todayEpoch - 2, mood = listOf("Sad"), symptoms = listOf("Cramps"))
+            DailyLog(date = today, mood = listOf("Happy"), symptoms = listOf("Headache")),
+            DailyLog(date = today.minusDays(1), mood = listOf("Happy"), symptoms = listOf("Headache")),
+            DailyLog(date = today.minusDays(2), mood = listOf("Sad"), symptoms = listOf("Cramps"))
         )
         
         val digest = NarrativeGenerator.generateWeeklyDigest(logs, today)
