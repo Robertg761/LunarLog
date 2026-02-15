@@ -45,10 +45,21 @@ class UpdateRepository @Inject constructor() {
             !name.contains("debug", ignoreCase = true)
         } ?: apkAssets.first()
 
+        val apkSizeBytes = assets
+            .firstOrNull { a ->
+                val n = a.name?.trim().orEmpty()
+                n.equals(apkName, ignoreCase = true)
+            }
+            ?.size
+
         UpdateInfo(
             latestVersionName = latestTag.removePrefix("v"),
             apkName = apkName,
-            apkUrl = apkUrl
+            apkUrl = apkUrl,
+            releaseNotes = latest.body?.trim().orEmpty(),
+            releaseUrl = latest.html_url?.trim().orEmpty(),
+            apkSizeBytes = apkSizeBytes,
+            publishedAt = latest.published_at?.trim()
         )
     }
 }

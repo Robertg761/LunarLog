@@ -65,6 +65,11 @@ class MainViewModel @Inject constructor(
 
     fun checkForUpdates() {
         viewModelScope.launch {
+            if (BuildConfig.DEBUG) {
+                // Debug builds are often signed differently than release APK assets.
+                _updateInfo.value = null
+                return@launch
+            }
             try {
                 val info = updateRepository.checkForUpdate(
                     owner = "Robertg761",

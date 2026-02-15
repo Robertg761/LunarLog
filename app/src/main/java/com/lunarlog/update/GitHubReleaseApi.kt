@@ -8,12 +8,16 @@ import java.net.URL
 
 internal data class GitHubLatestReleaseDto(
     val tag_name: String? = null,
+    val html_url: String? = null,
+    val body: String? = null,
+    val published_at: String? = null,
     val assets: List<GitHubAssetDto>? = null
 )
 
 internal data class GitHubAssetDto(
     val name: String? = null,
-    val browser_download_url: String? = null
+    val browser_download_url: String? = null,
+    val size: Long? = null
 )
 
 class GitHubReleaseApi(
