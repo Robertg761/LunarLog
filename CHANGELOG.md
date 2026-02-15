@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.0] - 2026-02-15
+
+### Changed
+- Automated GitHub Release publishing on merges to `main` (release notes pulled from `CHANGELOG.md` and signed APK attached via CI).
+- Release signing can be configured via environment variables for CI builds.
+
 ## [1.5.0] - 2026-01-16
 
 ### Added

@@ -33,15 +33,11 @@
 
 ### Update & Release Workflow (ONLY IF INSTRUCTED TO CREATE A NEW RELEASE)
 1.  **Code Updates:** Update code and bump `versionName`/`versionCode` in `app/build.gradle.kts`.
-2.  **Changelog:** Update `CHANGELOG.md` with new version details.
+2.  **Changelog:** Update `CHANGELOG.md` with new `## [x.y.z] - YYYY-MM-DD` section details.
 3.  **Commit:** Commit and push changes.
-4.  **Release Draft:**
-    *   Extract specific text for the new version from `CHANGELOG.md`.
-    *   Draft GitHub Release (vX.X.X) using this text.
-5.  **Publishing (User Task):**
-    *   Manually sign the APK.
-    *   Upload signed APK to the release.
-    *   Publish.
+4.  **Publish:**
+    *   If CI signing secrets are configured, merging to `main` auto-builds a signed release APK and publishes a GitHub Release `vX.Y.Z` with release notes from `CHANGELOG.md`.
+    *   Otherwise, sign and publish manually (APK signing + upload + publish).
 
 ### key Files
 *   **`PROJECT_SPEC.md`**: Detailed roadmap and feature specifications.

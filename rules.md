@@ -3,16 +3,12 @@
 ## Workflows
 
 ### LunarLog Update Workflow
-1. **Agent Tasks:**
-   - Update code/files and bump version in `app/build.gradle.kts`.
-   - Update `CHANGELOG.md` with new version details.
-   - Commit and push changes.
-   - Extract specific text for the new version from `CHANGELOG.md`.
-   - Draft GitHub Release (vX.X.X) using the extracted text as the description (do NOT just say "see changelog").
-2. **User Tasks:**
-   - Manually sign the APK.
-   - Manually upload the signed APK to the draft release.
-   - Publish the release.
+1. **Primary (Automated CI Release):**
+   - Bump `versionName`/`versionCode` in `app/build.gradle.kts`.
+   - Add the matching `## [x.y.z] - YYYY-MM-DD` section to `CHANGELOG.md`.
+   - Merge to `main`: GitHub Actions builds a **signed** release APK and publishes a GitHub Release `vX.Y.Z` using the `CHANGELOG.md` section as the release notes.
+2. **Fallback (Manual Release):**
+   - If CI signing secrets are not configured, follow the manual flow: sign APK locally, draft release, upload APK, publish.
 
 ## Project Structure
 - **Repository:** `Robertg761/LunarLog` (Public)

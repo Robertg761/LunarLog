@@ -5,6 +5,17 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
+// Optional CI signing. If these env vars are present, `assembleRelease` will produce a signed APK.
+val llSigningStoreFile = System.getenv("LL_SIGNING_STORE_FILE")
+val llSigningStorePassword = System.getenv("LL_SIGNING_STORE_PASSWORD")
+val llSigningKeyAlias = System.getenv("LL_SIGNING_KEY_ALIAS")
+val llSigningKeyPassword = System.getenv("LL_SIGNING_KEY_PASSWORD")
+val llSigningStoreType = System.getenv("LL_SIGNING_STORE_TYPE") // e.g. "PKCS12" or "JKS"
+val llHasSigning = !llSigningStoreFile.isNullOrBlank() &&
+    !llSigningStorePassword.isNullOrBlank() &&
+    !llSigningKeyAlias.isNullOrBlank() &&
+    !llSigningKeyPassword.isNullOrBlank()
+
 android {
     namespace = "com.lunarlog"
     compileSdk = 34
@@ -13,16 +24,33 @@ android {
         applicationId = "com.lunarlog"
         minSdk = 26
         targetSdk = 34
-        versionCode = 9
-        versionName = "1.5.0"
+        versionCode = 10
+        versionName = "1.6.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+    }
+
+    if (llHasSigning) {
+        signingConfigs {
+            create("release") {
+                storeFile = file(llSigningStoreFile!!)
+                if (!llSigningStoreType.isNullOrBlank()) {
+                    storeType = llSigningStoreType
+                }
+                storePassword = llSigningStorePassword
+                keyAlias = llSigningKeyAlias
+                keyPassword = llSigningKeyPassword
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
             proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
+            if (llHasSigning) {
+                signingConfig = signingConfigs.getByName("release")
+            }
         }
     }
 
