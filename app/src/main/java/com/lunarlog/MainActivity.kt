@@ -44,7 +44,7 @@ import androidx.compose.material3.SnackbarResult
 import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.remember
 import com.lunarlog.update.ApkUpdateManager
-import kotlinx.coroutines.delay
+import com.lunarlog.ui.update.UpdateBottomSheet
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -60,9 +60,6 @@ class MainActivity : AppCompatActivity() {
         // Silent update check (GitHub Releases).
         viewModel.checkForUpdates()
 
-        // If a previous download completed, prompt install on next launch.
-        apkUpdateManager.maybePromptInstallDownloadedApk(this)
-        
         // Keep splash screen until data is loaded
         splashScreen.setKeepOnScreenCondition {
             viewModel.uiState.value.isLoading
@@ -74,16 +71,34 @@ class MainActivity : AppCompatActivity() {
             val uiState by viewModel.uiState.collectAsState()
             val isLocked by viewModel.isLocked.collectAsState()
             val snackbarHostState = remember { SnackbarHostState() }
+            val updateSheetInfo = remember { androidx.compose.runtime.mutableStateOf<com.lunarlog.update.UpdateInfo?>(null) }
+            val promptedDownloaded = remember { androidx.compose.runtime.mutableStateOf(false) }
 
-            // Handle Install Trigger
+            // Handle Install Trigger (opens the guided in-app updater UI).
             LaunchedEffect(Unit) {
                 viewModel.installUpdateTrigger.collect { info ->
-                    apkUpdateManager.startDownload(this@MainActivity, info)
-                    // Poll briefly so we can prompt install as soon as the download completes
-                    // while the user remains in the app.
-                    repeat(120) {
-                        delay(1_000)
-                        if (apkUpdateManager.maybePromptInstallDownloadedApk(this@MainActivity)) return@repeat
+                    updateSheetInfo.value = info
+                }
+            }
+
+            // If an update was downloaded previously, offer install without surprise navigation.
+            LaunchedEffect(Unit) {
+                if (promptedDownloaded.value) return@LaunchedEffect
+                if (!apkUpdateManager.hasDownloadedApk(this@MainActivity)) return@LaunchedEffect
+                promptedDownloaded.value = true
+
+                val needsPerm = apkUpdateManager.needsUnknownSourcesPermission(this@MainActivity)
+                val result = snackbarHostState.showSnackbar(
+                    message = if (needsPerm) "Update downloaded. Enable installs to finish." else "Update downloaded. Ready to install.",
+                    actionLabel = if (needsPerm) "Enable" else "Install",
+                    duration = SnackbarDuration.Long
+                )
+                if (result == SnackbarResult.ActionPerformed) {
+                    if (needsPerm) {
+                        startActivity(apkUpdateManager.buildUnknownSourcesSettingsIntent(this@MainActivity))
+                    } else {
+                        apkUpdateManager.buildInstallIntentFromDownloadedApk(this@MainActivity)
+                            ?.let { startActivity(it) }
                     }
                 }
             }
@@ -136,6 +151,15 @@ class MainActivity : AppCompatActivity() {
                          // Fallback, though splash screen should cover this
                          Box(Modifier.fillMaxSize())
                     }
+
+                    val info = updateSheetInfo.value
+                    if (info != null) {
+                        UpdateBottomSheet(
+                            info = info,
+                            apkUpdateManager = apkUpdateManager,
+                            onDismiss = { updateSheetInfo.value = null }
+                        )
+                    }
                 }
             }
         }
@@ -143,7 +167,6 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
-        apkUpdateManager.maybePromptInstallDownloadedApk(this)
     }
 
     private fun authenticateUser() {

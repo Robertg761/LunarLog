@@ -16,6 +16,25 @@ class ApkUpdateManager(
     private fun prefs(context: Context) =
         context.getSharedPreferences(prefsName, Context.MODE_PRIVATE)
 
+    data class DownloadQueryResult(
+        val status: Int,
+        val bytesDownloaded: Long,
+        val totalBytes: Long,
+        val reason: Int?
+    )
+
+    fun needsUnknownSourcesPermission(context: Context): Boolean {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
+            !context.packageManager.canRequestPackageInstalls()
+    }
+
+    fun buildUnknownSourcesSettingsIntent(context: Context): Intent {
+        return Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
+            data = Uri.parse("package:${context.packageName}")
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    }
+
     fun startDownload(context: Context, info: UpdateInfo): Long {
         val fileName = "LunarLog-${info.latestVersionName}.apk"
         val request = DownloadManager.Request(Uri.parse(info.apkUrl))
@@ -34,61 +53,63 @@ class ApkUpdateManager(
         prefs(context).edit()
             .putLong(KEY_DOWNLOAD_ID, downloadId)
             .putString(KEY_APK_PATH, file.absolutePath)
-            .putBoolean(KEY_UNKNOWN_SOURCES_LAUNCHED, false)
             .apply()
 
         return downloadId
     }
 
-    fun maybePromptInstallDownloadedApk(context: Context): Boolean {
-        val p = prefs(context)
-        val downloadId = p.getLong(KEY_DOWNLOAD_ID, -1L)
-        val apkPath = p.getString(KEY_APK_PATH, null) ?: return false
-        if (downloadId <= 0) return false
+    fun queryDownload(context: Context): DownloadQueryResult? {
+        val downloadId = prefs(context).getLong(KEY_DOWNLOAD_ID, -1L)
+        if (downloadId <= 0) return null
 
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
         val cursor = dm.query(DownloadManager.Query().setFilterById(downloadId))
         cursor.use {
-            if (!it.moveToFirst()) return false
+            if (!it.moveToFirst()) return null
             val status = it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_STATUS))
-            if (status != DownloadManager.STATUS_SUCCESSFUL) return false
-        }
-
-        val apkFile = File(apkPath)
-        if (!apkFile.exists()) return false
-
-        // Unknown sources permission gate (API 26+).
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            if (!context.packageManager.canRequestPackageInstalls()) {
-                // Avoid repeatedly spamming settings while we poll for completion.
-                if (!p.getBoolean(KEY_UNKNOWN_SOURCES_LAUNCHED, false)) {
-                    p.edit().putBoolean(KEY_UNKNOWN_SOURCES_LAUNCHED, true).apply()
-                    val intent = Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-                        data = Uri.parse("package:${context.packageName}")
-                        addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    }
-                    context.startActivity(intent)
-                }
-                return false
+            val bytesDownloaded = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR))
+            val totalBytes = it.getLong(it.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES))
+            val reason = try {
+                it.getInt(it.getColumnIndexOrThrow(DownloadManager.COLUMN_REASON))
+            } catch (_: Exception) {
+                null
             }
+            return DownloadQueryResult(
+                status = status,
+                bytesDownloaded = bytesDownloaded,
+                totalBytes = totalBytes,
+                reason = reason
+            )
         }
-        p.edit().putBoolean(KEY_UNKNOWN_SOURCES_LAUNCHED, false).apply()
+    }
+
+    fun hasDownloadedApk(context: Context): Boolean {
+        val apkFile = getDownloadedApkFile(context) ?: return false
+        val q = queryDownload(context) ?: return false
+        return q.status == DownloadManager.STATUS_SUCCESSFUL && apkFile.exists()
+    }
+
+    fun getDownloadedApkFile(context: Context): File? {
+        val apkPath = prefs(context).getString(KEY_APK_PATH, null) ?: return null
+        return File(apkPath)
+    }
+
+    fun buildInstallIntentFromDownloadedApk(context: Context): Intent? {
+        val apkFile = getDownloadedApkFile(context) ?: return null
+        if (!apkFile.exists()) return null
+        if (needsUnknownSourcesPermission(context)) return null
 
         val authority = "${context.packageName}.fileprovider"
         val apkUri = FileProvider.getUriForFile(context, authority, apkFile)
-        val installIntent = Intent(Intent.ACTION_VIEW).apply {
+        return Intent(Intent.ACTION_VIEW).apply {
             setDataAndType(apkUri, "application/vnd.android.package-archive")
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
             addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
         }
-
-        context.startActivity(installIntent)
-        return true
     }
 
     companion object {
         private const val KEY_DOWNLOAD_ID = "download_id"
         private const val KEY_APK_PATH = "apk_path"
-        private const val KEY_UNKNOWN_SOURCES_LAUNCHED = "unknown_sources_launched"
     }
 }

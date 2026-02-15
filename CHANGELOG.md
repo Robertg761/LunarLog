@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.6.1] - 2026-02-15
+
+### Changed
+- Streamlined in-app updates: LunarLog now guides users through download, "allow installs from this app", and installation without sending them to GitHub.
+- Update checks are disabled for debug builds to avoid signature mismatch install failures.
+
 ## [1.6.0] - 2026-02-15
 
 ### Changed
