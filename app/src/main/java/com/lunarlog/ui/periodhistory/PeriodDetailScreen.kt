@@ -50,6 +50,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lunarlog.core.model.DailyLog
@@ -369,18 +370,29 @@ private fun DailyLogCard(
                 Text(log.date.format(dateFormatter))
             },
             supportingContent = {
-                val summary = buildList {
-                    if (log.flowLevel > 0) add("Flow: ${log.flowLevel}")
-                    addAll(log.mood.take(2))
-                    addAll(log.symptoms.take(2))
-                }.take(4).joinToString(", ")
-                
-                if (summary.isNotEmpty()) {
-                    Text(
-                        text = summary,
-                        maxLines = 1,
-                        style = MaterialTheme.typography.bodySmall
-                    )
+                val lines = buildDailyLogSummaryLines(log)
+
+                if (lines.primary.isNotBlank() || lines.secondary.isNotBlank()) {
+                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                        if (lines.primary.isNotBlank()) {
+                            Text(
+                                text = lines.primary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (lines.secondary.isNotBlank()) {
+                            Text(
+                                text = lines.secondary,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
+                            )
+                        }
+                    }
                 } else {
                     Text(
                         text = "No details logged",
