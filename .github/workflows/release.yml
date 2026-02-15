@@ -57,6 +57,25 @@ jobs:
             echo "skip=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Verify Signing Secrets
+        if: steps.exists.outputs.skip != 'true'
+        env:
+          KEYSTORE_B64: ${{ secrets.LL_KEYSTORE_B64 }}
+          STORE_PASSWORD: ${{ secrets.LL_SIGNING_STORE_PASSWORD }}
+          KEY_ALIAS: ${{ secrets.LL_SIGNING_KEY_ALIAS }}
+          KEY_PASSWORD: ${{ secrets.LL_SIGNING_KEY_PASSWORD }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          missing=0
+          if [ -z "${KEYSTORE_B64:-}" ]; then echo "Missing secret: LL_KEYSTORE_B64"; missing=1; fi
+          if [ -z "${STORE_PASSWORD:-}" ]; then echo "Missing secret: LL_SIGNING_STORE_PASSWORD"; missing=1; fi
+          if [ -z "${KEY_ALIAS:-}" ]; then echo "Missing secret: LL_SIGNING_KEY_ALIAS"; missing=1; fi
+          if [ -z "${KEY_PASSWORD:-}" ]; then echo "Missing secret: LL_SIGNING_KEY_PASSWORD"; missing=1; fi
+          if [ "$missing" -ne 0 ]; then
+            exit 1
+          fi
+
       - name: Decode Keystore
         if: steps.exists.outputs.skip != 'true'
         env:
