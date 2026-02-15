@@ -39,6 +39,7 @@ fun LogListScreen(
     val uiState by viewModel.uiState.collectAsState()
     var showAddSheet by remember { mutableStateOf(false) }
     var editingEntry by remember { mutableStateOf<LogEntry?>(null) }
+    var entryPendingDelete by remember { mutableStateOf<LogEntry?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
 
     LaunchedEffect(date) {
@@ -145,11 +146,60 @@ fun LogListScreen(
                             editingEntry = entry
                             showAddSheet = true
                         },
-                        onDelete = { viewModel.deleteEntry(entry) }
+                        onDelete = { entryPendingDelete = entry }
                     )
                 }
             }
         }
+    }
+
+    if (entryPendingDelete != null) {
+        val entry = entryPendingDelete!!
+        val timeStr = remember(entry.time) {
+            Instant.ofEpochMilli(entry.time)
+                .atZone(ZoneId.systemDefault())
+                .format(DateTimeFormatter.ofPattern("h:mm a"))
+        }
+
+        AlertDialog(
+            onDismissRequest = { entryPendingDelete = null },
+            title = { Text("Delete log?") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "This action can't be undone.",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    Text(
+                        text = "$timeStr \u2022 ${entry.type.name}: ${entry.value}",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    if (!entry.details.isNullOrBlank()) {
+                        Text(
+                            text = entry.details,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteEntry(entry)
+                        entryPendingDelete = null
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { entryPendingDelete = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
     }
 
     if (showAddSheet) {
