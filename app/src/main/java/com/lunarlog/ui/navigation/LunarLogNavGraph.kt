@@ -253,7 +253,8 @@ fun LunarLogNavGraph(
                 }
                 composable(
                     route = Screen.Details.route,
-                    arguments = listOf(navArgument("date") { type = NavType.LongType })
+                    arguments = listOf(navArgument("date") { type = NavType.LongType }),
+                    deepLinks = listOf(navDeepLink { uriPattern = "lunarlog://details/{date}" })
                 ) { backStackEntry ->
                     val date = backStackEntry.arguments?.getLong("date") ?: LocalDate.now().toEpochDay()
                     LogListScreen(

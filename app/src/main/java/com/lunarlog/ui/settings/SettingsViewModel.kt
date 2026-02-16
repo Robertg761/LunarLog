@@ -6,6 +6,7 @@ import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.lunarlog.data.DataManagementRepository
 import com.lunarlog.data.UserPreferencesRepository
+import com.lunarlog.workers.NotificationWorkScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -31,6 +32,12 @@ class SettingsViewModel @Inject constructor(
     val themeSeedColor = userPreferencesRepository.themeSeedColor
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
+    val periodReminderEnabled = userPreferencesRepository.periodLogReminderEnabled
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val periodReminderTimeMinutes = userPreferencesRepository.periodLogReminderTimeMinutes
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 20L * 60L)
+
     private val _message = MutableStateFlow<String?>(null)
     val message = _message
 
@@ -43,6 +50,20 @@ class SettingsViewModel @Inject constructor(
     fun setThemeSeedColor(color: Long) {
         viewModelScope.launch {
             userPreferencesRepository.setThemeSeedColor(color)
+        }
+    }
+
+    fun setPeriodReminderEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setPeriodLogReminderEnabled(enabled)
+        }
+    }
+
+    fun setPeriodReminderTimeMinutes(minutes: Long) {
+        viewModelScope.launch {
+            userPreferencesRepository.setPeriodLogReminderTimeMinutes(minutes)
+            // Reschedule immediately so changes take effect without requiring app restart.
+            NotificationWorkScheduler.scheduleCycleNotifications(context, minutes)
         }
     }
 

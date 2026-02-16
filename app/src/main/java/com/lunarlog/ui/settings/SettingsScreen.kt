@@ -1,8 +1,11 @@
 package com.lunarlog.ui.settings
 
+import android.Manifest
 import android.app.Activity
+import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
+import android.os.Build
 import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -57,11 +60,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lunarlog.BuildConfig
+import com.lunarlog.R
+import java.util.Locale
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -73,6 +79,8 @@ fun SettingsScreen(
 ) {
     val isAppLockEnabled by viewModel.isAppLockEnabled.collectAsState()
     val themeSeedColor by viewModel.themeSeedColor.collectAsState()
+    val periodReminderEnabled by viewModel.periodReminderEnabled.collectAsState()
+    val periodReminderTimeMinutes by viewModel.periodReminderTimeMinutes.collectAsState()
     val message by viewModel.message.collectAsState()
     val context = LocalContext.current
     var showNukeDialog by remember { mutableStateOf(false) }
@@ -125,6 +133,46 @@ fun SettingsScreen(
         } else {
              Toast.makeText(context, "Biometric hardware not available or set up.", Toast.LENGTH_LONG).show()
         }
+    }
+
+    // Notification permission (Android 13+)
+    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.setPeriodReminderEnabled(true)
+            Toast.makeText(context, "Daily reminder enabled.", Toast.LENGTH_SHORT).show()
+        } else {
+            viewModel.setPeriodReminderEnabled(false)
+            Toast.makeText(context, "Notification permission denied.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    fun formatMinutes(minutes: Long): String {
+        val m = minutes.coerceIn(0L, (24L * 60L) - 1L)
+        val hour24 = (m / 60L).toInt()
+        val min = (m % 60L).toInt()
+        val hour12 = ((hour24 + 11) % 12) + 1
+        val ampm = if (hour24 < 12) "AM" else "PM"
+        return String.format(Locale.US, "%d:%02d %s", hour12, min, ampm)
+    }
+
+    fun showTimePicker() {
+        val currentMinutes = periodReminderTimeMinutes.coerceIn(0L, (24L * 60L) - 1L)
+        val currentHour = (currentMinutes / 60L).toInt()
+        val currentMinute = (currentMinutes % 60L).toInt()
+
+        TimePickerDialog(
+            context,
+            { _, hourOfDay, minute ->
+                val newMinutes = (hourOfDay * 60L) + minute.toLong()
+                viewModel.setPeriodReminderTimeMinutes(newMinutes)
+                Toast.makeText(context, "Reminder time set to ${formatMinutes(newMinutes)}", Toast.LENGTH_SHORT).show()
+            },
+            currentHour,
+            currentMinute,
+            false
+        ).show()
     }
 
     if (showNukeDialog) {
@@ -206,6 +254,75 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
             
+            // Notifications
+            Text(
+                stringResource(id = R.string.settings_notifications),
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(id = R.string.settings_daily_period_log_reminder))
+                            Text(
+                                stringResource(id = R.string.settings_daily_period_log_reminder_desc),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = periodReminderEnabled,
+                            onCheckedChange = { enabled ->
+                                if (!enabled) {
+                                    viewModel.setPeriodReminderEnabled(false)
+                                    return@Switch
+                                }
+
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    val hasPerm = ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.POST_NOTIFICATIONS
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                    if (hasPerm) {
+                                        viewModel.setPeriodReminderEnabled(true)
+                                    } else {
+                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                } else {
+                                    viewModel.setPeriodReminderEnabled(true)
+                                }
+                            }
+                        )
+                    }
+
+                    Spacer(modifier = Modifier.height(12.dp))
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .clickable { showTimePicker() }
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(stringResource(id = R.string.settings_reminder_time))
+                            Text(
+                                formatMinutes(periodReminderTimeMinutes),
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Text(stringResource(id = R.string.settings_change), color = MaterialTheme.colorScheme.primary)
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             // Appearance
             Text(
                 "Appearance",
