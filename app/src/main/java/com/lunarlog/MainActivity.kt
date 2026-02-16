@@ -21,8 +21,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import com.lunarlog.ui.navigation.LunarLogNavGraph
 import com.lunarlog.ui.theme.LunarLogTheme
 import dagger.hilt.android.AndroidEntryPoint
-import androidx.lifecycle.lifecycleScope
-import com.lunarlog.data.UserPreferencesRepository
 import com.lunarlog.workers.NotificationWorkScheduler
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
@@ -43,17 +41,12 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.remember
 import com.lunarlog.update.ApkUpdateManager
 import com.lunarlog.ui.update.UpdateBottomSheet
-import javax.inject.Inject
-import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val apkUpdateManager = ApkUpdateManager()
-
-    @Inject
-    lateinit var userPreferencesRepository: UserPreferencesRepository
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -203,14 +196,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun scheduleNotificationWorker() {
-        lifecycleScope.launch {
-            val minutes = try {
-                userPreferencesRepository.getPeriodLogReminderTimeMinutesSync()
-            } catch (_: Exception) {
-                20L * 60L
-            }
-            NotificationWorkScheduler.scheduleCycleNotifications(this@MainActivity, minutes)
-        }
+        // Not tied to Activity lifecycle (and independent from reminder time).
+        NotificationWorkScheduler.scheduleCycleNotifications(applicationContext)
+        // Schedules/cancels the daily reminder based on saved preferences.
+        NotificationWorkScheduler.enqueuePeriodLogReminderReschedule(applicationContext)
     }
 }
 

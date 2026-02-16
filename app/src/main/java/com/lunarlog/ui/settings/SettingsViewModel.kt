@@ -56,14 +56,31 @@ class SettingsViewModel @Inject constructor(
     fun setPeriodReminderEnabled(enabled: Boolean) {
         viewModelScope.launch {
             userPreferencesRepository.setPeriodLogReminderEnabled(enabled)
+            if (enabled) {
+                val minutes = try {
+                    userPreferencesRepository.getPeriodLogReminderTimeMinutesSync()
+                } catch (_: Exception) {
+                    20L * 60L
+                }
+                NotificationWorkScheduler.schedulePeriodLogReminders(context, minutes)
+            } else {
+                NotificationWorkScheduler.cancelPeriodLogReminders(context)
+            }
         }
     }
 
     fun setPeriodReminderTimeMinutes(minutes: Long) {
         viewModelScope.launch {
             userPreferencesRepository.setPeriodLogReminderTimeMinutes(minutes)
-            // Reschedule immediately so changes take effect without requiring app restart.
-            NotificationWorkScheduler.scheduleCycleNotifications(context, minutes)
+            val enabled = try {
+                userPreferencesRepository.getPeriodLogReminderEnabledSync()
+            } catch (_: Exception) {
+                false
+            }
+            if (enabled) {
+                // Reschedule immediately so changes take effect without requiring app restart.
+                NotificationWorkScheduler.schedulePeriodLogReminders(context, minutes)
+            }
         }
     }
 
