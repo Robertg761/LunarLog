@@ -29,13 +29,12 @@ import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
 import com.lunarlog.data.PeriodChangeResult
 import com.lunarlog.di.WidgetEntryPoint
-import com.lunarlog.core.model.Cycle
-import com.lunarlog.logic.CyclePredictionUtils
+import com.lunarlog.logic.CounterPresentation
+import com.lunarlog.logic.CounterPresentationCalculator
 import dagger.hilt.android.EntryPointAccessors
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 class LogPeriodWidget : GlanceAppWidget() {
 
@@ -49,32 +48,16 @@ class LogPeriodWidget : GlanceAppWidget() {
         val cycles = withContext(Dispatchers.IO) {
             cycleRepository.getAllCyclesSync()
         }
-        
-        val today = LocalDate.now()
-        val latestCycle = cycles.maxByOrNull { it.startDate }
-        
-        val dayOfCycle = if (latestCycle != null) {
-            val start = latestCycle.startDate
-            ChronoUnit.DAYS.between(start, today).toInt() + 1
-        } else {
-            1
-        }
-        
-        val daysUntil = if (latestCycle != null) {
-            val avg = CyclePredictionUtils.calculateAverageCycleLength(cycles)
-            val nextPeriod = CyclePredictionUtils.predictNextPeriod(latestCycle, avg)
-            ChronoUnit.DAYS.between(today, nextPeriod).toInt()
-        } else {
-            28
-        }
+
+        val counter = CounterPresentationCalculator.calculate(cycles, LocalDate.now())
 
         provideContent {
-            WidgetContent(dayOfCycle, daysUntil)
+            WidgetContent(counter)
         }
     }
 
     @Composable
-    private fun WidgetContent(dayOfCycle: Int, daysUntil: Int) {
+    private fun WidgetContent(counter: CounterPresentation) {
         // Colors
         val primaryColor = ColorProvider(R.color.colorPrimary)
         val onPrimaryColor = ColorProvider(android.R.color.white)
@@ -94,11 +77,11 @@ class LogPeriodWidget : GlanceAppWidget() {
             ) {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = "Day",
+                        text = counter.title,
                         style = TextStyle(color = primaryColor)
                     )
                     Text(
-                        text = "$dayOfCycle",
+                        text = "${counter.value}",
                         style = TextStyle(
                             fontSize = androidx.compose.ui.unit.TextUnit(36f, androidx.compose.ui.unit.TextUnitType.Sp),
                             fontWeight = FontWeight.Bold,
@@ -111,7 +94,7 @@ class LogPeriodWidget : GlanceAppWidget() {
                 
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        text = if (daysUntil <= 0) "Due!" else "$daysUntil left",
+                        text = counter.subtitle,
                         style = TextStyle(color = ColorProvider(android.R.color.darker_gray))
                     )
                 }

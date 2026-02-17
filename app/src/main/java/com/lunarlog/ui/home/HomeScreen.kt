@@ -57,6 +57,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.lunarlog.logic.CounterMode
 import com.lunarlog.ui.theme.FertileGreen
 import com.lunarlog.ui.theme.FertileSurface
 import com.lunarlog.ui.theme.OnFertileSurface
@@ -192,10 +193,10 @@ fun HomeScreen(
 
                     // Cycle Indicator - Responsive
                     CycleStatusCircle(
-                        day = uiState.currentCycleDay,
-                        daysUntil = uiState.daysUntilPeriod,
-                        daysRemainingInPeriod = uiState.daysRemainingInPeriod,
-                        isPeriodActive = uiState.isPeriodActive,
+                        value = uiState.counterValue,
+                        mode = uiState.counterMode,
+                        title = uiState.counterTitle,
+                        subtitle = uiState.counterSubtitle,
                         activeColor = cycleColor,
                         scrollState = scrollState,
                         modifier = Modifier
@@ -329,10 +330,10 @@ fun HomeScreen(
 
 @Composable
 fun CycleStatusCircle(
-    day: Int, 
-    daysUntil: Int,
-    daysRemainingInPeriod: Int?,
-    isPeriodActive: Boolean,
+    value: Int,
+    mode: CounterMode,
+    title: String,
+    subtitle: String,
     activeColor: Color,
     scrollState: ScrollState? = null,
     modifier: Modifier = Modifier
@@ -394,7 +395,11 @@ fun CycleStatusCircle(
 
             // Dynamic Progress based on 28-day cycle assumption for visual filling
             // Clamp to ensure it looks like a ring
-            val progress = (day / 28f).coerceIn(0.05f, 1f)
+            val progressBase = when (mode) {
+                CounterMode.PERIOD_DAYS_LEFT, CounterMode.PERIOD_OVERAGE -> 10f
+                CounterMode.NEXT_PERIOD_COUNTDOWN, CounterMode.NEXT_PERIOD_OVERDUE -> 28f
+            }
+            val progress = (value / progressBase).coerceIn(0.05f, 1f)
             
             drawArc(
                 brush = Brush.sweepGradient(
@@ -415,13 +420,13 @@ fun CycleStatusCircle(
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = "Day",
+                text = title,
                 style = MaterialTheme.typography.titleMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
                 fontWeight = FontWeight.Medium
             )
             Text(
-                text = "$day",
+                text = "$value",
                 style = MaterialTheme.typography.displayLarge.copy(
                     fontWeight = FontWeight.Bold,
                     fontSize = 80.sp,
@@ -441,15 +446,8 @@ fun CycleStatusCircle(
                 shape = RoundedCornerShape(20.dp),
                 border = androidx.compose.foundation.BorderStroke(1.dp, activeColor.copy(alpha = 0.2f))
             ) {
-                val statusText = if (isPeriodActive) {
-                    val days = daysRemainingInPeriod ?: 0
-                    if (days <= 0) "Period ending today" else "$days days left in period"
-                } else {
-                    if (daysUntil <= 0) "Period due today" else "$daysUntil days until period"
-                }
-
                 Text(
-                    text = statusText,
+                    text = subtitle,
                     style = MaterialTheme.typography.labelLarge,
                     color = activeColor, // Match ring color
                     modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),

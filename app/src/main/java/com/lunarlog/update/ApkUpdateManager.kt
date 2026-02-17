@@ -53,6 +53,7 @@ class ApkUpdateManager(
         prefs(context).edit()
             .putLong(KEY_DOWNLOAD_ID, downloadId)
             .putString(KEY_APK_PATH, file.absolutePath)
+            .putString(KEY_DOWNLOADED_VERSION_NAME, normalizeVersionName(info.latestVersionName))
             .apply()
 
         return downloadId
@@ -89,9 +90,65 @@ class ApkUpdateManager(
         return q.status == DownloadManager.STATUS_SUCCESSFUL && apkFile.exists()
     }
 
+    fun hasDownloadedApkForVersion(context: Context, versionName: String): Boolean {
+        if (!hasDownloadedApk(context)) return false
+        val downloaded = getDownloadedVersionName(context) ?: return false
+        return normalizeVersionName(downloaded) == normalizeVersionName(versionName)
+    }
+
+    fun hasPendingDownloadedUpdate(context: Context, currentVersionName: String): Boolean {
+        if (!hasDownloadedApk(context)) return false
+
+        val downloadedVersion = getDownloadedVersionName(context)
+        if (downloadedVersion == null) {
+            // Can't verify version; preserve existing behavior and allow install prompt.
+            return true
+        }
+
+        val isPending = isNewerVersion(downloadedVersion, currentVersionName)
+        if (!isPending) {
+            clearDownloadedState(context, deleteApk = true)
+        }
+        return isPending
+    }
+
     fun getDownloadedApkFile(context: Context): File? {
         val apkPath = prefs(context).getString(KEY_APK_PATH, null) ?: return null
         return File(apkPath)
+    }
+
+    fun getDownloadedVersionName(context: Context): String? {
+        val stored = prefs(context).getString(KEY_DOWNLOADED_VERSION_NAME, null)?.trim()
+        if (!stored.isNullOrEmpty()) return stored
+
+        val fileName = getDownloadedApkFile(context)?.name ?: return null
+        return extractVersionFromApkFileName(fileName)
+    }
+
+    fun clearDownloadedState(context: Context, deleteApk: Boolean = false) {
+        val existingFile = getDownloadedApkFile(context)
+        val existingDownloadId = prefs(context).getLong(KEY_DOWNLOAD_ID, -1L)
+
+        if (existingDownloadId > 0) {
+            runCatching {
+                val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
+                dm.remove(existingDownloadId)
+            }
+        }
+
+        if (deleteApk) {
+            runCatching {
+                if (existingFile?.exists() == true) {
+                    existingFile.delete()
+                }
+            }
+        }
+
+        prefs(context).edit()
+            .remove(KEY_DOWNLOAD_ID)
+            .remove(KEY_APK_PATH)
+            .remove(KEY_DOWNLOADED_VERSION_NAME)
+            .apply()
     }
 
     fun buildInstallIntentFromDownloadedApk(context: Context): Intent? {
@@ -111,5 +168,31 @@ class ApkUpdateManager(
     companion object {
         private const val KEY_DOWNLOAD_ID = "download_id"
         private const val KEY_APK_PATH = "apk_path"
+        private const val KEY_DOWNLOADED_VERSION_NAME = "downloaded_version_name"
+
+        internal fun isNewerVersion(downloadedVersionName: String, currentVersionName: String): Boolean {
+            val downloaded = normalizeVersionName(downloadedVersionName)
+            val current = normalizeVersionName(currentVersionName)
+
+            val downloadedSemVer = SemVer.parseOrNull(downloaded)
+            val currentSemVer = SemVer.parseOrNull(current)
+            return if (downloadedSemVer != null && currentSemVer != null) {
+                downloadedSemVer > currentSemVer
+            } else {
+                downloaded != current
+            }
+        }
+
+        internal fun normalizeVersionName(raw: String): String {
+            return raw.trim().removePrefix("v").removePrefix("V")
+        }
+
+        internal fun extractVersionFromApkFileName(fileName: String): String? {
+            val prefix = "LunarLog-"
+            val suffix = ".apk"
+            if (!fileName.startsWith(prefix) || !fileName.endsWith(suffix)) return null
+            val rawVersion = fileName.substring(prefix.length, fileName.length - suffix.length)
+            return rawVersion.takeIf { it.isNotBlank() }?.let { normalizeVersionName(it) }
+        }
     }
 }

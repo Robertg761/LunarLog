@@ -81,7 +81,9 @@ class MainActivity : AppCompatActivity() {
             // If an update was downloaded previously, offer install without surprise navigation.
             LaunchedEffect(Unit) {
                 if (promptedDownloaded.value) return@LaunchedEffect
-                if (!apkUpdateManager.hasDownloadedApk(this@MainActivity)) return@LaunchedEffect
+                if (!apkUpdateManager.hasPendingDownloadedUpdate(this@MainActivity, BuildConfig.VERSION_NAME)) {
+                    return@LaunchedEffect
+                }
                 promptedDownloaded.value = true
 
                 val needsPerm = apkUpdateManager.needsUnknownSourcesPermission(this@MainActivity)

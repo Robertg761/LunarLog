@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.1] - 2026-02-17
+
+### Changed
+- **Home Counter Model**: Reworked the main counter to countdown-first behavior: estimated period days left while ongoing, then estimated days until next period after period end.
+- **Cross-Surface Consistency**: Unified counter semantics across Home, widget, and share status text using a shared counter presentation calculator.
+
+### Fixed
+- **Stale Update Prompt**: Prevented the "Update downloaded, install now" prompt from appearing after the update was already installed and the app was reopened.
+- **Overdue Visibility**: Counter now shows overdue states explicitly instead of collapsing overdue and due states into "due today".
+- **Period Overage Clarity**: Active periods that exceed estimate now display overage days instead of ambiguous/negative countdown behavior.
+
 ## [1.7.0] - 2026-02-17
 
 ### Added

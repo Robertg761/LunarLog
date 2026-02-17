@@ -67,7 +67,7 @@ fun UpdateBottomSheet(
     fun recomputeStage() {
         val q = apkUpdateManager.queryDownload(context)
         stage = when {
-            apkUpdateManager.hasDownloadedApk(context) -> {
+            apkUpdateManager.hasDownloadedApkForVersion(context, info.latestVersionName) -> {
                 if (apkUpdateManager.needsUnknownSourcesPermission(context)) UpdateStage.PermissionRequired else UpdateStage.ReadyToInstall
             }
             q?.status == DownloadManager.STATUS_RUNNING ||

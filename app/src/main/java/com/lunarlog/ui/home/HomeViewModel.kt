@@ -2,14 +2,14 @@ package com.lunarlog.ui.home
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lunarlog.core.model.Cycle
 import com.lunarlog.core.config.AppConfig
 import com.lunarlog.data.CycleRepository
-import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
 import com.lunarlog.data.PeriodChangeResult
+import com.lunarlog.logic.CounterMode
+import com.lunarlog.logic.CounterPresentationCalculator
 import com.lunarlog.logic.CyclePredictionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.flow.first
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
@@ -33,6 +32,10 @@ data class HomeUiState(
     val isPeriodActive: Boolean = false, // Visual: Is today a period day?
     val isPeriodOngoing: Boolean = false, // Logic: Is the period open?
     val isEndedToday: Boolean = false, // Logic: Did it end today?
+    val counterValue: Int = 0,
+    val counterMode: CounterMode = CounterMode.NEXT_PERIOD_COUNTDOWN,
+    val counterTitle: String = "Next Period",
+    val counterSubtitle: String = "No cycle data yet",
     val quickLogSymptoms: List<String> = emptyList(),
     val anomalies: List<com.lunarlog.logic.CycleAnomaly> = emptyList()
 )
@@ -54,14 +57,21 @@ class HomeViewModel @Inject constructor(
         kotlinx.coroutines.withContext(defaultDispatcher) {
             runCatching {
                 if (cycles.isEmpty()) {
-                    HomeUiState(isLoading = false)
+                    val counter = CounterPresentationCalculator.calculate(emptyList())
+                    HomeUiState(
+                        counterValue = counter.value,
+                        counterMode = counter.mode,
+                        counterTitle = counter.title,
+                        counterSubtitle = counter.subtitle,
+                        isLoading = false
+                    )
                 } else {
                     val sortedCycles = cycles.sortedByDescending { it.startDate }
                     val lastCycle = sortedCycles.first()
                     val averageLength = CyclePredictionUtils.calculateAverageCycleLength(cycles)
-                    val averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
                     val nextPeriodStart = CyclePredictionUtils.predictNextPeriod(lastCycle, averageLength)
                     val today = LocalDate.now()
+                    val counter = CounterPresentationCalculator.calculate(cycles, today)
 
                     val daysUntil = ChronoUnit.DAYS.between(today, nextPeriodStart).toInt()
                     val currentCycleDay = ChronoUnit.DAYS.between(lastCycle.startDate, today).toInt() + 1
@@ -76,24 +86,12 @@ class HomeViewModel @Inject constructor(
 
                     val anomalies = com.lunarlog.logic.SmartAnomalyDetector.detectAnomalies(cycles)
 
-                    val isPeriodActive = if (lastCycle.endDate != null) {
-                        !today.isAfter(lastCycle.endDate)
-                    } else {
-                        currentCycleDay <= averagePeriodLength
-                    }
-
                     val isPeriodOngoing = lastCycle.endDate == null
+                    val isPeriodActive = isPeriodOngoing
                     val isEndedToday = lastCycle.endDate == today
 
-                    val daysRemainingInPeriod = if (isPeriodActive) {
-                        if (lastCycle.endDate != null) {
-                            ChronoUnit.DAYS.between(today, lastCycle.endDate).toInt()
-                        } else {
-                             averagePeriodLength - currentCycleDay
-                        }
-                    } else {
-                        null
-                    }
+                    val daysRemainingInPeriod =
+                        if (counter.mode == CounterMode.PERIOD_DAYS_LEFT) counter.value else null
 
                     val quickLogSymptoms = com.lunarlog.logic.SymptomStatsCalculator.getTopSymptomsForPhase(currentCycleDay, cycles, logs)
 
@@ -105,6 +103,10 @@ class HomeViewModel @Inject constructor(
                         isPeriodActive = isPeriodActive,
                         isPeriodOngoing = isPeriodOngoing,
                         isEndedToday = isEndedToday,
+                        counterValue = counter.value,
+                        counterMode = counter.mode,
+                        counterTitle = counter.title,
+                        counterSubtitle = counter.subtitle,
                         isLoading = false,
                         quickLogSymptoms = quickLogSymptoms,
                         anomalies = anomalies
@@ -159,11 +161,32 @@ class HomeViewModel @Inject constructor(
         val state = uiState.value
         if (state.isLoading) return "Loading..."
 
+        val counterSummary = when (state.counterMode) {
+            CounterMode.PERIOD_DAYS_LEFT -> {
+                if (state.counterValue == 0) {
+                    "Estimated period status: ending today"
+                } else {
+                    "Estimated period days left: ${state.counterValue}"
+                }
+            }
+            CounterMode.PERIOD_OVERAGE ->
+                "Period is ${state.counterValue} days beyond estimate"
+            CounterMode.NEXT_PERIOD_COUNTDOWN -> {
+                if (state.counterValue == 0) {
+                    "Estimated next period: due today"
+                } else {
+                    "Estimated days until next period: ${state.counterValue}"
+                }
+            }
+            CounterMode.NEXT_PERIOD_OVERDUE ->
+                "Period is ${state.counterValue} days overdue"
+        }
+
         return """
             🌙 LunarLog Status Update
             
-            📅 Day ${state.currentCycleDay} of Cycle
-            ⏳ Period due in ${state.daysUntilPeriod} days
+            📊 $counterSummary
+            📅 Cycle day ${state.currentCycleDay}
             ${if (state.isFertile) "🌿 Likely Fertile Window" else ""}
             
             Sent from my private LunarLog
