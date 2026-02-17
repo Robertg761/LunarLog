@@ -97,7 +97,7 @@ fun LogListScreen(
                 // Period Toggle Card
                 PeriodToggleCard(
                     isPeriodDay = uiState.isPeriodDay,
-                    onToggle = { viewModel.togglePeriod() }
+                    onToggle = { checked -> viewModel.togglePeriod(checked) }
                 )
                 
                 // Empty State
@@ -135,7 +135,7 @@ fun LogListScreen(
                 item {
                     PeriodToggleCard(
                         isPeriodDay = uiState.isPeriodDay,
-                        onToggle = { viewModel.togglePeriod() },
+                        onToggle = { checked -> viewModel.togglePeriod(checked) },
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
                 }
@@ -276,7 +276,7 @@ fun LogEntryCard(
 @Composable
 fun PeriodToggleCard(
     isPeriodDay: Boolean,
-    onToggle: () -> Unit,
+    onToggle: (Boolean) -> Unit,
     modifier: Modifier = Modifier
 ) {
     Card(
@@ -321,7 +321,7 @@ fun PeriodToggleCard(
             }
             Switch(
                 checked = isPeriodDay,
-                onCheckedChange = { onToggle() }
+                onCheckedChange = onToggle
             )
         }
     }

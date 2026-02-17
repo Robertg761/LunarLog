@@ -27,6 +27,8 @@ import androidx.compose.ui.graphics.lerp
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -71,6 +73,9 @@ fun CalendarScreen(
                 },
                 onNext = {
                     scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
+                },
+                onToday = {
+                    scope.launch { pagerState.animateScrollToPage(initialPage) }
                 }
             )
         }
@@ -170,7 +175,8 @@ fun LegendItem(
 fun CalendarHeader(
     currentMonth: YearMonth,
     onPrevious: () -> Unit,
-    onNext: () -> Unit
+    onNext: () -> Unit,
+    onToday: () -> Unit
 ) {
     Row(
         modifier = Modifier
@@ -194,6 +200,9 @@ fun CalendarHeader(
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
+            TextButton(onClick = onToday) {
+                Text("Today")
+            }
         }
 
         IconButton(onClick = onNext) {
@@ -287,6 +296,20 @@ fun CalendarDayCell(
 
     Box(
         modifier = modifier
+            .semantics {
+                val statuses = buildList {
+                    if (day.data.isPeriod) add("period")
+                    if (day.data.isPredictedPeriod) add("predicted period")
+                    if (day.data.isFertile) add("fertile")
+                    if (day.data.isOvulation) add("ovulation")
+                    if (isToday) add("today")
+                }
+                contentDescription = if (statuses.isEmpty()) {
+                    "${day.date.dayOfMonth}"
+                } else {
+                    "${day.date.dayOfMonth}, ${statuses.joinToString(", ")}"
+                }
+            }
             .clickable(onClick = {
                 haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                 onClick()

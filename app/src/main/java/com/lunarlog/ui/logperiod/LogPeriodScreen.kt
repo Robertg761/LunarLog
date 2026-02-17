@@ -58,6 +58,7 @@ fun LogPeriodScreen(
     val uiState by viewModel.uiState.collectAsState()
     val snackbarHostState = remember { SnackbarHostState() }
     var showSuccess by remember { mutableStateOf(false) }
+    val isReady = datePickerState.selectedStartDateMillis != null
 
     // Calculate duration text
     val durationText = remember(datePickerState.selectedStartDateMillis, datePickerState.selectedEndDateMillis) {
@@ -109,9 +110,9 @@ fun LogPeriodScreen(
                 )
             },
             floatingActionButton = {
-                val isReady = datePickerState.selectedStartDateMillis != null
                 ExtendedFloatingActionButton(
                     onClick = {
+                        if (!isReady || uiState.isSaving) return@ExtendedFloatingActionButton
                         val startDate = datePickerState.selectedStartDateMillis
                         val endDate = datePickerState.selectedEndDateMillis
 
@@ -161,6 +162,14 @@ fun LogPeriodScreen(
                             fontWeight = FontWeight.Medium
                         )
                     }
+                }
+                if (!isReady) {
+                    Text(
+                        text = "Select a start date to enable saving.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(horizontal = 24.dp)
+                    )
                 }
 
                 Spacer(modifier = Modifier.height(8.dp))

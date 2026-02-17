@@ -16,6 +16,7 @@ object NotificationWorkScheduler {
     const val UNIQUE_CYCLE_WORK_NAME = "CycleNotificationWork"
     const val UNIQUE_PERIOD_LOG_REMINDER_WORK_NAME = "PeriodLogReminderWork"
     private const val UNIQUE_PERIOD_LOG_REMINDER_RESCHEDULE_WORK_NAME = "PeriodLogReminderRescheduleWork"
+    private const val UNIQUE_CYCLE_RESCHEDULE_WORK_NAME = "CycleNotificationRescheduleWork"
     private const val DEFAULT_CYCLE_NOTIFICATION_TIME_MINUTES = 9L * 60L
 
     /**
@@ -52,6 +53,10 @@ object NotificationWorkScheduler {
         )
     }
 
+    fun cancelCycleNotifications(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_CYCLE_WORK_NAME)
+    }
+
     /**
      * Schedules the [PeriodLogReminderWorker] to run once every 24h, with an initial delay so the
      * first run happens at the next occurrence of [timeMinutesFromMidnight] in the user's local tz.
@@ -85,6 +90,17 @@ object NotificationWorkScheduler {
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             UNIQUE_PERIOD_LOG_REMINDER_RESCHEDULE_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
+    fun enqueueCycleNotificationReschedule(context: Context) {
+        val request = OneTimeWorkRequestBuilder<CycleNotificationRescheduleWorker>()
+            .build()
+
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            UNIQUE_CYCLE_RESCHEDULE_WORK_NAME,
             ExistingWorkPolicy.REPLACE,
             request
         )

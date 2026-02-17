@@ -1,18 +1,19 @@
 package com.lunarlog.data
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.flowOf
 import com.lunarlog.core.model.DailyLog
 import java.time.LocalDate
 import java.time.ZoneId
 import javax.inject.Inject
 import javax.inject.Singleton
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.withContext
+import androidx.room.withTransaction
 
 @Singleton
 class DailyLogRepository @Inject constructor(
     private val dailyLogDao: DailyLogDao,
-    private val logEntryDao: LogEntryDao
+    private val logEntryDao: LogEntryDao,
+    private val appDatabase: AppDatabase
 ) {
     fun getLogForDate(date: LocalDate): Flow<DailyLog?> {
         return dailyLogDao.getLogForDate(date)
@@ -31,10 +32,47 @@ class DailyLogRepository @Inject constructor(
     }
 
     suspend fun saveLog(dailyLog: DailyLog) {
-        // Legacy support: We allow saving the aggregate directly, 
-        // but ideally we should update entries. 
-        // For now, we trust the caller knows what they are doing (e.g. Migration or Legacy UI).
-        dailyLogDao.insertLog(dailyLog)
+        val date = dailyLog.date.toEpochDay()
+        val defaultTime = dailyLog.date
+            .atTime(12, 0)
+            .atZone(ZoneId.systemDefault())
+            .toInstant()
+            .toEpochMilli()
+
+        val entries = mutableListOf<LogEntry>()
+
+        if (dailyLog.flowLevel > 0) {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.FLOW, value = dailyLog.flowLevel.toString())
+        }
+        dailyLog.symptoms.forEach {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.SYMPTOM, value = it)
+        }
+        dailyLog.mood.forEach {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.MOOD, value = it)
+        }
+        if (dailyLog.waterIntake > 0) {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.WATER, value = dailyLog.waterIntake.toString())
+        }
+        if (dailyLog.sleepHours > 0f) {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.SLEEP, value = dailyLog.sleepHours.toString())
+        }
+        if (dailyLog.sleepQuality > 0) {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.SLEEP_QUALITY, value = dailyLog.sleepQuality.toString())
+        }
+        if (dailyLog.sexDrive > 0) {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.SEX, value = dailyLog.sexDrive.toString())
+        }
+        if (dailyLog.notes.isNotBlank()) {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.NOTE, value = dailyLog.notes)
+        }
+        if (dailyLog.temperature != null) {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.TEMPERATURE, value = dailyLog.temperature.toString())
+        }
+        if (dailyLog.cervicalMucus > 0) {
+            entries += LogEntry(date = date, time = defaultTime, type = LogEntryType.MUCUS, value = dailyLog.cervicalMucus.toString())
+        }
+
+        replaceEntriesForDate(date, entries)
     }
 
     fun getAllLogs(): Flow<List<DailyLog>> {
@@ -42,7 +80,8 @@ class DailyLogRepository @Inject constructor(
     }
 
     fun searchLogs(query: String): Flow<List<DailyLog>> {
-        val ftsQuery = if (query.endsWith("*")) query else "$query*"
+        val ftsQuery = sanitizeFtsQuery(query)
+        if (ftsQuery.isBlank()) return flowOf(emptyList())
         return dailyLogDao.searchLogsFts(ftsQuery)
     }
 
@@ -57,9 +96,11 @@ class DailyLogRepository @Inject constructor(
     }
 
     suspend fun addEntry(entry: LogEntry) {
-        ensureLegacyDataHydrated(entry.date)
-        logEntryDao.insertEntry(entry)
-        updateDailyLogAggregate(entry.date)
+        appDatabase.withTransaction {
+            ensureLegacyDataHydrated(entry.date)
+            logEntryDao.insertEntry(entry)
+            updateDailyLogAggregateInTransaction(entry.date)
+        }
     }
 
     /**
@@ -73,13 +114,50 @@ class DailyLogRepository @Inject constructor(
     }
     
     suspend fun deleteEntry(entry: LogEntry) {
-        logEntryDao.deleteEntry(entry.id)
-        updateDailyLogAggregate(entry.date)
+        appDatabase.withTransaction {
+            logEntryDao.deleteEntry(entry.id)
+            updateDailyLogAggregateInTransaction(entry.date)
+        }
     }
 
     suspend fun updateEntry(entry: LogEntry) {
-        logEntryDao.updateEntry(entry)
-        updateDailyLogAggregate(entry.date)
+        appDatabase.withTransaction {
+            logEntryDao.updateEntry(entry)
+            updateDailyLogAggregateInTransaction(entry.date)
+        }
+    }
+
+    suspend fun replaceEntriesForDate(date: Long, entries: List<LogEntry>) {
+        appDatabase.withTransaction {
+            ensureLegacyDataHydrated(date)
+            logEntryDao.deleteEntriesForDate(date)
+            entries.forEach { entry ->
+                logEntryDao.insertEntry(entry)
+            }
+            updateDailyLogAggregateInTransaction(date)
+        }
+    }
+
+    suspend fun upsertEntries(
+        date: Long,
+        payload: Map<LogEntryType, List<String>>,
+        time: Long,
+        details: String? = null
+    ) {
+        val entries = payload.flatMap { (type, values) ->
+            values
+                .filter { it.isNotBlank() }
+                .map { value ->
+                    LogEntry(
+                        date = date,
+                        time = time,
+                        type = type,
+                        value = value,
+                        details = details
+                    )
+                }
+        }
+        replaceEntriesForDate(date, entries)
     }
 
     suspend fun ensureLegacyDataHydrated(date: Long) {
@@ -137,19 +215,26 @@ class DailyLogRepository @Inject constructor(
     }
 
     suspend fun rebuildDailyLogAggregate(date: Long) {
-        updateDailyLogAggregate(date)
+        appDatabase.withTransaction {
+            updateDailyLogAggregateInTransaction(date)
+        }
     }
 
     suspend fun rebuildDailyLogAggregateInTransaction(date: Long) {
         updateDailyLogAggregateInTransaction(date)
     }
 
-    private suspend fun updateDailyLogAggregate(date: Long) = withContext(Dispatchers.Default) {
+    private suspend fun updateDailyLogAggregateInTransaction(date: Long) {
         updateDailyLogAggregateInternal(date)
     }
 
-    private suspend fun updateDailyLogAggregateInTransaction(date: Long) {
-        updateDailyLogAggregateInternal(date)
+    private fun sanitizeFtsQuery(raw: String): String {
+        val tokens = raw
+            .split(Regex("\\s+"))
+            .map { token -> token.replace(Regex("[^\\p{L}\\p{N}_-]"), "") }
+            .filter { it.isNotBlank() }
+            .take(8)
+        return tokens.joinToString(" ") { "$it*" }
     }
 
     private suspend fun updateDailyLogAggregateInternal(date: Long) {

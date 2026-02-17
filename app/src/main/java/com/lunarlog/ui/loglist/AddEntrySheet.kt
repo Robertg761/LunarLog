@@ -10,6 +10,9 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.unit.dp
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
@@ -177,7 +180,11 @@ fun AddEntrySheet(
                         value = currentVal,
                         onValueChange = { entryData[LogEntryType.FLOW] = it },
                         valueRange = 0f..4f,
-                        steps = 3
+                        steps = 3,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Flow level"
+                            stateDescription = currentVal.toInt().toString()
+                        }
                     )
                     Text("0: None, 1: Spotting, 2: Light, 3: Medium, 4: Heavy")
                 }
@@ -188,7 +195,11 @@ fun AddEntrySheet(
                         value = currentVal,
                         onValueChange = { entryData[LogEntryType.WATER] = it },
                         valueRange = 1f..15f,
-                        steps = 13
+                        steps = 13,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Water cups"
+                            stateDescription = currentVal.toInt().toString()
+                        }
                     )
                 }
                 LogEntryType.SLEEP -> {
@@ -198,7 +209,11 @@ fun AddEntrySheet(
                         value = currentVal,
                         onValueChange = { entryData[LogEntryType.SLEEP] = it },
                         valueRange = 0f..12f,
-                        steps = 23
+                        steps = 23,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Sleep hours"
+                            stateDescription = String.format("%.1f", currentVal)
+                        }
                     )
                 }
                 LogEntryType.SLEEP_QUALITY -> {
@@ -208,7 +223,11 @@ fun AddEntrySheet(
                         value = currentVal,
                         onValueChange = { entryData[LogEntryType.SLEEP_QUALITY] = it },
                         valueRange = 1f..5f,
-                        steps = 3
+                        steps = 3,
+                        modifier = Modifier.semantics {
+                            contentDescription = "Sleep quality stars"
+                            stateDescription = currentVal.toInt().toString()
+                        }
                     )
                 }
                 LogEntryType.NOTE -> {

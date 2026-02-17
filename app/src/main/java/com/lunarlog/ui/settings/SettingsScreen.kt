@@ -42,6 +42,7 @@ import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
@@ -81,6 +82,8 @@ fun SettingsScreen(
     val themeSeedColor by viewModel.themeSeedColor.collectAsState()
     val periodReminderEnabled by viewModel.periodReminderEnabled.collectAsState()
     val periodReminderTimeMinutes by viewModel.periodReminderTimeMinutes.collectAsState()
+    val cycleNotificationEnabled by viewModel.cycleNotificationEnabled.collectAsState()
+    val appLockTimeoutSeconds by viewModel.appLockTimeoutSeconds.collectAsState()
     val message by viewModel.message.collectAsState()
     val context = LocalContext.current
     var showNukeDialog by remember { mutableStateOf(false) }
@@ -109,7 +112,9 @@ fun SettingsScreen(
     // Biometric Logic for enabling
     fun checkBiometric(onSuccess: () -> Unit) {
         val biometricManager = BiometricManager.from(context)
-        if (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS) {
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        if (biometricManager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS) {
              val executor = ContextCompat.getMainExecutor(context)
              val biometricPrompt = BiometricPrompt(context as FragmentActivity, executor,
                 object : BiometricPrompt.AuthenticationCallback() {
@@ -126,7 +131,7 @@ fun SettingsScreen(
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Confirm Identity")
                 .setSubtitle("Authenticate to enable App Lock")
-                .setNegativeButtonText("Cancel")
+                .setAllowedAuthenticators(authenticators)
                 .build()
 
             biometricPrompt.authenticate(promptInfo)
@@ -135,8 +140,17 @@ fun SettingsScreen(
         }
     }
 
+    fun formatLockTimeout(seconds: Long): String {
+        return when (seconds) {
+            0L -> "Immediately"
+            30L -> "After 30 seconds"
+            120L -> "After 2 minutes"
+            else -> "Immediately"
+        }
+    }
+
     // Notification permission (Android 13+)
-    val notificationPermissionLauncher = rememberLauncherForActivityResult(
+    val reminderNotificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
         if (granted) {
@@ -144,6 +158,18 @@ fun SettingsScreen(
             Toast.makeText(context, "Daily reminder enabled.", Toast.LENGTH_SHORT).show()
         } else {
             viewModel.setPeriodReminderEnabled(false)
+            Toast.makeText(context, "Notification permission denied.", Toast.LENGTH_LONG).show()
+        }
+    }
+
+    val cycleNotificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) {
+            viewModel.setCycleNotificationEnabled(true)
+            Toast.makeText(context, "Cycle alerts enabled.", Toast.LENGTH_SHORT).show()
+        } else {
+            viewModel.setCycleNotificationEnabled(false)
             Toast.makeText(context, "Notification permission denied.", Toast.LENGTH_LONG).show()
         }
     }
@@ -226,29 +252,52 @@ fun SettingsScreen(
             )
             Spacer(modifier = Modifier.height(8.dp))
             Card(modifier = Modifier.fillMaxWidth()) {
-                Row(
-                    modifier = Modifier.padding(16.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Icon(Icons.Filled.Lock, contentDescription = "App Lock Icon")
-                    Spacer(modifier = Modifier.padding(8.dp))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text("App Lock")
-                        Text(
-                            "Require authentication on startup",
-                            style = MaterialTheme.typography.bodySmall
+                Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(Icons.Filled.Lock, contentDescription = "App Lock Icon")
+                        Spacer(modifier = Modifier.padding(8.dp))
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("App Lock")
+                            Text(
+                                "Require authentication when returning to the app",
+                                style = MaterialTheme.typography.bodySmall
+                            )
+                        }
+                        Switch(
+                            checked = isAppLockEnabled,
+                            onCheckedChange = { enabled ->
+                                if (enabled) {
+                                    checkBiometric { viewModel.toggleAppLock(true) }
+                                } else {
+                                    viewModel.toggleAppLock(false)
+                                }
+                            }
                         )
                     }
-                    Switch(
-                        checked = isAppLockEnabled,
-                        onCheckedChange = { enabled ->
-                            if (enabled) {
-                                checkBiometric { viewModel.toggleAppLock(true) }
-                            } else {
-                                viewModel.toggleAppLock(false)
+                    if (isAppLockEnabled) {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        Text(
+                            "Lock timeout",
+                            style = MaterialTheme.typography.bodyMedium
+                        )
+                        Text(
+                            formatLockTimeout(appLockTimeoutSeconds),
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            listOf(0L to "Now", 30L to "30s", 120L to "2m").forEach { (seconds, label) ->
+                                FilterChip(
+                                    selected = appLockTimeoutSeconds == seconds,
+                                    onClick = { viewModel.setAppLockTimeoutSeconds(seconds) },
+                                    label = { Text(label) }
+                                )
                             }
                         }
-                    )
+                    }
                 }
             }
 
@@ -263,6 +312,41 @@ fun SettingsScreen(
             Spacer(modifier = Modifier.height(8.dp))
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(modifier = Modifier.padding(16.dp)) {
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Cycle prediction alerts")
+                            Text(
+                                "Notify about upcoming period and fertile window updates",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = cycleNotificationEnabled,
+                            onCheckedChange = { enabled ->
+                                if (!enabled) {
+                                    viewModel.setCycleNotificationEnabled(false)
+                                    return@Switch
+                                }
+                                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                    val hasPerm = ContextCompat.checkSelfPermission(
+                                        context,
+                                        Manifest.permission.POST_NOTIFICATIONS
+                                    ) == android.content.pm.PackageManager.PERMISSION_GRANTED
+                                    if (hasPerm) {
+                                        viewModel.setCycleNotificationEnabled(true)
+                                    } else {
+                                        cycleNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                    }
+                                } else {
+                                    viewModel.setCycleNotificationEnabled(true)
+                                }
+                            }
+                        )
+                    }
+                    Spacer(modifier = Modifier.height(12.dp))
                     Row(
                         verticalAlignment = Alignment.CenterVertically
                     ) {
@@ -290,7 +374,7 @@ fun SettingsScreen(
                                     if (hasPerm) {
                                         viewModel.setPeriodReminderEnabled(true)
                                     } else {
-                                        notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                        reminderNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                     }
                                 } else {
                                     viewModel.setPeriodReminderEnabled(true)

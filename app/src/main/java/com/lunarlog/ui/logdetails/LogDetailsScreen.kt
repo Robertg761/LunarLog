@@ -170,7 +170,7 @@ fun LogDetailsScreen(
                     selected = uiState.isPeriodDay,
                     onClick = {
                         view.performHapticFeedback(HapticFeedbackConstants.KEYBOARD_TAP)
-                        viewModel.togglePeriod()
+                        viewModel.togglePeriod(!uiState.isPeriodDay)
                     },
                     label = {
                         Text(if (uiState.isPeriodDay) "Period Day" else "Mark as Period")

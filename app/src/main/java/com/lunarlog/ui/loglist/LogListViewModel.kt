@@ -6,11 +6,12 @@ import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
+import com.lunarlog.data.PeriodChangeResult
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -33,6 +34,7 @@ class LogListViewModel @Inject constructor(
     
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState())
+    private var loadDateJob: Job? = null
 
     fun loadDate(date: Long) {
         val localDate = LocalDate.ofEpochDay(date)
@@ -41,8 +43,9 @@ class LogListViewModel @Inject constructor(
             entries = emptyList(), // Clear old entries
             isLoading = true
         )
-        
-        viewModelScope.launch {
+
+        loadDateJob?.cancel()
+        loadDateJob = viewModelScope.launch {
             try {
                 // Load period status first
                 val isPeriod = checkPeriodStatus(localDate)
@@ -147,19 +150,18 @@ class LogListViewModel @Inject constructor(
     }
 
     private suspend fun checkPeriodStatus(date: LocalDate): Boolean {
-        val cycles = cycleRepository.getAllCyclesSync()
-        return cycles.any { cycle ->
-            val start = cycle.startDate
-            val end = cycle.endDate ?: LocalDate.now()
-            !date.isBefore(start) && !date.isAfter(end)
-        }
+        return cycleRepository.isPeriodDay(date)
     }
 
-    fun togglePeriod() {
+    fun togglePeriod(isPeriodDay: Boolean) {
         viewModelScope.launch {
             val date = _uiState.value.date
-            val message = cycleRepository.togglePeriod(date)
+            val result = cycleRepository.setPeriodDay(date, isPeriodDay)
             val isPeriod = checkPeriodStatus(date)
+            val message = when (result) {
+                is PeriodChangeResult.Success -> result.message
+                is PeriodChangeResult.ValidationError -> result.message
+            }
             _uiState.value = _uiState.value.copy(
                 isPeriodDay = isPeriod,
                 periodMessage = message

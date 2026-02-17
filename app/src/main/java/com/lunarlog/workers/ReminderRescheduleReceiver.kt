@@ -15,7 +15,6 @@ class ReminderRescheduleReceiver : BroadcastReceiver() {
 
         // Keep this lightweight; do the actual preference read + reschedule in WorkManager.
         NotificationWorkScheduler.enqueuePeriodLogReminderReschedule(appContext)
-        // Also re-anchor cycle notifications to the intended daily schedule.
-        NotificationWorkScheduler.rescheduleCycleNotifications(appContext)
+        NotificationWorkScheduler.enqueueCycleNotificationReschedule(appContext)
     }
 }

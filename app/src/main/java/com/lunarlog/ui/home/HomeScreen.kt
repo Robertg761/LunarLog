@@ -82,6 +82,7 @@ fun HomeScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     
     var showQuickLog by remember { mutableStateOf(false) }
+    var showEndPeriodConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
         viewModel.message.collect { message ->
@@ -270,7 +271,13 @@ fun HomeScreen(
                             isPeriodActive = uiState.isPeriodActive,
                             isPeriodOngoing = uiState.isPeriodOngoing,
                             isEndedToday = uiState.isEndedToday,
-                            onTogglePeriod = { viewModel.togglePeriod() },
+                            onTogglePeriod = {
+                                if (uiState.isPeriodOngoing) {
+                                    showEndPeriodConfirm = true
+                                } else {
+                                    viewModel.togglePeriod()
+                                }
+                            },
                             quickSymptoms = uiState.quickLogSymptoms,
                             onSymptomClick = { viewModel.logQuickSymptom(it) },
                             onFullDetailsClick = onLogDetailsClicked,
@@ -298,6 +305,25 @@ fun HomeScreen(
                 .align(Alignment.BottomCenter)
                 .padding(bottom = 100.dp) // Avoid FAB and bottom nav
         )
+
+        if (showEndPeriodConfirm) {
+            AlertDialog(
+                onDismissRequest = { showEndPeriodConfirm = false },
+                title = { Text("End Period?") },
+                text = { Text("This will mark today as the end of your current period.") },
+                confirmButton = {
+                    TextButton(
+                        onClick = {
+                            showEndPeriodConfirm = false
+                            viewModel.togglePeriod()
+                        }
+                    ) { Text("End") }
+                },
+                dismissButton = {
+                    TextButton(onClick = { showEndPeriodConfirm = false }) { Text("Cancel") }
+                }
+            )
+        }
     }
 }
 

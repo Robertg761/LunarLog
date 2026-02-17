@@ -18,6 +18,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
+import android.widget.Toast
 import com.lunarlog.ui.navigation.LunarLogNavGraph
 import com.lunarlog.ui.theme.LunarLogTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -163,11 +164,19 @@ class MainActivity : AppCompatActivity() {
 
     override fun onResume() {
         super.onResume()
+        viewModel.onAppResumed()
+    }
+
+    override fun onPause() {
+        viewModel.onAppBackgrounded()
+        super.onPause()
     }
 
     private fun authenticateUser() {
         val biometricManager = BiometricManager.from(this)
-        if (biometricManager.canAuthenticate(BiometricManager.Authenticators.BIOMETRIC_STRONG) == BiometricManager.BIOMETRIC_SUCCESS) {
+        val authenticators = BiometricManager.Authenticators.BIOMETRIC_STRONG or
+            BiometricManager.Authenticators.DEVICE_CREDENTIAL
+        if (biometricManager.canAuthenticate(authenticators) == BiometricManager.BIOMETRIC_SUCCESS) {
             val executor = ContextCompat.getMainExecutor(this)
             val biometricPrompt = BiometricPrompt(this, executor,
                 object : BiometricPrompt.AuthenticationCallback() {
@@ -184,21 +193,21 @@ class MainActivity : AppCompatActivity() {
             val promptInfo = BiometricPrompt.PromptInfo.Builder()
                 .setTitle("Unlock LunarLog")
                 .setSubtitle("Confirm your identity to access your health data")
-                .setNegativeButtonText("Cancel")
+                .setAllowedAuthenticators(authenticators)
                 .build()
 
             biometricPrompt.authenticate(promptInfo)
         } else {
-            // Fallback if hardware not available, just unlock (or ask for PIN if we implemented that)
-            // For now, if no bio hardware, we unlock to avoid lockout
-             viewModel.unlock()
+            Toast.makeText(
+                this,
+                "App Lock is enabled, but no device authentication is available.",
+                Toast.LENGTH_LONG
+            ).show()
         }
     }
 
     private fun scheduleNotificationWorker() {
-        // Not tied to Activity lifecycle (and independent from reminder time).
-        NotificationWorkScheduler.scheduleCycleNotifications(applicationContext)
-        // Schedules/cancels the daily reminder based on saved preferences.
+        NotificationWorkScheduler.enqueueCycleNotificationReschedule(applicationContext)
         NotificationWorkScheduler.enqueuePeriodLogReminderReschedule(applicationContext)
     }
 }

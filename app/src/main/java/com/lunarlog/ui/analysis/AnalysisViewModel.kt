@@ -8,11 +8,10 @@ import com.lunarlog.logic.CycleSummary
 import com.lunarlog.logic.NarrativeGenerator
 import com.lunarlog.logic.WeeklyDigest
 import dagger.hilt.android.lifecycle.HiltViewModel
-import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.asStateFlow
-import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.stateIn
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import javax.inject.Inject
@@ -34,68 +33,59 @@ class AnalysisViewModel @Inject constructor(
     private val dailyLogRepository: DailyLogRepository
 ) : ViewModel() {
 
-    private val _uiState = MutableStateFlow(AnalysisUiState())
-    val uiState: StateFlow<AnalysisUiState> = _uiState.asStateFlow()
+    private val recentLogsFlow = dailyLogRepository.getLogsForRange(
+        startDate = LocalDate.now().minusMonths(6),
+        endDate = LocalDate.now()
+    )
 
-    init {
-        loadData()
-    }
+    val uiState: StateFlow<AnalysisUiState> = combine(
+        cycleRepository.getAllCycles(),
+        recentLogsFlow
+    ) { cycles, logs ->
+        val cycleHistory = cycles.filter { it.endDate != null }
+            .map {
+                val start = it.startDate
+                val length = (ChronoUnit.DAYS.between(start, it.endDate!!) + 1).toInt()
+                start to length
+            }
+            .sortedBy { it.first }
 
-    private fun loadData() {
-        viewModelScope.launch {
-            _uiState.value = _uiState.value.copy(isLoading = true)
+        val symptomCounts = logs.flatMap { it.symptoms }
+            .groupingBy { it }
+            .eachCount()
+            .toList()
+            .sortedByDescending { it.second }
+            .toMap()
 
-            // Load Cycles
-            val cycles = cycleRepository.getAllCycles().first()
-            val cycleHistory = cycles.filter { it.endDate != null }
-                .map { 
-                    val start = it.startDate
-                    val length = (ChronoUnit.DAYS.between(start, it.endDate!!) + 1).toInt()
-                    start to length
-                }
-                .sortedBy { it.first }
+        val moodCounts = logs.flatMap { it.mood }
+            .groupingBy { it }
+            .eachCount()
+            .toList()
+            .sortedByDescending { it.second }
+            .toMap()
 
-            // Load Logs (Last 6 months)
-            val endDay = LocalDate.now()
-            val startDay = LocalDate.now().minusMonths(6)
-            val logs = dailyLogRepository.getLogsForRange(startDay, endDay).first()
+        val cycleSummaries = cycles.filter { it.endDate != null }
+            .sortedByDescending { it.startDate }
+            .take(5)
+            .mapNotNull { NarrativeGenerator.generateCycleSummary(it, logs) }
 
-            val symptomCounts = logs.flatMap { it.symptoms }
-                .groupingBy { it }
-                .eachCount()
-                .toList()
-                .sortedByDescending { it.second }
-                .toMap()
+        val weeklyDigest = NarrativeGenerator.generateWeeklyDigest(logs)
+        val symptomCorrelations = com.lunarlog.logic.SymptomCorrelationEngine.analyzeCorrelations(cycles, logs)
+        val anomalies = com.lunarlog.logic.SmartAnomalyDetector.detectAnomalies(cycles)
 
-            val moodCounts = logs.flatMap { it.mood }
-                .groupingBy { it }
-                .eachCount()
-                .toList()
-                .sortedByDescending { it.second }
-                .toMap()
-            
-            // Generate Narratives
-            val cycleSummaries = cycles.filter { it.endDate != null }
-                .sortedByDescending { it.startDate }
-                .take(5) // Last 5 cycles
-                .mapNotNull { NarrativeGenerator.generateCycleSummary(it, logs) }
-
-            val weeklyDigest = NarrativeGenerator.generateWeeklyDigest(logs)
-
-            // Intelligence
-            val symptomCorrelations = com.lunarlog.logic.SymptomCorrelationEngine.analyzeCorrelations(cycles, logs)
-            val anomalies = com.lunarlog.logic.SmartAnomalyDetector.detectAnomalies(cycles)
-
-            _uiState.value = AnalysisUiState(
-                cycleHistory = cycleHistory,
-                symptomCounts = symptomCounts,
-                moodCounts = moodCounts,
-                recentCycleSummaries = cycleSummaries,
-                weeklyDigest = weeklyDigest,
-                symptomCorrelations = symptomCorrelations,
-                anomalies = anomalies,
-                isLoading = false
-            )
-        }
-    }
+        AnalysisUiState(
+            cycleHistory = cycleHistory,
+            symptomCounts = symptomCounts,
+            moodCounts = moodCounts,
+            recentCycleSummaries = cycleSummaries,
+            weeklyDigest = weeklyDigest,
+            symptomCorrelations = symptomCorrelations,
+            anomalies = anomalies,
+            isLoading = false
+        )
+    }.stateIn(
+        scope = viewModelScope,
+        started = SharingStarted.WhileSubscribed(5_000),
+        initialValue = AnalysisUiState(isLoading = true)
+    )
 }

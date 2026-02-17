@@ -9,6 +9,7 @@ import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
+import com.lunarlog.data.PeriodChangeResult
 import com.lunarlog.logic.CyclePredictionUtils
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.channels.Channel
@@ -51,68 +52,66 @@ class HomeViewModel @Inject constructor(
         dailyLogRepository.getAllLogs()
     ) { cycles, logs ->
         kotlinx.coroutines.withContext(defaultDispatcher) {
-            if (cycles.isEmpty()) {
-                HomeUiState(isLoading = false)
-            } else {
-                val sortedCycles = cycles.sortedByDescending { it.startDate }
-                val lastCycle = sortedCycles.first()
-                val averageLength = CyclePredictionUtils.calculateAverageCycleLength(cycles)
-                val averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
-                val nextPeriodStart = CyclePredictionUtils.predictNextPeriod(lastCycle, averageLength)
-                val today = LocalDate.now()
-
-                val daysUntil = ChronoUnit.DAYS.between(today, nextPeriodStart).toInt()
-                val currentCycleDay = ChronoUnit.DAYS.between(lastCycle.startDate, today).toInt() + 1
-
-                // Check fertile window (Advanced)
-                val ovulationByBBT = com.lunarlog.logic.AdvancedCycleIntelligence.detectOvulationFromBBT(lastCycle.startDate, logs)
-                val peakMucus = com.lunarlog.logic.AdvancedCycleIntelligence.detectPeakMucusDay(lastCycle.startDate, logs)
-                val refinedOvulation = ovulationByBBT ?: peakMucus ?: CyclePredictionUtils.predictOvulation(nextPeriodStart)
-                
-                val refinedFertileStart = refinedOvulation.minusDays(AppConfig.FERTILE_WINDOW_OFFSET_START)
-                val refinedFertileEnd = refinedOvulation.plusDays(AppConfig.FERTILE_WINDOW_OFFSET_END)
-                val isFertile = today >= refinedFertileStart && today <= refinedFertileEnd
-
-                // Check anomalies
-                val anomalies = com.lunarlog.logic.SmartAnomalyDetector.detectAnomalies(cycles)
-
-                // Check if period is active (Visual)
-                val isPeriodActive = if (lastCycle.endDate != null) {
-                    !today.isAfter(lastCycle.endDate)
+            runCatching {
+                if (cycles.isEmpty()) {
+                    HomeUiState(isLoading = false)
                 } else {
-                    currentCycleDay <= averagePeriodLength
-                }
+                    val sortedCycles = cycles.sortedByDescending { it.startDate }
+                    val lastCycle = sortedCycles.first()
+                    val averageLength = CyclePredictionUtils.calculateAverageCycleLength(cycles)
+                    val averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
+                    val nextPeriodStart = CyclePredictionUtils.predictNextPeriod(lastCycle, averageLength)
+                    val today = LocalDate.now()
 
-                // Check if period is ongoing (Logic: Open)
-                val isPeriodOngoing = lastCycle.endDate == null
-                
-                // Check if ended today
-                val isEndedToday = lastCycle.endDate == today
+                    val daysUntil = ChronoUnit.DAYS.between(today, nextPeriodStart).toInt()
+                    val currentCycleDay = ChronoUnit.DAYS.between(lastCycle.startDate, today).toInt() + 1
 
-                val daysRemainingInPeriod = if (isPeriodActive) {
-                    if (lastCycle.endDate != null) {
-                        ChronoUnit.DAYS.between(today, lastCycle.endDate).toInt()
+                    val ovulationByBBT = com.lunarlog.logic.AdvancedCycleIntelligence.detectOvulationFromBBT(lastCycle.startDate, logs)
+                    val peakMucus = com.lunarlog.logic.AdvancedCycleIntelligence.detectPeakMucusDay(lastCycle.startDate, logs)
+                    val refinedOvulation = ovulationByBBT ?: peakMucus ?: CyclePredictionUtils.predictOvulation(nextPeriodStart)
+                    
+                    val refinedFertileStart = refinedOvulation.minusDays(AppConfig.FERTILE_WINDOW_OFFSET_START)
+                    val refinedFertileEnd = refinedOvulation.plusDays(AppConfig.FERTILE_WINDOW_OFFSET_END)
+                    val isFertile = today >= refinedFertileStart && today <= refinedFertileEnd
+
+                    val anomalies = com.lunarlog.logic.SmartAnomalyDetector.detectAnomalies(cycles)
+
+                    val isPeriodActive = if (lastCycle.endDate != null) {
+                        !today.isAfter(lastCycle.endDate)
                     } else {
-                         averagePeriodLength - currentCycleDay
+                        currentCycleDay <= averagePeriodLength
                     }
-                } else {
-                    null
+
+                    val isPeriodOngoing = lastCycle.endDate == null
+                    val isEndedToday = lastCycle.endDate == today
+
+                    val daysRemainingInPeriod = if (isPeriodActive) {
+                        if (lastCycle.endDate != null) {
+                            ChronoUnit.DAYS.between(today, lastCycle.endDate).toInt()
+                        } else {
+                             averagePeriodLength - currentCycleDay
+                        }
+                    } else {
+                        null
+                    }
+
+                    val quickLogSymptoms = com.lunarlog.logic.SymptomStatsCalculator.getTopSymptomsForPhase(currentCycleDay, cycles, logs)
+
+                    HomeUiState(
+                        daysUntilPeriod = daysUntil,
+                        daysRemainingInPeriod = daysRemainingInPeriod,
+                        currentCycleDay = currentCycleDay,
+                        isFertile = isFertile,
+                        isPeriodActive = isPeriodActive,
+                        isPeriodOngoing = isPeriodOngoing,
+                        isEndedToday = isEndedToday,
+                        isLoading = false,
+                        quickLogSymptoms = quickLogSymptoms,
+                        anomalies = anomalies
+                    )
                 }
-
-                val quickLogSymptoms = com.lunarlog.logic.SymptomStatsCalculator.getTopSymptomsForPhase(currentCycleDay, cycles, logs)
-
-                HomeUiState(
-                    daysUntilPeriod = daysUntil,
-                    daysRemainingInPeriod = daysRemainingInPeriod,
-                    currentCycleDay = currentCycleDay,
-                    isFertile = isFertile,
-                    isPeriodActive = isPeriodActive,
-                    isPeriodOngoing = isPeriodOngoing,
-                    isEndedToday = isEndedToday,
-                    isLoading = false,
-                    quickLogSymptoms = quickLogSymptoms,
-                    anomalies = anomalies
-                )
+            }.getOrElse {
+                HomeUiState(isLoading = false)
             }
         }
     }
@@ -124,8 +123,18 @@ class HomeViewModel @Inject constructor(
 
     fun togglePeriod() {
         viewModelScope.launch {
-            val msg = cycleRepository.togglePeriod(LocalDate.now())
-            _message.trySend(msg)
+            val today = LocalDate.now()
+            val state = uiState.value
+            val result = when {
+                state.isPeriodOngoing -> cycleRepository.endOngoingPeriod(today)
+                state.isEndedToday -> cycleRepository.resumePeriodEndedOn(today)
+                else -> cycleRepository.startPeriod(today)
+            }
+
+            when (result) {
+                is PeriodChangeResult.Success -> _message.trySend(result.message)
+                is PeriodChangeResult.ValidationError -> _message.trySend(result.message)
+            }
         }
     }
 

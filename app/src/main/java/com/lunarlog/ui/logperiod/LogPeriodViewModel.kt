@@ -2,8 +2,8 @@ package com.lunarlog.ui.logperiod
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lunarlog.core.model.Cycle
 import com.lunarlog.data.CycleRepository
+import com.lunarlog.data.PeriodChangeResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -40,13 +40,21 @@ class LogPeriodViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                cycleRepository.insertCycle(
-                    Cycle(
-                        startDate = startLocalDate,
-                        endDate = endLocalDate
-                    )
-                )
-                _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
+                when (val result = cycleRepository.setPeriodRange(startLocalDate, endLocalDate)) {
+                    is PeriodChangeResult.Success -> {
+                        _uiState.value = _uiState.value.copy(
+                            isSaving = false,
+                            isSaved = true,
+                            errorMessage = null
+                        )
+                    }
+                    is PeriodChangeResult.ValidationError -> {
+                        _uiState.value = _uiState.value.copy(
+                            isSaving = false,
+                            errorMessage = result.message
+                        )
+                    }
+                }
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,

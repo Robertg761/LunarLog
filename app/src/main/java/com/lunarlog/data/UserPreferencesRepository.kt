@@ -6,6 +6,7 @@ import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.longPreferencesKey
+import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.Flow
@@ -22,9 +23,12 @@ class UserPreferencesRepository @Inject constructor(
 ) {
     private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run")
     private val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
+    private val APP_LOCK_MODE = stringPreferencesKey("app_lock_mode")
+    private val APP_LOCK_TIMEOUT_SECONDS = longPreferencesKey("app_lock_timeout_seconds")
     private val THEME_SEED_COLOR = longPreferencesKey("theme_seed_color") // Store ARGB
     private val PERIOD_LOG_REMINDER_ENABLED = booleanPreferencesKey("period_log_reminder_enabled")
     private val PERIOD_LOG_REMINDER_TIME_MINUTES = longPreferencesKey("period_log_reminder_time_minutes")
+    private val CYCLE_NOTIFICATION_ENABLED = booleanPreferencesKey("cycle_notification_enabled")
 
     val isFirstRun: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
@@ -34,6 +38,30 @@ class UserPreferencesRepository @Inject constructor(
     val isAppLockEnabled: Flow<Boolean> = context.dataStore.data
         .map { preferences ->
             preferences[APP_LOCK_ENABLED] ?: false
+        }
+
+    val appLockMode: Flow<AppLockMode> = context.dataStore.data
+        .map { preferences ->
+            val stored = preferences[APP_LOCK_MODE]
+            if (stored != null) {
+                try {
+                    AppLockMode.valueOf(stored)
+                } catch (_: IllegalArgumentException) {
+                    AppLockMode.NONE
+                }
+            } else {
+                // Backward compatibility with old boolean switch.
+                if (preferences[APP_LOCK_ENABLED] == true) {
+                    AppLockMode.BIOMETRIC_REQUIRED
+                } else {
+                    AppLockMode.NONE
+                }
+            }
+        }
+
+    val appLockTimeoutSeconds: Flow<Long> = context.dataStore.data
+        .map { preferences ->
+            preferences[APP_LOCK_TIMEOUT_SECONDS] ?: 0L
         }
     
     val themeSeedColor: Flow<Long?> = context.dataStore.data
@@ -53,6 +81,11 @@ class UserPreferencesRepository @Inject constructor(
         .map { preferences ->
             preferences[PERIOD_LOG_REMINDER_TIME_MINUTES] ?: (20L * 60L)
         }
+
+    val cycleNotificationEnabled: Flow<Boolean> = context.dataStore.data
+        .map { preferences ->
+            preferences[CYCLE_NOTIFICATION_ENABLED] ?: false
+        }
     
     suspend fun setFirstRunComplete() {
         context.dataStore.edit { preferences ->
@@ -63,6 +96,20 @@ class UserPreferencesRepository @Inject constructor(
     suspend fun setAppLockEnabled(enabled: Boolean) {
         context.dataStore.edit { preferences ->
             preferences[APP_LOCK_ENABLED] = enabled
+            preferences[APP_LOCK_MODE] = if (enabled) AppLockMode.BIOMETRIC_REQUIRED.name else AppLockMode.NONE.name
+        }
+    }
+
+    suspend fun setAppLockMode(mode: AppLockMode) {
+        context.dataStore.edit { preferences ->
+            preferences[APP_LOCK_MODE] = mode.name
+            preferences[APP_LOCK_ENABLED] = mode != AppLockMode.NONE
+        }
+    }
+
+    suspend fun setAppLockTimeoutSeconds(seconds: Long) {
+        context.dataStore.edit { preferences ->
+            preferences[APP_LOCK_TIMEOUT_SECONDS] = seconds.coerceAtLeast(0L)
         }
     }
 
@@ -84,12 +131,22 @@ class UserPreferencesRepository @Inject constructor(
         }
     }
 
+    suspend fun setCycleNotificationEnabled(enabled: Boolean) {
+        context.dataStore.edit { preferences ->
+            preferences[CYCLE_NOTIFICATION_ENABLED] = enabled
+        }
+    }
+
     suspend fun getPeriodLogReminderEnabledSync(): Boolean {
         return context.dataStore.data.first()[PERIOD_LOG_REMINDER_ENABLED] ?: false
     }
 
     suspend fun getPeriodLogReminderTimeMinutesSync(): Long {
         return context.dataStore.data.first()[PERIOD_LOG_REMINDER_TIME_MINUTES] ?: (20L * 60L)
+    }
+
+    suspend fun getCycleNotificationEnabledSync(): Boolean {
+        return context.dataStore.data.first()[CYCLE_NOTIFICATION_ENABLED] ?: false
     }
 
     suspend fun clearAll() {

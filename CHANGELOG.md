@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.7.0] - 2026-02-17
+
+### Added
+- **Security Model**: Introduced `AppLockMode` with lock timeout policy options (`Now`, `30s`, `2m`) and stronger device-auth handling.
+- **Notification Control**: Added explicit user opt-in for cycle prediction alerts in Settings.
+- **Calendar Accessibility**: Added TalkBack-friendly day semantics and a "Today" jump control.
+- **Release Operations**: Added Stage 6 artifacts under `docs/release/1.7.0/` (release notes, rollout plan, rollback playbook, QA smoke checklist, release-readiness report).
+
+### Changed
+- **Period Domain API**: Replaced ambiguous period toggling with explicit, validated operations (`startPeriod`, `endOngoingPeriod`, `resumePeriodEndedOn`, `setPeriodDay`, `setPeriodRange`, `updateCycleDates`) and typed results.
+- **Data Consistency**: Unified logging writes around transactional granular entries; aggregate `DailyLog` is now rebuilt from entries to prevent source-of-truth drift.
+- **Onboarding Reliability**: Onboarding completion is now success-gated with explicit error state handling.
+- **Analysis Reactivity**: Analysis data now updates reactively instead of loading once per screen init.
+- **Search Robustness**: Added FTS query sanitization for safer note search behavior.
+
+### Fixed
+- **Cycle Integrity**: Prevented invalid period mutations (including `endDate < startDate`) when editing historical days.
+- **Collector Lifecycle**: Fixed `LogListViewModel` date-loading collector duplication.
+- **Destructive UX**: Added confirmation for ending an active period from Quick Log and clearer invalid-save affordances in period logging.
+
 ## [1.6.1] - 2026-02-15
 
 ### Changed

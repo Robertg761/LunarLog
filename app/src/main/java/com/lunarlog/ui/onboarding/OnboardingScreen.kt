@@ -36,6 +36,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -64,9 +65,16 @@ fun OnboardingScreen(
     onOnboardingComplete: () -> Unit,
     viewModel: OnboardingViewModel = hiltViewModel()
 ) {
-    val isLoading by viewModel.isLoading.collectAsState()
+    val onboardingState by viewModel.onboardingState.collectAsState()
+    val isLoading = onboardingState is OnboardingViewModel.OnboardingState.Saving
     var selectedDate by remember { mutableStateOf(LocalDate.now()) }
     val context = LocalContext.current
+
+    LaunchedEffect(onboardingState) {
+        if (onboardingState is OnboardingViewModel.OnboardingState.Success) {
+            onOnboardingComplete()
+        }
+    }
 
     val datePickerDialog = DatePickerDialog(
         context,
@@ -133,6 +141,14 @@ fun OnboardingScreen(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    if (onboardingState is OnboardingViewModel.OnboardingState.Error) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = (onboardingState as OnboardingViewModel.OnboardingState.Error).message,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.error
+                        )
+                    }
                     Spacer(modifier = Modifier.height(24.dp))
 
                     // Date Picker Button
@@ -151,7 +167,6 @@ fun OnboardingScreen(
                     text = "Begin Journey",
                     onClick = {
                         viewModel.completeOnboarding(selectedDate)
-                        onOnboardingComplete()
                     }
                 )
             }

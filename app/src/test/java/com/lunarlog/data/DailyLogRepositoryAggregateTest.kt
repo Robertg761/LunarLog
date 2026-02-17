@@ -15,10 +15,11 @@ class DailyLogRepositoryAggregateTest {
 
     private val dailyLogDao: DailyLogDao = mockk(relaxed = true)
     private val logEntryDao: LogEntryDao = mockk(relaxed = true)
+    private val appDatabase: AppDatabase = mockk(relaxed = true)
 
     @Test
     fun `rebuildDailyLogAggregateInTransaction aggregates without dropping notes or symptoms`() = runTest {
-        val repo = DailyLogRepository(dailyLogDao, logEntryDao)
+        val repo = DailyLogRepository(dailyLogDao, logEntryDao, appDatabase)
         val dateEpochDay = LocalDate.of(2026, 2, 14).toEpochDay()
 
         coEvery { logEntryDao.getEntriesForDateSync(dateEpochDay) } returns listOf(

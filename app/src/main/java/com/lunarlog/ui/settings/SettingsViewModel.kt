@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lunarlog.data.AppLockMode
 import com.lunarlog.data.DataManagementRepository
 import com.lunarlog.data.UserPreferencesRepository
 import com.lunarlog.workers.NotificationWorkScheduler
@@ -11,6 +12,7 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -26,7 +28,17 @@ class SettingsViewModel @Inject constructor(
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
-    val isAppLockEnabled = userPreferencesRepository.isAppLockEnabled
+    val appLockMode = userPreferencesRepository.appLockMode
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), AppLockMode.NONE)
+
+    val appLockTimeoutSeconds = userPreferencesRepository.appLockTimeoutSeconds
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), 0L)
+
+    val isAppLockEnabled = appLockMode
+        .map { it != AppLockMode.NONE }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    val cycleNotificationEnabled = userPreferencesRepository.cycleNotificationEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
         
     val themeSeedColor = userPreferencesRepository.themeSeedColor
@@ -43,7 +55,15 @@ class SettingsViewModel @Inject constructor(
 
     fun toggleAppLock(enabled: Boolean) {
         viewModelScope.launch {
-            userPreferencesRepository.setAppLockEnabled(enabled)
+            userPreferencesRepository.setAppLockMode(
+                if (enabled) AppLockMode.BIOMETRIC_REQUIRED else AppLockMode.NONE
+            )
+        }
+    }
+
+    fun setAppLockTimeoutSeconds(seconds: Long) {
+        viewModelScope.launch {
+            userPreferencesRepository.setAppLockTimeoutSeconds(seconds)
         }
     }
     
@@ -65,6 +85,17 @@ class SettingsViewModel @Inject constructor(
                 NotificationWorkScheduler.schedulePeriodLogReminders(context, minutes)
             } else {
                 NotificationWorkScheduler.cancelPeriodLogReminders(context)
+            }
+        }
+    }
+
+    fun setCycleNotificationEnabled(enabled: Boolean) {
+        viewModelScope.launch {
+            userPreferencesRepository.setCycleNotificationEnabled(enabled)
+            if (enabled) {
+                NotificationWorkScheduler.scheduleCycleNotifications(context)
+            } else {
+                NotificationWorkScheduler.cancelCycleNotifications(context)
             }
         }
     }

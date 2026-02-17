@@ -3,10 +3,10 @@ package com.lunarlog.ui.logdetails
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.lunarlog.core.model.Cycle
-import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
+import com.lunarlog.data.LogEntryType
+import com.lunarlog.data.PeriodChangeResult
 import com.lunarlog.data.SymptomCategory
 import com.lunarlog.data.SymptomDefinition
 import com.lunarlog.data.SymptomRepository
@@ -194,18 +194,21 @@ class LogDetailsViewModel @Inject constructor(
 
         viewModelScope.launch {
             try {
-                repository.saveLog(
-                    DailyLog(
-                        date = state.date,
-                        flowLevel = state.flowLevel,
-                        symptoms = state.selectedSymptoms,
-                        mood = state.selectedMoods,
-                        waterIntake = state.waterIntake,
-                        sleepHours = state.sleepHours,
-                        sleepQuality = state.sleepQuality,
-                        sexDrive = state.sexDrive,
-                        notes = state.notes
-                    )
+                val payload = linkedMapOf<LogEntryType, List<String>>()
+                if (state.flowLevel > 0) payload[LogEntryType.FLOW] = listOf(state.flowLevel.toString())
+                if (state.selectedSymptoms.isNotEmpty()) payload[LogEntryType.SYMPTOM] = state.selectedSymptoms
+                if (state.selectedMoods.isNotEmpty()) payload[LogEntryType.MOOD] = state.selectedMoods
+                if (state.waterIntake > 0) payload[LogEntryType.WATER] = listOf(state.waterIntake.toString())
+                if (state.sleepHours > 0f) payload[LogEntryType.SLEEP] = listOf(state.sleepHours.toString())
+                if (state.sleepQuality > 0) payload[LogEntryType.SLEEP_QUALITY] = listOf(state.sleepQuality.toString())
+                if (state.sexDrive > 0) payload[LogEntryType.SEX] = listOf(state.sexDrive.toString())
+                if (state.notes.isNotBlank()) payload[LogEntryType.NOTE] = listOf(state.notes)
+
+                repository.upsertEntries(
+                    date = state.date.toEpochDay(),
+                    payload = payload,
+                    time = System.currentTimeMillis(),
+                    details = null
                 )
                 _uiState.value = _uiState.value.copy(isSaving = false, isSaved = true)
             } catch (e: Exception) {
@@ -230,18 +233,17 @@ class LogDetailsViewModel @Inject constructor(
     }
 
     private suspend fun checkPeriodStatus(date: LocalDate): Boolean {
-        val cycles = cycleRepository.getAllCyclesSync()
-        return cycles.any { cycle ->
-            val start = cycle.startDate
-            val end = cycle.endDate ?: LocalDate.now()
-            !date.isBefore(start) && !date.isAfter(end)
-        }
+        return cycleRepository.isPeriodDay(date)
     }
 
-    fun togglePeriod() {
+    fun togglePeriod(isPeriodDay: Boolean) {
         viewModelScope.launch {
             val date = _uiState.value.date
-            val message = cycleRepository.togglePeriod(date)
+            val result = cycleRepository.setPeriodDay(date, isPeriodDay)
+            val message = when (result) {
+                is PeriodChangeResult.Success -> result.message
+                is PeriodChangeResult.ValidationError -> result.message
+            }
             val isPeriod = checkPeriodStatus(date)
             _uiState.value = _uiState.value.copy(
                 isPeriodDay = isPeriod,

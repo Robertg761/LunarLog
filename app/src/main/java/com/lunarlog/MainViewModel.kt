@@ -2,6 +2,7 @@ package com.lunarlog
 
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.lunarlog.data.AppLockMode
 import com.lunarlog.data.UserPreferencesRepository
 import com.lunarlog.ui.navigation.Screen
 import com.lunarlog.update.UpdateInfo
@@ -14,6 +15,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
 
@@ -21,6 +23,8 @@ data class MainActivityUiState(
     val isLoading: Boolean = true,
     val startDestination: String = Screen.Home.route,
     val isAppLockEnabled: Boolean = false,
+    val appLockMode: AppLockMode = AppLockMode.NONE,
+    val appLockTimeoutSeconds: Long = 0L,
     val themeSeedColor: Int? = null,
     val updateInfo: UpdateInfo? = null,
     val isUpdateAvailable: Boolean = false
@@ -38,14 +42,17 @@ class MainViewModel @Inject constructor(
 
     val uiState = combine(
         userPreferencesRepository.isFirstRun,
-        userPreferencesRepository.isAppLockEnabled,
+        userPreferencesRepository.appLockMode,
+        userPreferencesRepository.appLockTimeoutSeconds,
         userPreferencesRepository.themeSeedColor,
         _updateInfo
-    ) { isFirstRun, isAppLockEnabled, themeSeedColor, updateInfo ->
+    ) { isFirstRun, appLockMode, appLockTimeoutSeconds, themeSeedColor, updateInfo ->
         MainActivityUiState(
             isLoading = false,
             startDestination = if (isFirstRun) Screen.Onboarding.route else Screen.Home.route,
-            isAppLockEnabled = isAppLockEnabled,
+            isAppLockEnabled = appLockMode != AppLockMode.NONE,
+            appLockMode = appLockMode,
+            appLockTimeoutSeconds = appLockTimeoutSeconds,
             themeSeedColor = themeSeedColor?.toInt(),
             updateInfo = updateInfo,
             isUpdateAvailable = updateInfo != null
@@ -56,11 +63,57 @@ class MainViewModel @Inject constructor(
         started = SharingStarted.WhileSubscribed(5_000)
     )
     
-    private val _isLocked = MutableStateFlow(true)
+    private val _isLocked = MutableStateFlow(false)
     val isLocked = _isLocked.asStateFlow()
+    private var lastUnlockAtMillis: Long? = null
+
+    init {
+        viewModelScope.launch {
+            userPreferencesRepository.appLockMode.collectLatest { mode ->
+                if (mode == AppLockMode.NONE) {
+                    _isLocked.value = false
+                    return@collectLatest
+                }
+                if (lastUnlockAtMillis == null) {
+                    _isLocked.value = true
+                }
+            }
+        }
+    }
 
     fun unlock() {
         _isLocked.value = false
+        lastUnlockAtMillis = System.currentTimeMillis()
+    }
+
+    fun lock() {
+        if (uiState.value.isAppLockEnabled) {
+            _isLocked.value = true
+        }
+    }
+
+    fun onAppResumed() {
+        val state = uiState.value
+        if (!state.isAppLockEnabled) {
+            _isLocked.value = false
+            return
+        }
+
+        val timeoutSeconds = state.appLockTimeoutSeconds.coerceAtLeast(0L)
+        if (timeoutSeconds == 0L) {
+            _isLocked.value = true
+            return
+        }
+
+        val lastUnlock = lastUnlockAtMillis
+        val elapsedMillis = if (lastUnlock == null) Long.MAX_VALUE else (System.currentTimeMillis() - lastUnlock)
+        _isLocked.value = elapsedMillis >= timeoutSeconds * 1000L
+    }
+
+    fun onAppBackgrounded() {
+        if (uiState.value.isAppLockEnabled && uiState.value.appLockTimeoutSeconds == 0L) {
+            _isLocked.value = true
+        }
     }
 
     fun checkForUpdates() {

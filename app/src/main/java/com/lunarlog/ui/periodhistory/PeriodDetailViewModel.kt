@@ -7,6 +7,7 @@ import com.lunarlog.core.model.Cycle
 import com.lunarlog.core.model.DailyLog
 import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
+import com.lunarlog.data.PeriodChangeResult
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -80,8 +81,15 @@ class PeriodDetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isSaving = true)
         viewModelScope.launch {
             try {
+                val updateResult = cycleRepository.updateCycleDates(cycle.id, date, endDate)
+                if (updateResult is PeriodChangeResult.ValidationError) {
+                    _uiState.value = _uiState.value.copy(
+                        isSaving = false,
+                        errorMessage = updateResult.message
+                    )
+                    return@launch
+                }
                 val updatedCycle = cycle.copy(startDate = date)
-                cycleRepository.updateCycle(updatedCycle)
                 // Reload logs for new date range
                 val logs = dailyLogRepository.getLogsForRangeSync(date, endDate ?: LocalDate.now())
                 _uiState.value = _uiState.value.copy(
@@ -110,8 +118,15 @@ class PeriodDetailViewModel @Inject constructor(
         _uiState.value = _uiState.value.copy(isSaving = true)
         viewModelScope.launch {
             try {
+                val updateResult = cycleRepository.updateCycleDates(cycle.id, cycle.startDate, date)
+                if (updateResult is PeriodChangeResult.ValidationError) {
+                    _uiState.value = _uiState.value.copy(
+                        isSaving = false,
+                        errorMessage = updateResult.message
+                    )
+                    return@launch
+                }
                 val updatedCycle = cycle.copy(endDate = date)
-                cycleRepository.updateCycle(updatedCycle)
                 // Reload logs for new date range
                 val logs = dailyLogRepository.getLogsForRangeSync(cycle.startDate, date ?: LocalDate.now())
                 _uiState.value = _uiState.value.copy(

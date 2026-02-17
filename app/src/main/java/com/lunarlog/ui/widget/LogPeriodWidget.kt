@@ -27,6 +27,7 @@ import androidx.glance.unit.ColorProvider
 import com.lunarlog.R
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
+import com.lunarlog.data.PeriodChangeResult
 import com.lunarlog.di.WidgetEntryPoint
 import com.lunarlog.core.model.Cycle
 import com.lunarlog.logic.CyclePredictionUtils
@@ -35,7 +36,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
-import androidx.room.withTransaction
 
 class LogPeriodWidget : GlanceAppWidget() {
 
@@ -152,37 +152,23 @@ class LogPeriodAction : ActionCallback {
             WidgetEntryPoint::class.java
         )
 
-        val db = entryPoint.appDatabase()
-        val cycleDao = db.cycleDao()
+        val cycleRepository = entryPoint.cycleRepository()
         val dailyLogRepository = entryPoint.dailyLogRepository()
 
         val today = LocalDate.now()
         val todayEpochDay = today.toEpochDay()
         
         withContext(Dispatchers.IO) {
-            db.withTransaction {
-                // Start a new cycle today (if one doesn't already start today).
-                val existing = cycleDao.getCycleForStartDate(today)
-                if (existing == null) {
-                    val cycles = cycleDao.getAllCyclesSync()
-                    val lastCycle = cycles.maxByOrNull { it.startDate }
-
-                    if (lastCycle != null && lastCycle.endDate == null) {
-                        cycleDao.updateCycle(lastCycle.copy(endDate = today.minusDays(1)))
-                    }
-
-                    cycleDao.insertCycle(Cycle(startDate = today))
-
-                    // Log flow as a granular entry so we don't overwrite other fields on the aggregate DailyLog row.
-                    dailyLogRepository.addEntryInTransaction(
-                        LogEntry(
-                            date = todayEpochDay,
-                            time = System.currentTimeMillis(),
-                            type = LogEntryType.FLOW,
-                            value = "2"
-                        )
+            val periodResult = cycleRepository.startPeriod(today)
+            if (periodResult is PeriodChangeResult.Success) {
+                dailyLogRepository.addEntry(
+                    LogEntry(
+                        date = todayEpochDay,
+                        time = System.currentTimeMillis(),
+                        type = LogEntryType.FLOW,
+                        value = "2"
                     )
-                }
+                )
             }
         }
         
