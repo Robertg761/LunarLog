@@ -8,6 +8,7 @@
 # Gradle
 .gradle/
 .gradle-home/
+.gradle-user-home/
 build/
 */build/
 
@@ -32,3 +33,6 @@ yarn-error.log*
 .gemini/
 .genkit/
 gha-creds-*.json
+
+# Local Android tooling (created when running Gradle in this environment)
+.android-user-home/
