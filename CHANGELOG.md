@@ -1,5 +1,16 @@
 # Changelog
 
+## [1.7.3] - 2026-03-31
+
+### Changed
+- **Release Versioning**: Bumped Play Store release metadata to a new version code for a fresh upload attempt.
+
+## [1.7.2] - 2026-03-31
+
+### Changed
+- **Play Store Packaging**: Added a dedicated Play release channel that removes sideload-only updater behavior and produces a Play-ready Android App Bundle.
+- **Target SDK Compliance**: Updated the Play release path to target Android 15 / API level 35 for current Google Play submission requirements.
+
 ## [1.7.1] - 2026-02-17
 
 ### Changed

@@ -54,8 +54,10 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
 
-        // Silent update check (GitHub Releases).
-        viewModel.checkForUpdates()
+        if (BuildConfig.ENABLE_GITHUB_UPDATES) {
+            // Silent update check for sideloaded GitHub builds.
+            viewModel.checkForUpdates()
+        }
 
         // Keep splash screen until data is loaded
         splashScreen.setKeepOnScreenCondition {
@@ -80,6 +82,7 @@ class MainActivity : AppCompatActivity() {
 
             // If an update was downloaded previously, offer install without surprise navigation.
             LaunchedEffect(Unit) {
+                if (!BuildConfig.ENABLE_GITHUB_UPDATES) return@LaunchedEffect
                 if (promptedDownloaded.value) return@LaunchedEffect
                 if (!apkUpdateManager.hasPendingDownloadedUpdate(this@MainActivity, BuildConfig.VERSION_NAME)) {
                     return@LaunchedEffect
@@ -104,6 +107,7 @@ class MainActivity : AppCompatActivity() {
             
             // Show Snackbar on Update
             LaunchedEffect(uiState.isUpdateAvailable) {
+                if (!BuildConfig.ENABLE_GITHUB_UPDATES) return@LaunchedEffect
                 if (uiState.isUpdateAvailable) {
                     val result = snackbarHostState.showSnackbar(
                         message = "New update available",
@@ -138,7 +142,11 @@ class MainActivity : AppCompatActivity() {
                                 LunarLogNavGraph(
                                     startDestination = uiState.startDestination,
                                     isUpdateAvailable = uiState.isUpdateAvailable,
-                                    onInstallUpdate = { viewModel.triggerInstallUpdate() }
+                                    onInstallUpdate = {
+                                        if (BuildConfig.ENABLE_GITHUB_UPDATES) {
+                                            viewModel.triggerInstallUpdate()
+                                        }
+                                    }
                                 )
                                 SnackbarHost(
                                     hostState = snackbarHostState,
@@ -152,7 +160,7 @@ class MainActivity : AppCompatActivity() {
                     }
 
                     val info = updateSheetInfo.value
-                    if (info != null) {
+                    if (BuildConfig.ENABLE_GITHUB_UPDATES && info != null) {
                         UpdateBottomSheet(
                             info = info,
                             apkUpdateManager = apkUpdateManager,

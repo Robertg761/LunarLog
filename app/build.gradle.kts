@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
@@ -5,12 +7,23 @@ plugins {
     alias(libs.plugins.hilt.android)
 }
 
-// Optional CI signing. If these env vars are present, `assembleRelease` will produce a signed APK.
-val llSigningStoreFile = System.getenv("LL_SIGNING_STORE_FILE")
-val llSigningStorePassword = System.getenv("LL_SIGNING_STORE_PASSWORD")
-val llSigningKeyAlias = System.getenv("LL_SIGNING_KEY_ALIAS")
-val llSigningKeyPassword = System.getenv("LL_SIGNING_KEY_PASSWORD")
-val llSigningStoreType = System.getenv("LL_SIGNING_STORE_TYPE") // e.g. "PKCS12" or "JKS"
+val keystoreProperties = Properties().apply {
+    val file = rootProject.file("keystore.properties")
+    if (file.exists()) {
+        file.inputStream().use(::load)
+    }
+}
+
+fun signingValue(name: String): String? =
+    System.getenv(name)?.takeIf { it.isNotBlank() }
+        ?: keystoreProperties.getProperty(name)?.takeIf { it.isNotBlank() }
+
+// Optional local/CI signing. If present, release variants will be signed automatically.
+val llSigningStoreFile = signingValue("LL_SIGNING_STORE_FILE")
+val llSigningStorePassword = signingValue("LL_SIGNING_STORE_PASSWORD")
+val llSigningKeyAlias = signingValue("LL_SIGNING_KEY_ALIAS")
+val llSigningKeyPassword = signingValue("LL_SIGNING_KEY_PASSWORD")
+val llSigningStoreType = signingValue("LL_SIGNING_STORE_TYPE") // e.g. "PKCS12" or "JKS"
 val llHasSigning = !llSigningStoreFile.isNullOrBlank() &&
     !llSigningStorePassword.isNullOrBlank() &&
     !llSigningKeyAlias.isNullOrBlank() &&
@@ -18,14 +31,14 @@ val llHasSigning = !llSigningStoreFile.isNullOrBlank() &&
 
 android {
     namespace = "com.lunarlog"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.lunarlog"
         minSdk = 26
-        targetSdk = 34
-        versionCode = 13
-        versionName = "1.7.1"
+        targetSdk = 35
+        versionCode = 15
+        versionName = "1.7.3"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -78,6 +91,21 @@ android {
 
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.4"
+    }
+
+    flavorDimensions += "distribution"
+
+    productFlavors {
+        create("play") {
+            dimension = "distribution"
+            buildConfigField("boolean", "ENABLE_GITHUB_UPDATES", "false")
+            buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"play\"")
+        }
+        create("github") {
+            dimension = "distribution"
+            buildConfigField("boolean", "ENABLE_GITHUB_UPDATES", "true")
+            buildConfigField("String", "DISTRIBUTION_CHANNEL", "\"github\"")
+        }
     }
 }
 

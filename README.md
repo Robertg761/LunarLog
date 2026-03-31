@@ -45,6 +45,8 @@ LunarLog is an Android app for menstrual cycle and wellness tracking with a loca
 
 ```bash
 ./gradlew :app:assembleDebug
+./gradlew :app:bundlePlayRelease
+./gradlew :app:assembleGithubRelease
 ./gradlew test
 ```
 
@@ -58,12 +60,15 @@ LunarLog is an Android app for menstrual cycle and wellness tracking with a loca
 - `app/src/test/java/com/lunarlog`: unit tests
 - `scripts`: release helper scripts
 - `.github/workflows/release.yml`: signed APK release automation
+- `docs/play-store-release.md`: Play Store release checklist and signing setup
 
 ## Versioning and Releases
 
 - App version is defined in `app/build.gradle.kts` (`versionCode`, `versionName`).
 - `CHANGELOG.md` is the source for release notes.
-- The release workflow builds a signed release APK and publishes a GitHub Release when `main` is updated with version/changelog changes.
+- `playRelease` builds the Play Store `.aab` bundle.
+- `githubRelease` builds the signed sideload APK used by GitHub Releases.
+- The release workflow builds a signed `githubRelease` APK and publishes a GitHub Release when `main` is updated with version/changelog changes.
 
 ## Testing
 

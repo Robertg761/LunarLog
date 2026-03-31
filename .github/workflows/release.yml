@@ -92,7 +92,7 @@ jobs:
           # Your keystore is PKCS12 (even if the file extension is .jks).
           echo "LL_SIGNING_STORE_TYPE=PKCS12" >> "$GITHUB_ENV"
 
-      - name: Build Signed Release APK
+      - name: Build Signed GitHub Release APK
         if: steps.exists.outputs.skip != 'true'
         env:
           LL_SIGNING_STORE_PASSWORD: ${{ secrets.LL_SIGNING_STORE_PASSWORD }}
@@ -101,7 +101,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          ./gradlew :app:assembleRelease
+          ./gradlew :app:assembleGithubRelease
 
       - name: Prepare Dist
         if: steps.exists.outputs.skip != 'true'
@@ -112,9 +112,9 @@ jobs:
           VERSION="${{ steps.ver.outputs.version_name }}"
           mkdir -p dist
 
-          APK_PATH="$(ls -1 app/build/outputs/apk/release/*.apk | head -n 1)"
+          APK_PATH="$(ls -1 app/build/outputs/apk/github/release/*.apk | head -n 1)"
           if [ -z "$APK_PATH" ]; then
-            echo "Could not locate release APK under app/build/outputs/apk/release/"
+            echo "Could not locate GitHub release APK under app/build/outputs/apk/github/release/"
             exit 1
           fi
 

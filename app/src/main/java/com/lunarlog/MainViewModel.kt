@@ -118,7 +118,7 @@ class MainViewModel @Inject constructor(
 
     fun checkForUpdates() {
         viewModelScope.launch {
-            if (BuildConfig.DEBUG) {
+            if (BuildConfig.DEBUG || !BuildConfig.ENABLE_GITHUB_UPDATES) {
                 // Debug builds are often signed differently than release APK assets.
                 _updateInfo.value = null
                 return@launch
@@ -138,6 +138,7 @@ class MainViewModel @Inject constructor(
     }
 
     fun triggerInstallUpdate() {
+        if (!BuildConfig.ENABLE_GITHUB_UPDATES) return
         val info = _updateInfo.value ?: return
         _installUpdateTrigger.trySend(info)
     }

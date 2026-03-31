@@ -14,6 +14,9 @@ build/
 
 # Android
 local.properties
+keystore.properties
+*.jks
+*.keystore
 captures/
 .externalNativeBuild/
 .cxx/
@@ -33,6 +36,7 @@ yarn-error.log*
 .gemini/
 .genkit/
 gha-creds-*.json
+local/
 
 # Local Android tooling (created when running Gradle in this environment)
 .android-user-home/
