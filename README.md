@@ -92,3 +92,4 @@ Run all unit tests:
 - `PROJECT_DESC.md`: short project summary
 - `PROJECT_SPEC.md`: feature roadmap and implementation phases
 - `CHANGELOG.md`: release history
+- `docs/privacy-policy.md`: privacy policy for store listing and public publishing

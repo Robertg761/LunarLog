@@ -47,7 +47,7 @@ Build the GitHub APK:
 2. Enroll in Play App Signing and register your upload key.
 3. Upload `app/build/outputs/bundle/playRelease/app-play-release.aab` to the Internal testing track first.
 4. Complete the Data safety form. LunarLog handles menstrual-cycle and wellness data, so answer this carefully and keep it aligned with the app’s actual local-first behavior.
-5. Add a privacy policy URL before production rollout.
+5. Add a privacy policy URL before production rollout. A repo version is available at `docs/privacy-policy.md`; publish it at a stable public URL before submitting.
 6. Fill in App content declarations, store listing copy, screenshots, icon, and feature graphic.
 7. Verify the notification permission explanation and any health-related positioning in the store listing are accurate and non-misleading.
 
