@@ -201,6 +201,18 @@ fun SettingsScreen(
         ).show()
     }
 
+    fun openPrivacyPolicy() {
+        val intent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse(context.getString(R.string.privacy_policy_url))
+        )
+        runCatching {
+            context.startActivity(intent)
+        }.onFailure {
+            Toast.makeText(context, R.string.privacy_policy_open_failed, Toast.LENGTH_LONG).show()
+        }
+    }
+
     if (showNukeDialog) {
         AlertDialog(
             onDismissRequest = { showNukeDialog = false },
@@ -551,6 +563,13 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(16.dp))
+                    TextButton(
+                        onClick = { openPrivacyPolicy() },
+                        modifier = Modifier.align(Alignment.End)
+                    ) {
+                        Text(stringResource(id = R.string.settings_privacy_policy))
+                    }
                 }
             }
         }

@@ -8,6 +8,9 @@
     <string name="settings_daily_period_log_reminder_desc">Remind you once per day to log details during your period</string>
     <string name="settings_reminder_time">Reminder time</string>
     <string name="settings_change">Change</string>
+    <string name="settings_privacy_policy">Privacy Policy</string>
+    <string name="privacy_policy_url">https://robertg761.github.io/LunarLog/</string>
+    <string name="privacy_policy_open_failed">Unable to open the privacy policy.</string>
 
     <!-- Shortcuts -->
     <string name="shortcut_log_short">Log Period</string>
