@@ -56,6 +56,32 @@ class CycleRepositoryTest {
     }
 
     @Test
+    fun `updateCycleDates rejects future start date`() = runTest {
+        val result = repository.updateCycleDates(
+            cycleId = 1,
+            startDate = LocalDate.now().plusDays(1),
+            endDate = null
+        )
+
+        assertTrue(result is PeriodChangeResult.ValidationError)
+        coVerify(exactly = 0) { cycleDao.getCycleById(any()) }
+        coVerify(exactly = 0) { cycleDao.updateCycle(any()) }
+    }
+
+    @Test
+    fun `updateCycleDates rejects future end date`() = runTest {
+        val result = repository.updateCycleDates(
+            cycleId = 1,
+            startDate = LocalDate.now().minusDays(3),
+            endDate = LocalDate.now().plusDays(1)
+        )
+
+        assertTrue(result is PeriodChangeResult.ValidationError)
+        coVerify(exactly = 0) { cycleDao.getCycleById(any()) }
+        coVerify(exactly = 0) { cycleDao.updateCycle(any()) }
+    }
+
+    @Test
     fun `setPeriodDay false splits middle day`() = runTest {
         val cycle = Cycle(
             id = 1,

@@ -77,11 +77,16 @@ class CalendarViewModel @Inject constructor(
         if (sortedCycles.isNotEmpty()) {
             val lastCycle = sortedCycles.last()
             val avgLength = CyclePredictionUtils.calculateAverageCycleLength(cycles)
+            val avgPeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
             
             // Predict for next 12 months
             val predictionLimit = LocalDate.now().plusMonths(12).toEpochDay()
             
-            var currentStart = CyclePredictionUtils.predictNextPeriod(lastCycle, avgLength)
+            var currentStart = CyclePredictionUtils.predictNextPeriodAfterLatestCycle(
+                lastCycle,
+                avgLength,
+                avgPeriodLength
+            )
             
             while (currentStart.toEpochDay() < predictionLimit) {
                 // Period Prediction (Assuming 5 days for prediction visualization)

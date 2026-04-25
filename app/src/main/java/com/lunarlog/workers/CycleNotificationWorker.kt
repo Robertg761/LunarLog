@@ -27,10 +27,15 @@ class CycleNotificationWorker @AssistedInject constructor(
         if (cycles.isEmpty()) return Result.success()
 
         val averageLength = CyclePredictionUtils.calculateAverageCycleLength(cycles)
+        val averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
         // Cycles are ordered by startDate DESC in Dao, so the first one is the latest
         val lastCycle = cycles.first()
 
-        val nextPeriod = CyclePredictionUtils.predictNextPeriod(lastCycle, averageLength)
+        val nextPeriod = CyclePredictionUtils.predictNextPeriodAfterLatestCycle(
+            lastCycle,
+            averageLength,
+            averagePeriodLength
+        )
         val fertileWindow = CyclePredictionUtils.predictFertileWindow(nextPeriod)
 
         val today = LocalDate.now()

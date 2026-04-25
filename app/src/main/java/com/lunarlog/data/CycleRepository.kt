@@ -164,6 +164,11 @@ class CycleRepository @Inject constructor(
 
     suspend fun updateCycleDates(cycleId: Int, startDate: LocalDate, endDate: LocalDate?): PeriodChangeResult =
         appDatabase.withTransaction {
+            val today = LocalDate.now()
+            if (startDate.isAfter(today) || endDate?.isAfter(today) == true) {
+                return@withTransaction PeriodChangeResult.ValidationError("Cannot modify future days")
+            }
+
             val cycle = cycleDao.getCycleById(cycleId)
                 ?: return@withTransaction PeriodChangeResult.ValidationError("Period not found")
 

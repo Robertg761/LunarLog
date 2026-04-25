@@ -1,5 +1,11 @@
 # Changelog
 
+## [1.7.4] - 2026-04-25
+
+### Fixed
+- **Calendar Prediction Continuation**: Prevented just-ended long periods from appearing to continue into the following day as a predicted period.
+- **Countdown Accuracy**: Adjusted next-period countdowns after a period ends so they account for the recorded end date.
+
 ## [1.7.3] - 2026-03-31
 
 ### Changed

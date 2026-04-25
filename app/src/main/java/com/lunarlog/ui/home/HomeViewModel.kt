@@ -69,7 +69,12 @@ class HomeViewModel @Inject constructor(
                     val sortedCycles = cycles.sortedByDescending { it.startDate }
                     val lastCycle = sortedCycles.first()
                     val averageLength = CyclePredictionUtils.calculateAverageCycleLength(cycles)
-                    val nextPeriodStart = CyclePredictionUtils.predictNextPeriod(lastCycle, averageLength)
+                    val averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
+                    val nextPeriodStart = CyclePredictionUtils.predictNextPeriodAfterLatestCycle(
+                        lastCycle,
+                        averageLength,
+                        averagePeriodLength
+                    )
                     val today = LocalDate.now()
                     val counter = CounterPresentationCalculator.calculate(cycles, today)
 

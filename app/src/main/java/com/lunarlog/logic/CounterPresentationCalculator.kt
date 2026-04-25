@@ -57,7 +57,11 @@ object CounterPresentationCalculator {
                 )
             }
         } else {
-            val nextPeriodStart = CyclePredictionUtils.predictNextPeriod(latestCycle, averageCycleLength)
+            val nextPeriodStart = CyclePredictionUtils.predictNextPeriodAfterLatestCycle(
+                latestCycle,
+                averageCycleLength,
+                averagePeriodLength
+            )
             val daysUntilNextPeriod = ChronoUnit.DAYS.between(today, nextPeriodStart).toInt()
 
             if (daysUntilNextPeriod >= 0) {

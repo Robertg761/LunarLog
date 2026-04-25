@@ -43,6 +43,22 @@ class CyclePredictionUtilsTest {
     }
 
     @Test
+    fun predictNextPeriodAfterLatestCycle_usesEndDateWhenClosedPeriodRunsLong() {
+        val lastCycle = Cycle(
+            startDate = LocalDate.of(2023, 1, 1),
+            endDate = LocalDate.of(2023, 1, 29)
+        )
+
+        val result = CyclePredictionUtils.predictNextPeriodAfterLatestCycle(
+            lastCycle = lastCycle,
+            averageCycleLength = 28,
+            averagePeriodLength = 5
+        )
+
+        assertEquals(LocalDate.of(2023, 2, 22), result)
+    }
+
+    @Test
     fun predictFertileWindow_calculatesCorrectWindow() {
         // Next period: Jan 20
         // Ovulation: Jan 20 - 14 = Jan 6

@@ -2,6 +2,7 @@ package com.lunarlog.ui.widget
 
 import android.content.Context
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
@@ -58,10 +59,10 @@ class LogPeriodWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(counter: CounterPresentation) {
-        // Colors
-        val primaryColor = ColorProvider(R.color.colorPrimary)
-        val onPrimaryColor = ColorProvider(android.R.color.white)
-        val surfaceColor = ColorProvider(android.R.color.white)
+        val primaryColor = ColorProvider(Color(0xFFD81B60))
+        val onPrimaryColor = ColorProvider(Color.White)
+        val surfaceColor = ColorProvider(Color.White)
+        val subtitleColor = ColorProvider(Color(0xFF616161))
         
         Column(
             modifier = GlanceModifier
@@ -95,7 +96,7 @@ class LogPeriodWidget : GlanceAppWidget() {
                 Column(horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
                         text = counter.subtitle,
-                        style = TextStyle(color = ColorProvider(android.R.color.darker_gray))
+                        style = TextStyle(color = subtitleColor)
                     )
                 }
             }

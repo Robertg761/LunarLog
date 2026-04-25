@@ -71,6 +71,20 @@ object CyclePredictionUtils {
         return lastCycle.startDate.plusDays(averageLength.toLong())
     }
 
+    fun predictNextPeriodAfterLatestCycle(
+        lastCycle: Cycle,
+        averageCycleLength: Int,
+        averagePeriodLength: Int
+    ): LocalDate {
+        val startBasedPrediction = predictNextPeriod(lastCycle, averageCycleLength)
+        val endDate = lastCycle.endDate ?: return startBasedPrediction
+
+        val expectedNonPeriodDays = (averageCycleLength - averagePeriodLength + 1).coerceAtLeast(1)
+        val endBasedPrediction = endDate.plusDays(expectedNonPeriodDays.toLong())
+
+        return maxOf(startBasedPrediction, endBasedPrediction)
+    }
+
     fun predictOvulation(nextPeriodStart: LocalDate): LocalDate {
         return nextPeriodStart.minusDays(AppConfig.DEFAULT_LUTEAL_PHASE_LENGTH.toLong())
     }

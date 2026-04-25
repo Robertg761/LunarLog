@@ -62,6 +62,19 @@ class CounterPresentationCalculatorTest {
     }
 
     @Test
+    fun `returns next period countdown after long period ends today`() {
+        val cycles = listOf(
+            Cycle(startDate = today.minusDays(28), endDate = today)
+        )
+
+        val result = CounterPresentationCalculator.calculate(cycles, today)
+
+        assertEquals(CounterMode.NEXT_PERIOD_COUNTDOWN, result.mode)
+        assertEquals(24, result.value)
+        assertEquals("24 days until period", result.subtitle)
+    }
+
+    @Test
     fun `returns due today when closed cycle hits estimate`() {
         val cycles = listOf(
             Cycle(startDate = today.minusDays(28), endDate = today.minusDays(24))
