@@ -14,6 +14,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandIn
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkOut
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
@@ -41,9 +43,9 @@ import androidx.compose.runtime.setValue
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -58,6 +60,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lunarlog.logic.CounterMode
+import com.lunarlog.ui.theme.BrandMoon
+import com.lunarlog.ui.theme.BrandRoseDeep
+import com.lunarlog.ui.theme.BrandRoseLight
 import com.lunarlog.ui.theme.FertileGreen
 import com.lunarlog.ui.theme.FertileSurface
 import com.lunarlog.ui.theme.OnFertileSurface
@@ -91,40 +96,39 @@ fun HomeScreen(
         }
     }
 
-    // Organic Background Colors
+    // Logo-inspired background colors
+    val background = MaterialTheme.colorScheme.background
     val primaryContainer = MaterialTheme.colorScheme.primaryContainer
     val secondaryContainer = MaterialTheme.colorScheme.secondaryContainer
-    val tertiaryContainer = MaterialTheme.colorScheme.tertiaryContainer
+    val surface = MaterialTheme.colorScheme.surface
 
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .background(MaterialTheme.colorScheme.background)
+            .background(
+                Brush.verticalGradient(
+                    listOf(
+                        background,
+                        primaryContainer.copy(alpha = 0.22f),
+                        secondaryContainer.copy(alpha = 0.16f),
+                        surface.copy(alpha = 0.96f)
+                    )
+                )
+            )
     ) {
-        // Organic Blobs Background
         Canvas(modifier = Modifier.fillMaxSize()) {
-            // Top Left Blob
-            drawCircle(
-                color = primaryContainer.copy(alpha = 0.4f),
-                radius = size.width * 0.6f,
-                center = Offset(0f, 0f)
-            )
-            // Bottom Right Blob
-            drawCircle(
-                color = secondaryContainer.copy(alpha = 0.4f),
-                radius = size.width * 0.5f,
-                center = Offset(size.width, size.height)
-            )
-             // Middle Left Blob
-            drawCircle(
-                color = tertiaryContainer.copy(alpha = 0.3f),
-                radius = size.width * 0.4f,
-                center = Offset(0f, size.height * 0.6f)
+            drawRect(
+                brush = Brush.linearGradient(
+                    colors = listOf(
+                        BrandMoon.copy(alpha = 0.42f),
+                        Color.Transparent,
+                        primaryContainer.copy(alpha = 0.20f)
+                    ),
+                    start = Offset(size.width * 0.08f, 0f),
+                    end = Offset(size.width * 0.92f, size.height)
+                )
             )
         }
-        
-        // Blur effect for blobs (if needed, but drawing soft alpha circles is usually performant enough)
-        // A full blur modifier on the box can be expensive.
 
         Scaffold(
             modifier = Modifier.nestedScroll(scrollBehavior.nestedScrollConnection),
@@ -132,13 +136,20 @@ fun HomeScreen(
             topBar = {
                 CenterAlignedTopAppBar(
                     title = {
-                        Text(
-                            "LunarLog",
-                            style = MaterialTheme.typography.headlineMedium.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onBackground
+                        Row(
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            LunarLogBrandMark(modifier = Modifier.size(34.dp))
+                            Spacer(modifier = Modifier.width(10.dp))
+                            Text(
+                                "LunarLog",
+                                style = MaterialTheme.typography.headlineSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
                             )
-                        )
+                        }
                     },
                     actions = {
                         IconButton(onClick = {
@@ -166,7 +177,7 @@ fun HomeScreen(
                     scrollBehavior = scrollBehavior,
                     colors = TopAppBarDefaults.centerAlignedTopAppBarColors(
                         containerColor = Color.Transparent,
-                        scrolledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.8f) // Frosted glass effect potential
+                        scrolledContainerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.94f)
                     )
                 )
             }
@@ -253,9 +264,17 @@ fun HomeScreen(
                 label = "fab_expand",
                 transitionSpec = {
                     fadeIn(animationSpec = tween(300)) + 
-                    expandIn(expandFrom = Alignment.BottomEnd, animationSpec = tween(300, easing = FastOutSlowInEasing)) togetherWith
+                    scaleIn(
+                        initialScale = 0.92f,
+                        animationSpec = tween(360, easing = FastOutSlowInEasing)
+                    ) +
+                    expandIn(expandFrom = Alignment.BottomEnd, animationSpec = tween(360, easing = FastOutSlowInEasing)) togetherWith
                     fadeOut(animationSpec = tween(300)) + 
-                    shrinkOut(shrinkTowards = Alignment.BottomEnd, animationSpec = tween(300, easing = FastOutSlowInEasing))
+                    scaleOut(
+                        targetScale = 0.96f,
+                        animationSpec = tween(240, easing = FastOutSlowInEasing)
+                    ) +
+                    shrinkOut(shrinkTowards = Alignment.BottomEnd, animationSpec = tween(260, easing = FastOutSlowInEasing))
                 }
             ) { isExpanded ->
                 if (isExpanded) {
@@ -294,7 +313,12 @@ fun HomeScreen(
                         icon = { Icon(Icons.Default.Edit, "Quick Log") },
                         text = { Text("Log Today", fontWeight = FontWeight.Bold) },
                         expanded = true,
-                        elevation = FloatingActionButtonDefaults.elevation(8.dp)
+                        elevation = FloatingActionButtonDefaults.elevation(
+                            defaultElevation = 6.dp,
+                            pressedElevation = 2.dp,
+                            focusedElevation = 8.dp,
+                            hoveredElevation = 8.dp
+                        )
                     )
                 }
             }
@@ -325,6 +349,36 @@ fun HomeScreen(
                 }
             )
         }
+    }
+}
+
+@Composable
+private fun LunarLogBrandMark(modifier: Modifier = Modifier) {
+    Canvas(modifier = modifier) {
+        drawRoundRect(
+            brush = Brush.linearGradient(
+                colors = listOf(BrandRoseLight, BrandRoseDeep),
+                start = Offset.Zero,
+                end = Offset(size.width, size.height)
+            ),
+            size = size,
+            cornerRadius = CornerRadius(size.width * 0.26f, size.height * 0.26f)
+        )
+        drawCircle(
+            color = BrandMoon.copy(alpha = 0.18f),
+            radius = size.minDimension * 0.27f,
+            center = Offset(size.width * 0.34f, size.height * 0.34f)
+        )
+        drawCircle(
+            color = BrandMoon.copy(alpha = 0.96f),
+            radius = size.minDimension * 0.24f,
+            center = Offset(size.width * 0.53f, size.height * 0.55f)
+        )
+        drawCircle(
+            color = BrandRoseDeep,
+            radius = size.minDimension * 0.14f,
+            center = Offset(size.width * 0.53f, size.height * 0.55f)
+        )
     }
 }
 
@@ -418,41 +472,53 @@ fun CycleStatusCircle(
             )
         }
 
-        Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text(
-                text = title,
-                style = MaterialTheme.typography.titleMedium,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
-                fontWeight = FontWeight.Medium
+        Surface(
+            shape = CircleShape,
+            color = MaterialTheme.colorScheme.surface.copy(alpha = 0.72f),
+            border = androidx.compose.foundation.BorderStroke(
+                width = 1.dp,
+                color = BrandMoon.copy(alpha = 0.9f)
             )
-            Text(
-                text = "$value",
-                style = MaterialTheme.typography.displayLarge.copy(
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 80.sp,
-                    shadow = androidx.compose.ui.graphics.Shadow(
-                        color = activeColor.copy(alpha = 0.3f),
-                        offset = Offset(0f, 4f),
-                        blurRadius = 8f
-                    )
-                ),
-                color = activeColor
-            )
-            
-            Spacer(modifier = Modifier.height(8.dp))
-            
-            Surface(
-                color = activeColor.copy(alpha = 0.1f),
-                shape = RoundedCornerShape(20.dp),
-                border = androidx.compose.foundation.BorderStroke(1.dp, activeColor.copy(alpha = 0.2f))
+        ) {
+            Column(
+                horizontalAlignment = Alignment.CenterHorizontally,
+                modifier = Modifier.padding(horizontal = 24.dp, vertical = 30.dp)
             ) {
                 Text(
-                    text = subtitle,
-                    style = MaterialTheme.typography.labelLarge,
-                    color = activeColor, // Match ring color
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
-                    fontWeight = FontWeight.Bold
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f),
+                    fontWeight = FontWeight.Medium
                 )
+                Text(
+                    text = "$value",
+                    style = MaterialTheme.typography.displayLarge.copy(
+                        fontWeight = FontWeight.Bold,
+                        fontSize = 80.sp,
+                        shadow = androidx.compose.ui.graphics.Shadow(
+                            color = activeColor.copy(alpha = 0.3f),
+                            offset = Offset(0f, 4f),
+                            blurRadius = 8f
+                        )
+                    ),
+                    color = activeColor
+                )
+                
+                Spacer(modifier = Modifier.height(8.dp))
+                
+                Surface(
+                    color = activeColor.copy(alpha = 0.1f),
+                    shape = RoundedCornerShape(20.dp),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, activeColor.copy(alpha = 0.2f))
+                ) {
+                    Text(
+                        text = subtitle,
+                        style = MaterialTheme.typography.labelLarge,
+                        color = activeColor, // Match ring color
+                        modifier = Modifier.padding(horizontal = 16.dp, vertical = 6.dp),
+                        fontWeight = FontWeight.Bold
+                    )
+                }
             }
         }
     }
@@ -506,11 +572,11 @@ fun DailySummaryCard(
     ElevatedCard(
         onClick = onLogDetailsClicked,
         modifier = modifier.fillMaxWidth(),
-        shape = RoundedCornerShape(24.dp), // More rounded
+        shape = RoundedCornerShape(28.dp),
         colors = CardDefaults.elevatedCardColors(
-            containerColor = MaterialTheme.colorScheme.surface
+            containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.96f)
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
     ) {
         Row(
             modifier = Modifier
@@ -541,7 +607,7 @@ fun DailySummaryCard(
             // Cute icon container
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer,
+                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f),
                 modifier = Modifier.size(56.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {

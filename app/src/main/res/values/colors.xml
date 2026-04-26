@@ -8,5 +8,6 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
     
-    <color name="colorPrimary">#FFD81B60</color> <!-- Pink 600 -->
+    <color name="colorPrimary">#FFD93672</color>
+    <color name="ic_launcher_background">#D93672</color>
 </resources>

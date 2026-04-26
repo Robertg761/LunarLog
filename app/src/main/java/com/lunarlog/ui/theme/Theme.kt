@@ -31,19 +31,26 @@ import androidx.core.view.WindowCompat
 
 private val DarkColorScheme = darkColorScheme(
     primary = Primary80,
-    onPrimary = Primary40,
-    primaryContainer = PrimaryContainer,
-    onPrimaryContainer = OnPrimaryContainer,
+    onPrimary = BrandPlum,
+    primaryContainer = BrandRoseDeep,
+    onPrimaryContainer = Color(0xFFFFD7E4),
     secondary = Secondary80,
-    onSecondary = Secondary40,
-    secondaryContainer = SecondaryContainer,
-    onSecondaryContainer = OnSecondaryContainer,
+    onSecondary = BrandPlum,
+    secondaryContainer = Color(0xFF5F253B),
+    onSecondaryContainer = Color(0xFFFFD8E5),
     tertiary = Tertiary80,
-    onTertiary = Tertiary40,
-    tertiaryContainer = TertiaryContainer,
-    onTertiaryContainer = OnTertiaryContainer,
+    onTertiary = BrandPlum,
+    tertiaryContainer = Color(0xFF63344A),
+    onTertiaryContainer = Color(0xFFFFD8E7),
     background = BackgroundDark,
-    surface = SurfaceDark
+    onBackground = Color(0xFFFFECF2),
+    surface = SurfaceDark,
+    onSurface = Color(0xFFFFECF2),
+    surfaceContainer = SurfaceContainerDark,
+    surfaceVariant = SurfaceVariantDark,
+    onSurfaceVariant = Color(0xFFE5C1CC),
+    outline = OutlineDark,
+    outlineVariant = Color(0xFF6C4A58)
 )
 
 private val LightColorScheme = lightColorScheme(
@@ -60,14 +67,21 @@ private val LightColorScheme = lightColorScheme(
     tertiaryContainer = TertiaryContainer,
     onTertiaryContainer = OnTertiaryContainer,
     background = BackgroundLight,
+    onBackground = BrandInk,
     surface = SurfaceLight,
+    onSurface = BrandInk,
+    surfaceContainer = SurfaceContainerLight,
+    surfaceVariant = SurfaceVariantLight,
+    onSurfaceVariant = Color(0xFF72535F),
+    outline = OutlineLight,
+    outlineVariant = Color(0xFFE3C3CE)
 )
 
 @Composable
 fun LunarLogTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     // Dynamic color is available on Android 12+
-    dynamicColor: Boolean = true,
+    dynamicColor: Boolean = false,
     seedColor: Int? = null, // New parameter
     content: @Composable () -> Unit
 ) {
@@ -113,8 +127,11 @@ fun generateLightSchemeFromSeed(seed: Color): ColorScheme {
         secondary = seed.copy(alpha = 0.8f),
         onSecondary = Color.White,
         tertiary = seed.copy(alpha = 0.6f),
-        background = Color(0xFFFFFBFB),
-        surface = Color(0xFFFFFBFB)
+        background = BackgroundLight,
+        surface = SurfaceLight,
+        surfaceContainer = SurfaceContainerLight,
+        surfaceVariant = SurfaceVariantLight,
+        outline = OutlineLight
     )
 }
 
@@ -127,7 +144,10 @@ fun generateDarkSchemeFromSeed(seed: Color): ColorScheme {
         secondary = seed.copy(alpha = 0.8f),
         onSecondary = Color.Black,
         tertiary = seed.copy(alpha = 0.6f),
-        background = Color(0xFF1C1B1B),
-        surface = Color(0xFF1C1B1B)
+        background = BackgroundDark,
+        surface = SurfaceDark,
+        surfaceContainer = SurfaceContainerDark,
+        surfaceVariant = SurfaceVariantDark,
+        outline = OutlineDark
     )
 }

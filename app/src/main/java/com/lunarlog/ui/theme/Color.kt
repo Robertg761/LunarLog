@@ -2,35 +2,49 @@ package com.lunarlog.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Primary - Blossom (Vibrant Pink)
-val Primary80 = Color(0xFFFFB2DD)
-val Primary40 = Color(0xFFD81B60) // Pink 600
-val PrimaryContainer = Color(0xFFFFD9E3)
-val OnPrimaryContainer = Color(0xFF3E001D)
+// Brand palette sampled from the LunarLog logo.
+val BrandRose = Color(0xFFD93672)
+val BrandRoseLight = Color(0xFFF26399)
+val BrandRoseDeep = Color(0xFFA81852)
+val BrandBlush = Color(0xFFFFD4E3)
+val BrandMoon = Color(0xFFFFF7FA)
+val BrandPetal = Color(0xFFF47BA8)
+val BrandPlum = Color(0xFF3D1024)
+val BrandInk = Color(0xFF251018)
 
-// Secondary - Petal (Soft Peach/Coral)
-val Secondary80 = Color(0xFFFFCCBC)
-val Secondary40 = Color(0xFFF4511E) // Deep Orange 600
-val SecondaryContainer = Color(0xFFFFE0DB)
-val OnSecondaryContainer = Color(0xFF3E0500)
+// Primary - Lunar rose
+val Primary80 = Color(0xFFFFB1CF)
+val Primary40 = BrandRose
+val PrimaryContainer = BrandBlush
+val OnPrimaryContainer = BrandPlum
 
-// Tertiary - Lavender (Mystic)
-val Tertiary80 = Color(0xFFE1BEE7)
-val Tertiary40 = Color(0xFF8E24AA)
-val TertiaryContainer = Color(0xFFF3E5F5)
-val OnTertiaryContainer = Color(0xFF320046)
+// Secondary - Soft logo highlight
+val Secondary80 = Color(0xFFFFB8D0)
+val Secondary40 = BrandPetal
+val SecondaryContainer = Color(0xFFFFE2EB)
+val OnSecondaryContainer = Color(0xFF4B102A)
 
-// Neutrals & Backgrounds (Warm/Rose Tinted)
-val SurfaceLight = Color(0xFFFFF8F9) // Very pale pinkish white
-val SurfaceDark = Color(0xFF1A1115)
-val BackgroundLight = Color(0xFFFFF0F5) // Lavender Blush
-val BackgroundDark = Color(0xFF1A1115)
+// Tertiary - Deep berry for contrast and data accents
+val Tertiary80 = Color(0xFFEFB8C8)
+val Tertiary40 = Color(0xFF8B2C55)
+val TertiaryContainer = Color(0xFFFFD8E7)
+val OnTertiaryContainer = Color(0xFF3B0820)
 
-val OutlineLight = Color(0xFF857379)
-val OutlineDark = Color(0xFF9F8C93)
+// Neutrals & Backgrounds (logo-inspired warm rose)
+val SurfaceLight = Color(0xFFFFFAFB)
+val SurfaceContainerLight = Color(0xFFFFEFF4)
+val SurfaceVariantLight = Color(0xFFF7DDE6)
+val SurfaceDark = Color(0xFF201018)
+val SurfaceContainerDark = Color(0xFF2A1620)
+val SurfaceVariantDark = Color(0xFF533241)
+val BackgroundLight = Color(0xFFFFF4F7)
+val BackgroundDark = Color(0xFF160B11)
+
+val OutlineLight = Color(0xFF8E6C78)
+val OutlineDark = Color(0xFFB99AA6)
 
 // Semantic Colors - Refined for "Beautiful" UI
-val PeriodRed = Color(0xFFFF5983) // Softer, more vibrant red-pink
+val PeriodRed = BrandRoseLight
 
 val PeriodSurface = Color(0xFFFFD9E2) // Light pink background for period days
 val OnPeriodSurface = Color(0xFF8C0032) // Dark text for period days

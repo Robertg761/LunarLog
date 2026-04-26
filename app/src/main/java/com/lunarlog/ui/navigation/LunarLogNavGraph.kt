@@ -1,9 +1,16 @@
 package com.lunarlog.ui.navigation
 
 import androidx.compose.animation.AnimatedContentTransitionScope
+import androidx.compose.animation.EnterTransition
 import androidx.compose.animation.ExperimentalSharedTransitionApi
+import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -16,15 +23,20 @@ import androidx.compose.material.icons.outlined.Timeline
 import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.Icon
 import androidx.compose.material3.NavigationBar
+import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationBarItem
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
+import androidx.navigation.NavBackStackEntry
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -74,6 +86,59 @@ private fun getScreenOrder(route: String?): Int {
     }
 }
 
+private val macMotionSpec = tween<IntOffset>(
+    durationMillis = 420,
+    easing = FastOutSlowInEasing
+)
+
+private val macFadeSpec = tween<Float>(
+    durationMillis = 260,
+    delayMillis = 60,
+    easing = FastOutSlowInEasing
+)
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.macEnterTransition(): EnterTransition? {
+    val initial = getScreenOrder(initialState.destination.route)
+    val target = getScreenOrder(targetState.destination.route)
+    if (initial == -1 || target == -1) return null
+
+    val direction = if (initial < target) {
+        AnimatedContentTransitionScope.SlideDirection.Left
+    } else {
+        AnimatedContentTransitionScope.SlideDirection.Right
+    }
+
+    return slideIntoContainer(
+        towards = direction,
+        animationSpec = macMotionSpec,
+        initialOffset = { it / 5 }
+    ) + fadeIn(animationSpec = macFadeSpec) + scaleIn(
+        initialScale = 0.985f,
+        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing)
+    )
+}
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.macExitTransition(): ExitTransition? {
+    val initial = getScreenOrder(initialState.destination.route)
+    val target = getScreenOrder(targetState.destination.route)
+    if (initial == -1 || target == -1) return null
+
+    val direction = if (initial < target) {
+        AnimatedContentTransitionScope.SlideDirection.Left
+    } else {
+        AnimatedContentTransitionScope.SlideDirection.Right
+    }
+
+    return slideOutOfContainer(
+        towards = direction,
+        animationSpec = macMotionSpec,
+        targetOffset = { it / 6 }
+    ) + fadeOut(animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)) + scaleOut(
+        targetScale = 0.992f,
+        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing)
+    )
+}
+
 @OptIn(ExperimentalSharedTransitionApi::class)
 @Composable
 fun LunarLogNavGraph(
@@ -91,10 +156,20 @@ fun LunarLogNavGraph(
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
-                NavigationBar {
+                NavigationBar(
+                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    tonalElevation = 0.dp
+                ) {
                     bottomNavItems.forEach { screen ->
                         val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
                         NavigationBarItem(
+                            colors = NavigationBarItemDefaults.colors(
+                                selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                indicatorColor = MaterialTheme.colorScheme.primaryContainer,
+                                unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                                unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
+                            ),
                             icon = {
                                 if (screen == Screen.Home && isUpdateAvailable) {
                                     androidx.compose.material3.BadgedBox(
@@ -136,22 +211,8 @@ fun LunarLogNavGraph(
             ) {
                 composable(
                     route = Screen.Home.route,
-                    enterTransition = {
-                        val initial = getScreenOrder(initialState.destination.route)
-                        val target = getScreenOrder(targetState.destination.route)
-                        if (initial != -1 && target != -1) {
-                            if (initial < target) slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
-                            else slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
-                        } else null
-                    },
-                    exitTransition = {
-                        val initial = getScreenOrder(initialState.destination.route)
-                        val target = getScreenOrder(targetState.destination.route)
-                        if (initial != -1 && target != -1) {
-                            if (initial < target) slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
-                            else slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
-                        } else null
-                    }
+                    enterTransition = { macEnterTransition() },
+                    exitTransition = { macExitTransition() }
                 ) {
                     HomeScreen(
                         onLogDetailsClicked = {
@@ -167,22 +228,8 @@ fun LunarLogNavGraph(
                 composable(
                     route = Screen.Calendar.route,
                     deepLinks = listOf(navDeepLink { uriPattern = "lunarlog://calendar" }),
-                    enterTransition = {
-                        val initial = getScreenOrder(initialState.destination.route)
-                        val target = getScreenOrder(targetState.destination.route)
-                        if (initial != -1 && target != -1) {
-                            if (initial < target) slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
-                            else slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
-                        } else null
-                    },
-                    exitTransition = {
-                        val initial = getScreenOrder(initialState.destination.route)
-                        val target = getScreenOrder(targetState.destination.route)
-                        if (initial != -1 && target != -1) {
-                            if (initial < target) slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
-                            else slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
-                        } else null
-                    }
+                    enterTransition = { macEnterTransition() },
+                    exitTransition = { macExitTransition() }
                 ) {
                     CalendarScreen(
                         onDayClicked = { date ->
@@ -195,22 +242,8 @@ fun LunarLogNavGraph(
                 composable(
                     route = Screen.Analysis.route,
                     deepLinks = listOf(navDeepLink { uriPattern = "lunarlog://analysis" }),
-                    enterTransition = {
-                        val initial = getScreenOrder(initialState.destination.route)
-                        val target = getScreenOrder(targetState.destination.route)
-                        if (initial != -1 && target != -1) {
-                            if (initial < target) slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
-                            else slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
-                        } else null
-                    },
-                    exitTransition = {
-                        val initial = getScreenOrder(initialState.destination.route)
-                        val target = getScreenOrder(targetState.destination.route)
-                        if (initial != -1 && target != -1) {
-                            if (initial < target) slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
-                            else slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
-                        } else null
-                    }
+                    enterTransition = { macEnterTransition() },
+                    exitTransition = { macExitTransition() }
                 ) {
                     AnalysisScreen(
                         onBack = { navController.popBackStack() },
@@ -264,22 +297,8 @@ fun LunarLogNavGraph(
                 }
                 composable(
                     route = Screen.PeriodHistory.route,
-                    enterTransition = {
-                        val initial = getScreenOrder(initialState.destination.route)
-                        val target = getScreenOrder(targetState.destination.route)
-                        if (initial != -1 && target != -1) {
-                            if (initial < target) slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
-                            else slideIntoContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
-                        } else null
-                    },
-                    exitTransition = {
-                        val initial = getScreenOrder(initialState.destination.route)
-                        val target = getScreenOrder(targetState.destination.route)
-                        if (initial != -1 && target != -1) {
-                            if (initial < target) slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Left, tween(300))
-                            else slideOutOfContainer(AnimatedContentTransitionScope.SlideDirection.Right, tween(300))
-                        } else null
-                    }
+                    enterTransition = { macEnterTransition() },
+                    exitTransition = { macExitTransition() }
                 ) {
                     com.lunarlog.ui.periodhistory.PeriodHistoryScreen(
                         onCycleClick = { cycleId ->

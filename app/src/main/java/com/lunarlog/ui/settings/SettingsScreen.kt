@@ -436,12 +436,12 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     val colors = listOf(
-                        0xFFFFB2DD, // Blossom (Default)
+                        0xFFD93672, // Lunar Rose (Default)
+                        0xFFF26399, // Logo Highlight
                         0xFFE1BEE7, // Lavender
                         0xFFFFCCBC, // Peach
                         0xFFB2DFDB, // Teal
-                        0xFFBBDEFB, // Blue
-                        0xFFC5E1A5  // Green
+                        0xFFBBDEFB  // Blue
                     )
                     
                     Row(
@@ -450,7 +450,7 @@ fun SettingsScreen(
                     ) {
                         colors.forEach { colorLong ->
                             val color = Color(colorLong)
-                            val isSelected = themeSeedColor == colorLong || (themeSeedColor == null && colorLong == 0xFFFFB2DD.toLong())
+                            val isSelected = themeSeedColor == colorLong || (themeSeedColor == null && colorLong == 0xFFD93672.toLong())
                             
                             Box(
                                 modifier = Modifier
