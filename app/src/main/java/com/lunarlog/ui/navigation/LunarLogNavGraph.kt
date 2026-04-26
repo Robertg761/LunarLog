@@ -9,8 +9,6 @@ import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
-import androidx.compose.animation.scaleIn
-import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -32,7 +30,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -86,14 +83,8 @@ private fun getScreenOrder(route: String?): Int {
     }
 }
 
-private val macMotionSpec = tween<IntOffset>(
-    durationMillis = 420,
-    easing = FastOutSlowInEasing
-)
-
 private val macFadeSpec = tween<Float>(
-    durationMillis = 260,
-    delayMillis = 60,
+    durationMillis = 140,
     easing = FastOutSlowInEasing
 )
 
@@ -102,20 +93,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.macEnterTransition
     val target = getScreenOrder(targetState.destination.route)
     if (initial == -1 || target == -1) return null
 
-    val direction = if (initial < target) {
-        AnimatedContentTransitionScope.SlideDirection.Left
-    } else {
-        AnimatedContentTransitionScope.SlideDirection.Right
-    }
-
-    return slideIntoContainer(
-        towards = direction,
-        animationSpec = macMotionSpec,
-        initialOffset = { it / 5 }
-    ) + fadeIn(animationSpec = macFadeSpec) + scaleIn(
-        initialScale = 0.985f,
-        animationSpec = tween(durationMillis = 420, easing = FastOutSlowInEasing)
-    )
+    return fadeIn(animationSpec = macFadeSpec)
 }
 
 private fun AnimatedContentTransitionScope<NavBackStackEntry>.macExitTransition(): ExitTransition? {
@@ -123,20 +101,7 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.macExitTransition(
     val target = getScreenOrder(targetState.destination.route)
     if (initial == -1 || target == -1) return null
 
-    val direction = if (initial < target) {
-        AnimatedContentTransitionScope.SlideDirection.Left
-    } else {
-        AnimatedContentTransitionScope.SlideDirection.Right
-    }
-
-    return slideOutOfContainer(
-        towards = direction,
-        animationSpec = macMotionSpec,
-        targetOffset = { it / 6 }
-    ) + fadeOut(animationSpec = tween(durationMillis = 180, easing = FastOutSlowInEasing)) + scaleOut(
-        targetScale = 0.992f,
-        animationSpec = tween(durationMillis = 240, easing = FastOutSlowInEasing)
-    )
+    return fadeOut(animationSpec = tween(durationMillis = 90, easing = FastOutSlowInEasing))
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -190,12 +155,14 @@ fun LunarLogNavGraph(
                             label = { Text(screen.label!!) },
                             selected = selected,
                             onClick = {
-                                navController.navigate(screen.route) {
-                                    popUpTo(navController.graph.findStartDestination().id) {
-                                        saveState = true
+                                if (!selected) {
+                                    navController.navigate(screen.route) {
+                                        popUpTo(navController.graph.findStartDestination().id) {
+                                            saveState = true
+                                        }
+                                        launchSingleTop = true
+                                        restoreState = true
                                     }
-                                    launchSingleTop = true
-                                    restoreState = true
                                 }
                             }
                         )
