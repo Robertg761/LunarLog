@@ -117,37 +117,45 @@ fun CalendarScreen(
 
 @Composable
 fun CalendarLegend(modifier: Modifier = Modifier) {
-    Row(
+    Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceEvenly,
-        verticalAlignment = Alignment.CenterVertically
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
-        LegendItem(text = "Period") {
-            drawCircle(color = PeriodSurface)
-        }
-        LegendItem(text = "Predicted") {
-            drawCircle(
-                color = PeriodRed.copy(alpha = 0.5f),
-                style = Stroke(
-                    width = 2.dp.toPx(),
-                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            LegendItem(text = "Period") {
+                drawCircle(color = PeriodSurface)
+            }
+            LegendItem(text = "Predicted") {
+                drawCircle(
+                    color = PeriodRed.copy(alpha = 0.5f),
+                    style = Stroke(
+                        width = 2.dp.toPx(),
+                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                    )
                 )
-            )
+            }
+            LegendItem(text = "Fertile") {
+                drawCircle(
+                    color = FertileGreen,
+                    radius = size.minDimension / 4
+                )
+            }
+            LegendItem(text = "Ovulation") {
+                drawCircle(color = OvulationBlue.copy(alpha = 0.2f))
+                drawCircle(
+                    color = OvulationBlue,
+                    radius = size.minDimension / 4,
+                    center = Offset(center.x, center.y - size.minDimension / 3)
+                )
+            }
         }
-        LegendItem(text = "Fertile") {
-            drawCircle(
-                color = FertileGreen,
-                radius = size.minDimension / 4
-            )
-        }
-        LegendItem(text = "Ovulation") {
-            drawCircle(color = OvulationBlue.copy(alpha = 0.2f))
-            drawCircle(
-                color = OvulationBlue,
-                radius = size.minDimension / 4,
-                center = Offset(center.x, center.y - size.minDimension / 3)
-            )
-        }
+
+        FlowIntensityLegendItem()
     }
 }
 
@@ -165,6 +173,31 @@ fun LegendItem(
         }
         Text(
             text = text,
+            style = MaterialTheme.typography.labelSmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
+    }
+}
+
+@Composable
+fun FlowIntensityLegendItem() {
+    Row(
+        horizontalArrangement = Arrangement.spacedBy(8.dp),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Canvas(modifier = Modifier.size(width = 72.dp, height = 20.dp)) {
+            val radius = size.height / 2
+            val spacing = size.width / 4
+            for (level in 1..4) {
+                drawCircle(
+                    color = lerp(PeriodSurface, PeriodRed, level / 4f),
+                    radius = radius,
+                    center = Offset(spacing * (level - 0.5f), center.y)
+                )
+            }
+        }
+        Text(
+            text = "Flow: light -> heavy",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
