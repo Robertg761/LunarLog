@@ -48,7 +48,10 @@ class CalendarViewModel @Inject constructor(
         logs.forEach { log ->
             dayMap[log.date.toEpochDay()] = DayData(
                 hasLog = true,
-                flowIntensity = log.flowLevel
+                flowIntensity = log.flowLevel,
+                symptoms = log.symptoms,
+                moods = log.mood,
+                notes = log.notes
             )
         }
 
@@ -154,12 +157,27 @@ class CalendarViewModel @Inject constructor(
                 PeriodType.NONE
             }
 
+            val predictedType = if (data.isPredictedPeriod) {
+                val prev = state.data[epoch - 1]?.isPredictedPeriod == true
+                val next = state.data[epoch + 1]?.isPredictedPeriod == true
+                when {
+                    !prev && !next -> PeriodType.SINGLE
+                    !prev && next -> PeriodType.START
+                    prev && next -> PeriodType.MIDDLE
+                    prev && !next -> PeriodType.END
+                    else -> PeriodType.SINGLE
+                }
+            } else {
+                PeriodType.NONE
+            }
+
             days.add(
                 CalendarDayUiModel(
                     date = date,
                     isCurrentMonth = date.month == yearMonth.month,
                     data = data,
-                    periodType = type
+                    periodType = type,
+                    predictedPeriodType = predictedType
                 )
             )
         }
@@ -179,14 +197,18 @@ data class DayData(
     val isFertile: Boolean = false,
     val isOvulation: Boolean = false,
     val hasLog: Boolean = false,
-    val flowIntensity: Int = 0
+    val flowIntensity: Int = 0,
+    val symptoms: List<String> = emptyList(),
+    val moods: List<String> = emptyList(),
+    val notes: String = ""
 )
 
 data class CalendarDayUiModel(
     val date: LocalDate,
     val isCurrentMonth: Boolean,
     val data: DayData,
-    val periodType: PeriodType
+    val periodType: PeriodType,
+    val predictedPeriodType: PeriodType
 )
 
 enum class PeriodType { NONE, START, MIDDLE, END, SINGLE }

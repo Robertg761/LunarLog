@@ -6,6 +6,7 @@ import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
@@ -14,6 +15,8 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -36,11 +39,12 @@ import androidx.hilt.navigation.compose.hiltViewModel
 import com.lunarlog.ui.theme.*
 import java.time.LocalDate
 import java.time.YearMonth
+import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
     onDayClicked: (Long) -> Unit,
@@ -55,6 +59,7 @@ fun CalendarScreen(
     val initialPage = 5000
     val pagerState = rememberPagerState(initialPage = initialPage) { 10000 }
     val scope = rememberCoroutineScope()
+    var previewDay by remember { mutableStateOf<CalendarDayUiModel?>(null) }
     
     // Calculate current visible month based on Pager
     // Optimization: Derive state to avoid unnecessary recompositions
@@ -104,13 +109,27 @@ fun CalendarScreen(
                 } else {
                     CalendarMonthPage(
                         days = days,
-                        onDayClicked = onDayClicked
+                        onDaySelected = { previewDay = it }
                     )
                 }
             }
             
             // Legend
             CalendarLegend(modifier = Modifier.padding(16.dp))
+        }
+    }
+
+    previewDay?.let { day ->
+        ModalBottomSheet(
+            onDismissRequest = { previewDay = null }
+        ) {
+            CalendarDayPreviewSheet(
+                day = day,
+                onEdit = {
+                    previewDay = null
+                    onDayClicked(day.date.toEpochDay())
+                }
+            )
         }
     }
 }
@@ -120,10 +139,10 @@ fun CalendarLegend(modifier: Modifier = Modifier) {
     Column(
         modifier = modifier.fillMaxWidth(),
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(12.dp)
+        verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth(0.82f),
             horizontalArrangement = Arrangement.SpaceEvenly,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -131,14 +150,26 @@ fun CalendarLegend(modifier: Modifier = Modifier) {
                 drawCircle(color = PeriodSurface)
             }
             LegendItem(text = "Predicted") {
-                drawCircle(
-                    color = PeriodRed.copy(alpha = 0.5f),
+                drawRoundRect(
+                    color = PeriodRed.copy(alpha = 0.08f),
+                    cornerRadius = CornerRadius(size.height / 2, size.height / 2)
+                )
+                drawRoundRect(
+                    color = PeriodRed.copy(alpha = 0.55f),
+                    cornerRadius = CornerRadius(size.height / 2, size.height / 2),
                     style = Stroke(
                         width = 2.dp.toPx(),
                         pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                     )
                 )
             }
+        }
+
+        Row(
+            modifier = Modifier.fillMaxWidth(0.82f),
+            horizontalArrangement = Arrangement.SpaceEvenly,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
             LegendItem(text = "Fertile") {
                 drawCircle(
                     color = FertileGreen,
@@ -155,7 +186,7 @@ fun CalendarLegend(modifier: Modifier = Modifier) {
             }
         }
 
-        FlowIntensityLegendItem()
+        FlowIntensityLegendItem(modifier = Modifier.padding(top = 2.dp))
     }
 }
 
@@ -180,27 +211,43 @@ fun LegendItem(
 }
 
 @Composable
-fun FlowIntensityLegendItem() {
-    Row(
-        horizontalArrangement = Arrangement.spacedBy(8.dp),
-        verticalAlignment = Alignment.CenterVertically
+fun FlowIntensityLegendItem(modifier: Modifier = Modifier) {
+    Column(
+        modifier = modifier,
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(3.dp)
     ) {
-        Canvas(modifier = Modifier.size(width = 72.dp, height = 20.dp)) {
-            val radius = size.height / 2
-            val spacing = size.width / 4
-            for (level in 1..4) {
-                drawCircle(
-                    color = lerp(PeriodSurface, PeriodRed, level / 4f),
-                    radius = radius,
-                    center = Offset(spacing * (level - 0.5f), center.y)
-                )
-            }
-        }
         Text(
-            text = "Flow: light -> heavy",
+            text = "Flow intensity",
             style = MaterialTheme.typography.labelSmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text(
+                text = "Light",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+            Canvas(modifier = Modifier.size(width = 76.dp, height = 18.dp)) {
+                val radius = size.height / 2
+                val spacing = size.width / 4
+                for (level in 1..4) {
+                    drawCircle(
+                        color = lerp(PeriodSurface, PeriodRed, level / 4f),
+                        radius = radius,
+                        center = Offset(spacing * (level - 0.5f), center.y)
+                    )
+                }
+            }
+            Text(
+                text = "Heavy",
+                style = MaterialTheme.typography.labelSmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
+            )
+        }
     }
 }
 
@@ -264,7 +311,7 @@ fun CalendarWeekDaysHeader() {
 @Composable
 fun CalendarMonthPage(
     days: List<CalendarDayUiModel>,
-    onDayClicked: (Long) -> Unit
+    onDaySelected: (CalendarDayUiModel) -> Unit
 ) {
     // Custom Layout: fixed 6 rows x 7 cols
     Column(
@@ -282,7 +329,7 @@ fun CalendarMonthPage(
                         CalendarDayCell(
                             day = day,
                             modifier = Modifier.weight(1f).fillMaxHeight(),
-                            onClick = { onDayClicked(day.date.toEpochDay()) }
+                            onClick = { onDaySelected(day) }
                         )
                     } else {
                         Spacer(Modifier.weight(1f))
@@ -290,6 +337,162 @@ fun CalendarMonthPage(
                 }
             }
         }
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+fun CalendarDayPreviewSheet(
+    day: CalendarDayUiModel,
+    onEdit: () -> Unit
+) {
+    val dateFormatter = remember { DateTimeFormatter.ofPattern("EEEE, MMM d") }
+    val statusLabels = remember(day) {
+        buildList {
+            if (day.data.isPeriod) add("Period")
+            if (day.data.isPredictedPeriod) add("Predicted")
+            if (day.data.isFertile) add("Fertile")
+            if (day.data.isOvulation) add("Ovulation")
+            if (day.date == LocalDate.now()) add("Today")
+        }
+    }
+    val details = day.data.symptoms + day.data.moods
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 20.dp)
+            .padding(bottom = 28.dp),
+        verticalArrangement = Arrangement.spacedBy(16.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = day.date.format(dateFormatter),
+                    style = MaterialTheme.typography.titleLarge,
+                    fontWeight = FontWeight.Bold
+                )
+                Text(
+                    text = day.date.year.toString(),
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Button(onClick = onEdit) {
+                Icon(Icons.Filled.Edit, contentDescription = null)
+                Spacer(modifier = Modifier.width(8.dp))
+                Text("Edit")
+            }
+        }
+
+        if (statusLabels.isNotEmpty()) {
+            FlowRow(
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                statusLabels.forEach { label ->
+                    CalendarPreviewChip(text = label)
+                }
+            }
+        }
+
+        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+
+        Row(
+            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Icon(
+                imageVector = Icons.Filled.WaterDrop,
+                contentDescription = null,
+                tint = if (day.data.flowIntensity > 0) PeriodRed else MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Column {
+                Text(
+                    text = "Flow",
+                    style = MaterialTheme.typography.labelMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                Text(
+                    text = flowLabel(day.data.flowIntensity),
+                    style = MaterialTheme.typography.bodyLarge,
+                    color = MaterialTheme.colorScheme.onSurface
+                )
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Symptoms & mood",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            if (details.isEmpty()) {
+                Text(
+                    text = "No symptoms logged",
+                    style = MaterialTheme.typography.bodyMedium,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            } else {
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    details.take(8).forEach { detail ->
+                        CalendarPreviewChip(text = detail)
+                    }
+                    if (details.size > 8) {
+                        CalendarPreviewChip(text = "+${details.size - 8} more")
+                    }
+                }
+            }
+        }
+
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Text(
+                text = "Notes",
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Text(
+                text = day.data.notes.ifBlank { "No notes logged" },
+                style = MaterialTheme.typography.bodyMedium,
+                color = if (day.data.notes.isBlank()) {
+                    MaterialTheme.colorScheme.onSurfaceVariant
+                } else {
+                    MaterialTheme.colorScheme.onSurface
+                }
+            )
+        }
+    }
+}
+
+@Composable
+fun CalendarPreviewChip(text: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.72f),
+        contentColor = MaterialTheme.colorScheme.onSecondaryContainer,
+        shape = MaterialTheme.shapes.small
+    ) {
+        Text(
+            text = text,
+            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium
+        )
+    }
+}
+
+private fun flowLabel(flowIntensity: Int): String {
+    return when (flowIntensity) {
+        1 -> "Spotting"
+        2 -> "Light"
+        3 -> "Medium"
+        4 -> "Heavy"
+        else -> "None"
     }
 }
 
@@ -326,6 +529,10 @@ fun CalendarDayCell(
     }
     
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val pressedFillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
+    val pressedStrokeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
+    val interactionSource = remember { MutableInteractionSource() }
+    val isPressed by interactionSource.collectIsPressedAsState()
 
     Box(
         modifier = modifier
@@ -343,10 +550,14 @@ fun CalendarDayCell(
                     "${day.date.dayOfMonth}, ${statuses.joinToString(", ")}"
                 }
             }
-            .clickable(onClick = {
-                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
-                onClick()
-            }),
+            .clickable(
+                interactionSource = interactionSource,
+                indication = null,
+                onClick = {
+                    haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                    onClick()
+                }
+            ),
         contentAlignment = Alignment.Center
     ) {
         // Custom Drawing for Connected Periods
@@ -360,15 +571,9 @@ fun CalendarDayCell(
             val radius = diameter / 2
             val barTop = cy - radius
             val barHeight = diameter
-
-            // 1. Draw Period Background (Connected Pill)
-            if (day.data.isPeriod) {
-                // Use finalPeriodColor here
-                val color = finalPeriodColor 
-
-                when (day.periodType) {
+            fun drawConnectedFill(type: PeriodType, color: Color) {
+                when (type) {
                     PeriodType.START -> {
-                        // Rounded Left (Circle), Flat Right (Rect)
                         drawCircle(
                             color = color,
                             radius = radius,
@@ -381,7 +586,6 @@ fun CalendarDayCell(
                         )
                     }
                     PeriodType.MIDDLE -> {
-                        // Flat Left, Flat Right
                         drawRect(
                             color = color,
                             topLeft = Offset(0f, barTop),
@@ -389,7 +593,6 @@ fun CalendarDayCell(
                         )
                     }
                     PeriodType.END -> {
-                        // Flat Left (Rect), Rounded Right (Circle)
                         drawRect(
                             color = color,
                             topLeft = Offset(0f, barTop),
@@ -402,7 +605,6 @@ fun CalendarDayCell(
                         )
                     }
                     PeriodType.SINGLE -> {
-                        // Rounded All (Circle)
                         drawCircle(
                             color = color,
                             radius = radius,
@@ -411,6 +613,14 @@ fun CalendarDayCell(
                     }
                     PeriodType.NONE -> {}
                 }
+            }
+
+            // 1. Draw Period Background (Connected Pill)
+            if (day.data.isPeriod) {
+                // Use finalPeriodColor here
+                drawConnectedFill(day.periodType, finalPeriodColor)
+            } else if (day.data.isPredictedPeriod) {
+                drawConnectedFill(day.predictedPeriodType, periodColor.copy(alpha = 0.08f))
             }
 
             // 2. Draw Today Ring (Refined)
@@ -456,14 +666,72 @@ fun CalendarDayCell(
                         center = Offset(cx, cy - radius - 6.dp.toPx())
                     )
                 } else if (day.data.isPredictedPeriod) {
-                    drawCircle(
-                        color = periodColor.copy(alpha = 0.5f),
-                        radius = radius,
-                        style = Stroke(
-                            width = 2.dp.toPx(),
+                    when (day.predictedPeriodType) {
+                        PeriodType.START -> {
+                            drawArc(
+                                color = periodColor.copy(alpha = 0.55f),
+                                startAngle = 90f,
+                                sweepAngle = 180f,
+                                useCenter = false,
+                                topLeft = Offset(cx - radius, barTop),
+                                size = Size(diameter, diameter),
+                                style = Stroke(
+                                    width = 2.dp.toPx(),
+                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                                )
+                            )
+                        }
+                        PeriodType.END -> {
+                            drawArc(
+                                color = periodColor.copy(alpha = 0.55f),
+                                startAngle = 270f,
+                                sweepAngle = 180f,
+                                useCenter = false,
+                                topLeft = Offset(cx - radius, barTop),
+                                size = Size(diameter, diameter),
+                                style = Stroke(
+                                    width = 2.dp.toPx(),
+                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                                )
+                            )
+                        }
+                        PeriodType.SINGLE -> {
+                            drawCircle(
+                                color = periodColor.copy(alpha = 0.55f),
+                                radius = radius,
+                                style = Stroke(
+                                    width = 2.dp.toPx(),
+                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                                )
+                            )
+                        }
+                        PeriodType.MIDDLE,
+                        PeriodType.NONE -> {}
+                    }
+                    val lineBounds = when (day.predictedPeriodType) {
+                        PeriodType.START -> cx to w
+                        PeriodType.MIDDLE -> 0f to w
+                        PeriodType.END -> 0f to cx
+                        PeriodType.SINGLE,
+                        PeriodType.NONE -> null
+                    }
+                    if (lineBounds != null) {
+                        val (lineStart, lineEnd) = lineBounds
+                        drawLine(
+                            color = periodColor.copy(alpha = 0.55f),
+                            start = Offset(lineStart, barTop),
+                            end = Offset(lineEnd, barTop),
+                            strokeWidth = 2.dp.toPx(),
                             pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
                         )
-                    )
+                        drawLine(
+                            color = periodColor.copy(alpha = 0.55f),
+                            start = Offset(lineStart, barTop + barHeight),
+                            end = Offset(lineEnd, barTop + barHeight),
+                            strokeWidth = 2.dp.toPx(),
+                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                        )
+                    }
                 }
             }
 
@@ -473,6 +741,18 @@ fun CalendarDayCell(
                     color = if (day.data.isPeriod) onPeriodSurface else onSurfaceVariant,
                     radius = 2.dp.toPx(),
                     center = Offset(cx, cy + radius - 6.dp.toPx())
+                )
+            }
+
+            if (isPressed) {
+                drawCircle(
+                    color = pressedFillColor,
+                    radius = radius * 1.08f
+                )
+                drawCircle(
+                    color = pressedStrokeColor,
+                    radius = radius * 1.08f,
+                    style = Stroke(width = 2.dp.toPx())
                 )
             }
         }
