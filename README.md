@@ -1,5 +1,9 @@
 # LunarLog
 
+<p align="center">
+  <img src="docs/assets/lunarlog-logo-512.png" alt="LunarLog logo" width="128">
+</p>
+
 LunarLog is an Android app for menstrual cycle and wellness tracking with a local-first privacy model.
 
 ## What It Does
@@ -65,10 +69,32 @@ LunarLog is an Android app for menstrual cycle and wellness tracking with a loca
 ## Versioning and Releases
 
 - App version is defined in `app/build.gradle.kts` (`versionCode`, `versionName`).
-- `CHANGELOG.md` is the source for release notes.
+- `CHANGELOG.md` is used for release notes when it has a matching section for the pushed tag.
 - `playRelease` builds the Play Store `.aab` bundle.
 - `githubRelease` builds the signed sideload APK used by GitHub Releases.
-- The release workflow builds a signed `githubRelease` APK and publishes a GitHub Release when `main` is updated with version/changelog changes.
+- The release workflow runs when a `vX.Y.Z` tag is pushed to the current `main` HEAD. It aligns Android version metadata to the tag, runs tests, builds a signed `githubRelease` APK, publishes the GitHub Release, displays the LunarLog logo in the release notes, attaches the 512px logo asset beside the APK, and syncs the version bump back to `main` when needed.
+
+## Play Console Release Documentation
+
+LunarLog has separate Play Store and GitHub release channels:
+
+- Google Play: `playRelease` creates an Android App Bundle without the sideload updater permission.
+- GitHub Releases: `githubRelease` creates the direct-download APK with the GitHub updater flow enabled.
+
+Play Console package and store listing details:
+
+- Package name: `com.lunarlog`
+- App category/positioning: privacy-first menstrual cycle and wellness tracking
+- Privacy policy URL: `https://robertg761.github.io/LunarLog/`
+- Store logo source: `docs/assets/lunarlog-logo-512.png`
+- Local Play Store asset source, when present: `local/play-store-assets/`
+
+Submission notes:
+
+- Upload `app/build/outputs/bundle/playRelease/app-play-release.aab` to Internal testing before wider rollout.
+- Complete the Health apps declaration with the `Period tracking` category.
+- Complete the Data safety form to match LunarLog's local-first behavior: no account requirement, no advertising SDKs, no third-party analytics/crash-reporting SDKs, and cycle/wellness data stored on-device unless the user exports or shares it.
+- Keep store listing copy, screenshots, icon, feature graphic, notification text, and health-related claims aligned with the privacy policy and actual app behavior.
 
 ## Testing
 
@@ -92,4 +118,6 @@ Run all unit tests:
 - `PROJECT_DESC.md`: short project summary
 - `PROJECT_SPEC.md`: feature roadmap and implementation phases
 - `CHANGELOG.md`: release history
+- `docs/play-store-release.md`: Play release build, signing, upload, and channel notes
+- `docs/google-play-compliance-checklist.md`: Play policy and data safety checklist
 - `docs/privacy-policy.md`: privacy policy for store listing and public publishing
