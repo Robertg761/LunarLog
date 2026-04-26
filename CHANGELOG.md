@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.6] - 2026-04-26
+
+### Fixed
+- **Launcher Icon**: Updated the installed Android launcher icon to use the Play Store logo.
+- **Update Notes**: Prevented GitHub Release logo markup from appearing as raw text in the in-app updater.
+- **Release Workflow**: Removed embedded HTML from generated release notes while keeping the logo attached as a release asset.
+
 ## [1.7.4] - 2026-04-25
 
 ### Fixed

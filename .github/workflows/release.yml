@@ -33,7 +33,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - id: release_meta
         name: Resolve Release Version From Tag
@@ -115,7 +115,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Align Android Version To Release Tag
         env:
@@ -189,8 +189,6 @@ jobs:
         run: |
           set -euo pipefail
           {
-            echo '<p align="center"><img src="https://raw.githubusercontent.com/Robertg761/LunarLog/main/docs/assets/lunarlog-logo-512.png" alt="LunarLog logo" width="96"></p>'
-            echo
             node scripts/extract_changelog_section.js "$RELEASE_VERSION" || {
               echo "## v$RELEASE_VERSION"
               echo
@@ -230,7 +228,7 @@ jobs:
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
-          node-version: "20"
+          node-version: "24"
 
       - name: Align Android Version To Release Tag
         env:

@@ -56,10 +56,35 @@ class UpdateRepository @Inject constructor() {
             latestVersionName = latestTag.removePrefix("v"),
             apkName = apkName,
             apkUrl = apkUrl,
-            releaseNotes = latest.body?.trim().orEmpty(),
+            releaseNotes = sanitizeReleaseNotes(latest.body.orEmpty()),
             releaseUrl = latest.html_url?.trim().orEmpty(),
             apkSizeBytes = apkSizeBytes,
             publishedAt = latest.published_at?.trim()
         )
+    }
+
+    internal fun sanitizeReleaseNotes(raw: String): String {
+        return raw
+            .lineSequence()
+            .map { line ->
+                line
+                    .replace(Regex("<[^>]+>"), "")
+                    .replace(Regex("""!\[[^]]*]\([^)]*\)"""), "")
+                    .replace(Regex("""\[[^]]+]\([^)]*\)""")) { match ->
+                        match.value.substringAfter("[").substringBefore("]")
+                    }
+                    .replace(Regex("""^#{1,6}\s*"""), "")
+                    .replace(Regex("""^\s*[-*]\s+"""), "- ")
+                    .replace(Regex("""\*\*([^*]+)\*\*"""), "$1")
+                    .replace("`", "")
+                    .trimEnd()
+            }
+            .filter { line ->
+                line.isNotBlank() &&
+                    !line.contains("raw.githubusercontent.com", ignoreCase = true) &&
+                    !line.contains("lunarlog-logo", ignoreCase = true)
+            }
+            .joinToString("\n")
+            .trim()
     }
 }
