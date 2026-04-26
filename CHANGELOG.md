@@ -1,5 +1,12 @@
 # Changelog
 
+## [1.7.7] - 2026-04-26
+
+### Changed
+- **Page Transitions**: Replaced heavier tab slide/scale motion with a shorter fade transition for smoother page changes.
+- **Analysis Performance**: Moved Insights aggregation work off the main thread to reduce navigation animation contention.
+- **Launcher Icon**: Refined the adaptive icon foreground so it fits better inside Samsung launcher masks.
+
 ## [1.7.6] - 2026-04-26
 
 ### Fixed
