@@ -1,5 +1,14 @@
 # Changelog
 
+## [1.7.8] - 2026-04-26
+
+### Added
+- **Calendar Day Preview**: Tapping a calendar date now opens a bottom-sheet preview with cycle status, flow, symptoms, mood, notes, and an edit action.
+
+### Changed
+- **Calendar Legend**: Clarified period flow intensity with light-to-heavy guidance and a less crowded legend layout.
+- **Calendar Predictions**: Predicted period ranges now render as connected dashed pills for better range readability.
+
 ## [1.7.7] - 2026-04-26
 
 ### Changed
