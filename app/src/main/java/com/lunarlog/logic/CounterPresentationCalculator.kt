@@ -63,13 +63,16 @@ object CounterPresentationCalculator {
                 averagePeriodLength
             )
             val daysUntilNextPeriod = ChronoUnit.DAYS.between(today, nextPeriodStart).toInt()
+            val daysSinceLastPeriod = ChronoUnit.DAYS.between(latestCycle.endDate, today)
+                .toInt()
+                .coerceAtLeast(0)
 
             if (daysUntilNextPeriod >= 0) {
                 CounterPresentation(
                     value = daysUntilNextPeriod,
                     mode = CounterMode.NEXT_PERIOD_COUNTDOWN,
                     title = "Next Period",
-                    subtitle = if (daysUntilNextPeriod == 0) "Due today" else "$daysUntilNextPeriod days until period"
+                    subtitle = daysSinceLastPeriodSubtitle(daysSinceLastPeriod)
                 )
             } else {
                 val overdueDays = abs(daysUntilNextPeriod)
@@ -80,6 +83,13 @@ object CounterPresentationCalculator {
                     subtitle = "$overdueDays days overdue"
                 )
             }
+        }
+    }
+
+    private fun daysSinceLastPeriodSubtitle(daysSinceLastPeriod: Int): String {
+        return when (daysSinceLastPeriod) {
+            1 -> "1 day since last period"
+            else -> "$daysSinceLastPeriod days since last period"
         }
     }
 }

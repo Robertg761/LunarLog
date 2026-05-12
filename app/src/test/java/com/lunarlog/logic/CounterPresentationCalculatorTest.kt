@@ -58,7 +58,7 @@ class CounterPresentationCalculatorTest {
 
         assertEquals(CounterMode.NEXT_PERIOD_COUNTDOWN, result.mode)
         assertEquals(18, result.value)
-        assertEquals("18 days until period", result.subtitle)
+        assertEquals("6 days since last period", result.subtitle)
     }
 
     @Test
@@ -71,7 +71,7 @@ class CounterPresentationCalculatorTest {
 
         assertEquals(CounterMode.NEXT_PERIOD_COUNTDOWN, result.mode)
         assertEquals(24, result.value)
-        assertEquals("24 days until period", result.subtitle)
+        assertEquals("0 days since last period", result.subtitle)
     }
 
     @Test
@@ -84,7 +84,19 @@ class CounterPresentationCalculatorTest {
 
         assertEquals(CounterMode.NEXT_PERIOD_COUNTDOWN, result.mode)
         assertEquals(0, result.value)
-        assertEquals("Due today", result.subtitle)
+        assertEquals("24 days since last period", result.subtitle)
+    }
+
+    @Test
+    fun `uses singular day wording for one day since last period`() {
+        val cycles = listOf(
+            Cycle(startDate = today.minusDays(5), endDate = today.minusDays(1))
+        )
+
+        val result = CounterPresentationCalculator.calculate(cycles, today)
+
+        assertEquals(CounterMode.NEXT_PERIOD_COUNTDOWN, result.mode)
+        assertEquals("1 day since last period", result.subtitle)
     }
 
     @Test

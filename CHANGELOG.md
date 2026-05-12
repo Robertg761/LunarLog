@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.7.9] - 2026-05-11
+
+### Fixed
+- **Home Period Counters**: Main screen now shows days until the next period as the large counter and days since the last period in the smaller summary.
+
 ## [1.7.8] - 2026-04-26
 
 ### Added

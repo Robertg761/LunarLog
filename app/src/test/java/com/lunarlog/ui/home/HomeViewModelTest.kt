@@ -132,12 +132,12 @@ class HomeViewModelTest {
 
         assertEquals(CounterMode.NEXT_PERIOD_COUNTDOWN, state.counterMode)
         assertEquals(18, state.counterValue)
-        assertEquals("18 days until period", state.counterSubtitle)
+        assertEquals("6 days since last period", state.counterSubtitle)
         assertEquals(false, state.isPeriodActive)
     }
 
     @Test
-    fun `uiState should show due today when latest closed cycle hits estimate`() = runTest {
+    fun `uiState should show days since last period when latest closed cycle hits estimate`() = runTest {
         val today = LocalDate.now()
         val lastCycleStart = today.minusDays(28)
         val cycle = Cycle(
@@ -158,7 +158,7 @@ class HomeViewModelTest {
 
         assertEquals(CounterMode.NEXT_PERIOD_COUNTDOWN, state.counterMode)
         assertEquals(0, state.counterValue)
-        assertEquals("Due today", state.counterSubtitle)
+        assertEquals("24 days since last period", state.counterSubtitle)
     }
 
     @Test
