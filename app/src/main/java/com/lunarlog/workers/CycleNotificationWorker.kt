@@ -10,6 +10,7 @@ import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
 import com.lunarlog.R
 import com.lunarlog.data.CycleRepository
+import com.lunarlog.data.UserPreferencesRepository
 import com.lunarlog.logic.CyclePredictionUtils
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -19,10 +20,18 @@ import java.time.LocalDate
 class CycleNotificationWorker @AssistedInject constructor(
     @Assisted context: Context,
     @Assisted workerParams: WorkerParameters,
-    private val repository: CycleRepository
+    private val repository: CycleRepository,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) : CoroutineWorker(context, workerParams) {
 
     override suspend fun doWork(): Result {
+        val enabled = try {
+            userPreferencesRepository.getCycleNotificationEnabledSync()
+        } catch (_: Exception) {
+            false
+        }
+        if (!enabled) return Result.success()
+
         val cycles = repository.getAllCyclesSync()
         if (cycles.isEmpty()) return Result.success()
 
@@ -54,7 +63,7 @@ class CycleNotificationWorker @AssistedInject constructor(
               sendNotification(
                 notificationId = ("cycle_update_fertile_start_${fertileWindow.first.toEpochDay()}").hashCode(),
                 title = "Cycle Update",
-                message = "Your fertile window starts today."
+                message = "Your estimated fertile days begin today. Predictions are not birth control."
             )
         }
 
@@ -65,16 +74,22 @@ class CycleNotificationWorker @AssistedInject constructor(
         val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelId = "lunar_log_channel"
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(channelId, "LunarLog Notifications", NotificationManager.IMPORTANCE_DEFAULT)
-            notificationManager.createNotificationChannel(channel)
-        }
+        val channel = NotificationChannel(channelId, "LunarLog Notifications", NotificationManager.IMPORTANCE_DEFAULT)
+        notificationManager.createNotificationChannel(channel)
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setPublicVersion(
+                NotificationCompat.Builder(applicationContext, channelId)
+                    .setSmallIcon(R.drawable.ic_launcher_foreground)
+                    .setContentTitle("LunarLog reminder")
+                    .setContentText("Open LunarLog to view details")
+                    .build()
+            )
             .setAutoCancel(true)
             .build()
 

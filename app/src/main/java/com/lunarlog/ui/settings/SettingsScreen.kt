@@ -1,7 +1,6 @@
 package com.lunarlog.ui.settings
 
 import android.Manifest
-import android.app.Activity
 import android.app.TimePickerDialog
 import android.content.Intent
 import android.net.Uri
@@ -28,11 +27,14 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.ColorLens
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.DeleteForever
 import androidx.compose.material.icons.filled.Download
 import androidx.compose.material.icons.filled.Lock
@@ -46,6 +48,8 @@ import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -56,19 +60,34 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.selected
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
+import androidx.core.net.toUri
 import androidx.fragment.app.FragmentActivity
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lunarlog.BuildConfig
 import com.lunarlog.R
+import com.lunarlog.data.Medication
 import java.util.Locale
+
+private data class MedicationDraft(
+    val name: String,
+    val dosage: String,
+    val frequency: String,
+    val reminderTime: Long
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -84,9 +103,13 @@ fun SettingsScreen(
     val periodReminderTimeMinutes by viewModel.periodReminderTimeMinutes.collectAsState()
     val cycleNotificationEnabled by viewModel.cycleNotificationEnabled.collectAsState()
     val appLockTimeoutSeconds by viewModel.appLockTimeoutSeconds.collectAsState()
+    val medications by viewModel.medications.collectAsState()
     val message by viewModel.message.collectAsState()
     val context = LocalContext.current
     var showNukeDialog by remember { mutableStateOf(false) }
+    var showAddMedicationDialog by remember { mutableStateOf(false) }
+    var medicationPendingDelete by remember { mutableStateOf<Medication?>(null) }
+    var medicationPendingNotificationPermission by remember { mutableStateOf<MedicationDraft?>(null) }
 
     LaunchedEffect(message) {
         message?.let {
@@ -174,6 +197,27 @@ fun SettingsScreen(
         }
     }
 
+    val medicationNotificationPermissionLauncher = rememberLauncherForActivityResult(
+        contract = ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        medicationPendingNotificationPermission?.let { draft ->
+            viewModel.addMedication(
+                draft.name,
+                draft.dosage,
+                draft.frequency,
+                draft.reminderTime.takeIf { granted }
+            )
+            if (!granted) {
+                Toast.makeText(
+                    context,
+                    "Notification permission denied; medication added without a reminder.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
+        }
+        medicationPendingNotificationPermission = null
+    }
+
     fun formatMinutes(minutes: Long): String {
         val m = minutes.coerceIn(0L, (24L * 60L) - 1L)
         val hour24 = (m / 60L).toInt()
@@ -204,7 +248,7 @@ fun SettingsScreen(
     fun openPrivacyPolicy() {
         val intent = Intent(
             Intent.ACTION_VIEW,
-            Uri.parse(context.getString(R.string.privacy_policy_url))
+            context.getString(R.string.privacy_policy_url).toUri()
         )
         runCatching {
             context.startActivity(intent)
@@ -233,6 +277,51 @@ fun SettingsScreen(
                 TextButton(onClick = { showNukeDialog = false }) {
                     Text("Cancel")
                 }
+            }
+        )
+    }
+
+    if (showAddMedicationDialog) {
+        AddMedicationDialog(
+            onDismiss = { showAddMedicationDialog = false },
+            onSave = { name, dosage, frequency, reminderTime ->
+                val needsNotificationPermission = reminderTime != null &&
+                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
+                    android.content.pm.PackageManager.PERMISSION_GRANTED
+                if (needsNotificationPermission) {
+                    medicationPendingNotificationPermission = MedicationDraft(
+                        name = name,
+                        dosage = dosage,
+                        frequency = frequency,
+                        reminderTime = reminderTime!!
+                    )
+                    medicationNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                } else {
+                    viewModel.addMedication(name, dosage, frequency, reminderTime)
+                }
+                showAddMedicationDialog = false
+            }
+        )
+    }
+
+    medicationPendingDelete?.let { medication ->
+        AlertDialog(
+            onDismissRequest = { medicationPendingDelete = null },
+            title = { Text("Delete medication?") },
+            text = { Text("This also removes the dose history for ${medication.name}.") },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        viewModel.deleteMedication(medication.id)
+                        medicationPendingDelete = null
+                    }
+                ) {
+                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { medicationPendingDelete = null }) { Text("Cancel") }
             }
         )
     }
@@ -330,7 +419,7 @@ fun SettingsScreen(
                         Column(modifier = Modifier.weight(1f)) {
                             Text("Cycle prediction alerts")
                             Text(
-                                "Notify about upcoming period and fertile window updates",
+                                "Notify about upcoming period and estimated fertile-day updates",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -419,6 +508,67 @@ fun SettingsScreen(
 
             Spacer(modifier = Modifier.height(32.dp))
 
+            Text(
+                "Medications",
+                style = MaterialTheme.typography.titleMedium,
+                color = MaterialTheme.colorScheme.primary
+            )
+            Spacer(modifier = Modifier.height(8.dp))
+            Card(modifier = Modifier.fillMaxWidth()) {
+                Column(modifier = Modifier.padding(16.dp)) {
+                    if (medications.isEmpty()) {
+                        Text(
+                            "No medications added.",
+                            style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    } else {
+                        medications.forEach { medication ->
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Column(modifier = Modifier.weight(1f)) {
+                                    Text(medication.name)
+                                    val schedule = medication.frequency
+                                        .replace('_', ' ')
+                                        .replaceFirstChar { it.uppercase() }
+                                    val reminder = medication.reminderTime
+                                        ?.let { " at ${formatMinutes(it)}" }
+                                        .orEmpty()
+                                    Text(
+                                        listOfNotNull(
+                                            medication.dosage.takeIf { it.isNotBlank() },
+                                            "$schedule$reminder"
+                                        ).joinToString(" • "),
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                }
+                                IconButton(onClick = { medicationPendingDelete = medication }) {
+                                    Icon(
+                                        Icons.Filled.Delete,
+                                        contentDescription = "Delete ${medication.name}",
+                                        tint = MaterialTheme.colorScheme.error
+                                    )
+                                }
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+                    OutlinedButton(
+                        onClick = { showAddMedicationDialog = true },
+                        modifier = Modifier.fillMaxWidth()
+                    ) {
+                        Icon(Icons.Filled.Add, contentDescription = null)
+                        Spacer(modifier = Modifier.padding(4.dp))
+                        Text("Add Medication")
+                    }
+                }
+            }
+
+            Spacer(modifier = Modifier.height(32.dp))
+
             // Appearance
             Text(
                 "Appearance",
@@ -436,19 +586,19 @@ fun SettingsScreen(
                     Spacer(modifier = Modifier.height(16.dp))
                     
                     val colors = listOf(
-                        0xFFD93672, // Lunar Rose (Default)
-                        0xFFF26399, // Logo Highlight
-                        0xFFE1BEE7, // Lavender
-                        0xFFFFCCBC, // Peach
-                        0xFFB2DFDB, // Teal
-                        0xFFBBDEFB  // Blue
+                        "Lunar rose" to 0xFFD93672,
+                        "Pink" to 0xFFF26399,
+                        "Lavender" to 0xFFE1BEE7,
+                        "Peach" to 0xFFFFCCBC,
+                        "Teal" to 0xFFB2DFDB,
+                        "Blue" to 0xFFBBDEFB
                     )
                     
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween
                     ) {
-                        colors.forEach { colorLong ->
+                        colors.forEach { (colorName, colorLong) ->
                             val color = Color(colorLong)
                             val isSelected = themeSeedColor == colorLong || (themeSeedColor == null && colorLong == 0xFFD93672.toLong())
                             
@@ -458,8 +608,22 @@ fun SettingsScreen(
                                     .clip(CircleShape)
                                     .background(color)
                                     .clickable { viewModel.setThemeSeedColor(colorLong) }
+                                    .semantics {
+                                        contentDescription = "$colorName theme color"
+                                        role = Role.Button
+                                        selected = isSelected
+                                    }
                                     .then(if (isSelected) Modifier.border(2.dp, MaterialTheme.colorScheme.onSurface, CircleShape) else Modifier)
-                            )
+                            ) {
+                                if (isSelected) {
+                                    Icon(
+                                        Icons.Filled.Check,
+                                        contentDescription = null,
+                                        tint = if (color.luminance() > 0.5f) Color.Black else Color.White,
+                                        modifier = Modifier.align(Alignment.Center)
+                                    )
+                                }
+                            }
                         }
                     }
                 }
@@ -563,6 +727,12 @@ fun SettingsScreen(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
+                    Spacer(modifier = Modifier.height(8.dp))
+                    Text(
+                        "LunarLog is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. Consult a healthcare professional for medical advice, diagnosis, or treatment. Fertile-day estimates are not birth control.",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
                     Spacer(modifier = Modifier.height(16.dp))
                     TextButton(
                         onClick = { openPrivacyPolicy() },
@@ -574,4 +744,109 @@ fun SettingsScreen(
             }
         }
     }
+}
+
+@Composable
+private fun AddMedicationDialog(
+    onDismiss: () -> Unit,
+    onSave: (name: String, dosage: String, frequency: String, reminderTime: Long?) -> Unit
+) {
+    val context = LocalContext.current
+    var name by remember { mutableStateOf("") }
+    var dosage by remember { mutableStateOf("") }
+    var frequency by remember { mutableStateOf("daily") }
+    var reminderEnabled by remember { mutableStateOf(false) }
+    var reminderMinutes by remember { mutableLongStateOf(9L * 60L) }
+
+    fun formatReminder(minutes: Long): String {
+        val hour24 = (minutes / 60L).toInt()
+        val minute = (minutes % 60L).toInt()
+        val hour12 = ((hour24 + 11) % 12) + 1
+        return String.format(
+            Locale.US,
+            "%d:%02d %s",
+            hour12,
+            minute,
+            if (hour24 < 12) "AM" else "PM"
+        )
+    }
+
+    fun pickReminderTime() {
+        TimePickerDialog(
+            context,
+            { _, hour, minute -> reminderMinutes = hour * 60L + minute },
+            (reminderMinutes / 60L).toInt(),
+            (reminderMinutes % 60L).toInt(),
+            false
+        ).show()
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text("Add medication") },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedTextField(
+                    value = name,
+                    onValueChange = { name = it.take(80) },
+                    label = { Text("Name") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                OutlinedTextField(
+                    value = dosage,
+                    onValueChange = { dosage = it.take(80) },
+                    label = { Text("Dose (optional)") },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+                Text("Schedule", style = MaterialTheme.typography.labelLarge)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    listOf("daily" to "Daily", "weekly" to "Weekly", "as_needed" to "As needed")
+                        .forEach { (value, label) ->
+                            FilterChip(
+                                selected = frequency == value,
+                                onClick = {
+                                    frequency = value
+                                    if (value == "as_needed") reminderEnabled = false
+                                },
+                                label = { Text(label) }
+                            )
+                        }
+                }
+                if (frequency != "as_needed") {
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text("Reminder")
+                            Text(
+                                if (reminderEnabled) formatReminder(reminderMinutes) else "Off",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        Switch(
+                            checked = reminderEnabled,
+                            onCheckedChange = { reminderEnabled = it }
+                        )
+                    }
+                    if (reminderEnabled) {
+                        TextButton(onClick = { pickReminderTime() }) {
+                            Text("Change reminder time")
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(
+                enabled = name.isNotBlank(),
+                onClick = {
+                    onSave(name, dosage, frequency, reminderMinutes.takeIf { reminderEnabled })
+                }
+            ) { Text("Add") }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

@@ -19,7 +19,15 @@ if (!releaseVersion) {
   process.exit(2);
 }
 
-if (!/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/.test(releaseVersion)) {
+const semverMatch = releaseVersion.match(
+  /^(0|[1-9]\d*)\.(0|[1-9]\d*)\.(0|[1-9]\d*)(?:-([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?(?:\+([0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*))?$/
+);
+const prereleaseIdentifiers = semverMatch?.[4]?.split(".") ?? [];
+const hasInvalidNumericPrerelease = prereleaseIdentifiers.some(
+  (identifier) => /^\d+$/.test(identifier) && identifier.length > 1 && identifier.startsWith("0")
+);
+
+if (!semverMatch || hasInvalidNumericPrerelease) {
   console.error(`Invalid release version: ${releaseVersion}`);
   process.exit(2);
 }

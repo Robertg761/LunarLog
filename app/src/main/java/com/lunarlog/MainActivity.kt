@@ -1,6 +1,8 @@
 package com.lunarlog
 
+import android.content.Intent
 import android.os.Bundle
+import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
@@ -42,17 +44,21 @@ import androidx.compose.material3.SnackbarDuration
 import androidx.compose.runtime.remember
 import com.lunarlog.update.ApkUpdateManager
 import com.lunarlog.ui.update.UpdateBottomSheet
+import kotlinx.coroutines.flow.MutableStateFlow
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
 
     private val viewModel: MainViewModel by viewModels()
     private val apkUpdateManager = ApkUpdateManager()
+    private val pendingDeepLink = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
+        pendingDeepLink.value = intent.lunarLogDeepLinkOrNull()
 
         if (BuildConfig.ENABLE_GITHUB_UPDATES) {
             // Silent update check for sideloaded GitHub builds.
@@ -61,7 +67,7 @@ class MainActivity : AppCompatActivity() {
 
         // Keep splash screen until data is loaded
         splashScreen.setKeepOnScreenCondition {
-            viewModel.uiState.value.isLoading
+            viewModel.uiState.value.isLoading || !viewModel.isLockStateReady.value
         }
 
         scheduleNotificationWorker()
@@ -69,6 +75,8 @@ class MainActivity : AppCompatActivity() {
         setContent {
             val uiState by viewModel.uiState.collectAsState()
             val isLocked by viewModel.isLocked.collectAsState()
+            val isLockStateReady by viewModel.isLockStateReady.collectAsState()
+            val deepLink by pendingDeepLink.collectAsState()
             val snackbarHostState = remember { SnackbarHostState() }
             val updateSheetInfo = remember { androidx.compose.runtime.mutableStateOf<com.lunarlog.update.UpdateInfo?>(null) }
             val promptedDownloaded = remember { androidx.compose.runtime.mutableStateOf(false) }
@@ -127,7 +135,7 @@ class MainActivity : AppCompatActivity() {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colorScheme.background
                 ) {
-                    if (!uiState.isLoading) {
+                    if (!uiState.isLoading && isLockStateReady) {
                         if (uiState.isAppLockEnabled && isLocked) {
                             // Show Lock Screen / Prompt
                             LockScreenContent(
@@ -142,6 +150,17 @@ class MainActivity : AppCompatActivity() {
                                 LunarLogNavGraph(
                                     startDestination = uiState.startDestination,
                                     isUpdateAvailable = uiState.isUpdateAvailable,
+                                    pendingDeepLink = deepLink,
+                                    onDeepLinkHandled = { handled ->
+                                        pendingDeepLink.value = null
+                                        if (!handled) {
+                                            Toast.makeText(
+                                                this@MainActivity,
+                                                "Unable to open that LunarLog link.",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    },
                                     onInstallUpdate = {
                                         if (BuildConfig.ENABLE_GITHUB_UPDATES) {
                                             viewModel.triggerInstallUpdate()
@@ -175,6 +194,12 @@ class MainActivity : AppCompatActivity() {
     override fun onResume() {
         super.onResume()
         viewModel.onAppResumed()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        pendingDeepLink.value = intent.lunarLogDeepLinkOrNull()
     }
 
     override fun onPause() {
@@ -221,6 +246,11 @@ class MainActivity : AppCompatActivity() {
         NotificationWorkScheduler.enqueuePeriodLogReminderReschedule(applicationContext)
     }
 }
+
+private fun Intent.lunarLogDeepLinkOrNull(): String? =
+    dataString?.takeIf {
+        action == Intent.ACTION_VIEW && data?.scheme.equals("lunarlog", ignoreCase = true)
+    }
 
 @androidx.compose.runtime.Composable
 fun LockScreenContent(onUnlock: () -> Unit) {

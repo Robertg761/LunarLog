@@ -19,8 +19,36 @@ class ApkUpdateManagerTest {
     }
 
     @Test
-    fun `isNewerVersion fallback treats different non-semver tags as newer`() {
-        assertTrue(ApkUpdateManager.isNewerVersion("nightly-20260217", "nightly-20260216"))
+    fun `isNewerVersion rejects untrusted non-semver labels`() {
+        assertFalse(ApkUpdateManager.isNewerVersion("nightly-20260217", "nightly-20260216"))
+    }
+
+    @Test
+    fun `stable release is newer than prerelease of same version`() {
+        assertTrue(ApkUpdateManager.isNewerVersion("1.8.0", "1.8.0-rc.1"))
+        assertFalse(ApkUpdateManager.isNewerVersion("1.8.0-rc.1", "1.8.0"))
+    }
+
+    @Test
+    fun `numeric prerelease identifiers use numeric ordering`() {
+        assertTrue(ApkUpdateManager.isNewerVersion("1.8.0-rc.10", "1.8.0-rc.2"))
+        assertTrue(
+            ApkUpdateManager.isNewerVersion(
+                "1.8.0-rc.100000000000000000000",
+                "1.8.0-rc.99999999999999999999"
+            )
+        )
+    }
+
+    @Test
+    fun `invalid prerelease identifiers are rejected`() {
+        assertFalse(ApkUpdateManager.isNewerVersion("1.8.0-01", "1.7.0"))
+        assertFalse(ApkUpdateManager.isNewerVersion("1.8.0-rc..1", "1.7.0"))
+    }
+
+    @Test
+    fun `build metadata does not affect precedence`() {
+        assertFalse(ApkUpdateManager.isNewerVersion("1.8.0+build.2", "1.8.0+build.1"))
     }
 
     @Test

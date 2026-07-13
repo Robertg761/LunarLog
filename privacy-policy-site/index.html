@@ -134,7 +134,7 @@
     <section class="card">
       <div class="eyebrow">LunarLog</div>
       <h1>Privacy Policy</h1>
-      <p class="meta">Effective date: April 3, 2026</p>
+      <p class="meta">Effective date: July 13, 2026</p>
       <p class="lede">LunarLog is a menstrual cycle and wellness tracking app for Android. This Privacy Policy explains what data LunarLog handles, how that data is used, and the choices you have.</p>
 
       <div class="divider"></div>
@@ -169,7 +169,7 @@
       </ul>
 
       <h2>Where Data Is Stored</h2>
-      <p>LunarLog stores app data locally on your Android device using on-device storage. The app is configured with Android automatic cloud backup disabled.</p>
+      <p>LunarLog stores app data locally on your Android device using on-device storage. Android automatic cloud backup and device-to-device transfer are disabled and explicitly excluded by the app's extraction rules.</p>
       <p>LunarLog does not upload your cycle or wellness data to the developer's servers.</p>
 
       <h2>Sharing and Exporting</h2>
@@ -186,17 +186,18 @@
       <h2>Permissions and Device Features</h2>
       <p>LunarLog may use the following Android permissions or device features:</p>
       <ul>
-        <li><code>POST_NOTIFICATIONS</code>: used only to send reminder or cycle notifications that you enable</li>
+        <li><code>POST_NOTIFICATIONS</code>: used only to send reminder, medication, or cycle notifications that you enable; notifications use private lock-screen visibility with a generic public version</li>
         <li>Biometric or device credentials: used only for app lock and handled through Android's authentication system</li>
         <li>Local file access through Android's document picker and file APIs: used only when you export, restore, or install an update you requested</li>
         <li>Home screen widget support: if you add the widget, limited cycle-related information may be visible on your device's home screen</li>
+        <li>Secure-window protection: app screens are excluded from screenshots, screen recording, and the normal recents preview to reduce incidental exposure</li>
       </ul>
       <p>LunarLog does not receive or store your raw fingerprint, face scan, or other biometric template data. Biometric authentication is processed by Android and only the success or failure result is returned to the app.</p>
 
       <h2>Network Use</h2>
       <p>LunarLog is designed for offline use. Core tracking features do not require an internet connection.</p>
       <p>For Google Play builds, LunarLog's core health tracking features work without sending your health data to the developer.</p>
-      <p>For direct-download GitHub builds, LunarLog may contact GitHub to check for app updates and download a newer APK if you choose to install one. That update flow does not upload your cycle or wellness entries.</p>
+      <p>For direct-download GitHub builds, LunarLog may contact GitHub to check for app updates and download a newer APK if you choose to install one. That update flow does not upload your cycle or wellness entries. The Google Play build does not request Android's internet permission.</p>
 
       <h2>Third Parties</h2>
       <p>LunarLog does not use advertising networks or third-party analytics services.</p>
@@ -209,7 +210,7 @@
       </ul>
 
       <h2>Data Retention</h2>
-      <p>Your data remains on your device until you delete it, uninstall the app, or use the in-app data deletion features.</p>
+      <p>Your data remains on your device until you delete it, uninstall the app, or use the in-app data deletion features. User-created export files remain wherever you saved them and are not deleted by uninstalling or resetting LunarLog.</p>
       <p>LunarLog includes options to:</p>
       <ul>
         <li>Export your data</li>

@@ -13,7 +13,15 @@ data class BackupDataV2(
     val logEntries: List<LogEntryDto> = emptyList(),
     val medications: List<MedicationDto> = emptyList(),
     val medicationLogs: List<MedicationLogDto> = emptyList(),
-    val symptomDefinitions: List<SymptomDefinitionDto> = emptyList()
+    val symptomDefinitions: List<SymptomDefinitionDto> = emptyList(),
+    val preferences: BackupPreferencesDto? = null
+)
+
+data class BackupPreferencesDto(
+    val themeSeedColor: Long? = null,
+    val periodLogReminderEnabled: Boolean = false,
+    val periodLogReminderTimeMinutes: Long = 20L * 60L,
+    val cycleNotificationEnabled: Boolean = false
 )
 
 data class CycleDto(
@@ -72,4 +80,3 @@ data class SymptomDefinitionDto(
     val category: String,
     val isCustom: Boolean = false
 )
-

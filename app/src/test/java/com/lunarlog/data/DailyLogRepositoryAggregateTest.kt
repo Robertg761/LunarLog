@@ -41,5 +41,29 @@ class DailyLogRepositoryAggregateTest {
             inserted.captured.notes
         )
     }
-}
 
+    @Test
+    fun `rebuild removes an empty aggregate instead of creating a blank log`() = runTest {
+        val repo = DailyLogRepository(dailyLogDao, logEntryDao, appDatabase)
+        val date = LocalDate.of(2026, 7, 13)
+        coEvery { logEntryDao.getEntriesForDateSync(date.toEpochDay()) } returns emptyList()
+
+        repo.rebuildDailyLogAggregateInTransaction(date.toEpochDay())
+
+        coVerify(exactly = 1) { dailyLogDao.deleteLog(date) }
+        coVerify(exactly = 0) { dailyLogDao.insertLog(any()) }
+    }
+
+    @Test
+    fun `legacy hydration removes a blank aggregate`() = runTest {
+        val repo = DailyLogRepository(dailyLogDao, logEntryDao, appDatabase)
+        val date = LocalDate.of(2026, 7, 13)
+        coEvery { logEntryDao.getEntriesForDateSync(date.toEpochDay()) } returns emptyList()
+        coEvery { dailyLogDao.getLogForDateSync(date) } returns DailyLog(date = date)
+
+        repo.ensureLegacyDataHydrated(date.toEpochDay())
+
+        coVerify(exactly = 1) { dailyLogDao.deleteLog(date) }
+        coVerify(exactly = 0) { logEntryDao.insertEntry(any()) }
+    }
+}

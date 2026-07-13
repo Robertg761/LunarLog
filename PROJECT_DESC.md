@@ -4,4 +4,6 @@ LunarLog is a privacy-first menstrual cycle and wellness tracker for Android. Th
 
 The project focuses on practical daily logging and long-term trend visibility. Users can track period days, symptoms, mood, sleep, hydration, medications, and notes, then explore trends in calendar and analysis views. LunarLog also supports local backup and restore, app lock, reminders, and generated reports for personal review or clinical discussions.
 
-In this repository, the current Android app version is `1.6.1` (`versionCode 11`) and is implemented with Kotlin, Jetpack Compose, Room, Hilt, and WorkManager.
+In this repository, the current Android app version is `1.8.0` (`versionCode 22`), the Room database is version 9, and the app is implemented with Kotlin, Jetpack Compose, Room, Hilt, and WorkManager.
+
+LunarLog is open-source software licensed under the MIT License.

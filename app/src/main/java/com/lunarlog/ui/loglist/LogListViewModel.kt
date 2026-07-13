@@ -6,12 +6,19 @@ import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
+import com.lunarlog.data.Medication
+import com.lunarlog.data.MedicationRepository
 import com.lunarlog.data.PeriodChangeResult
+import com.lunarlog.data.SymptomCategory
+import com.lunarlog.data.SymptomDefinition
+import com.lunarlog.data.SymptomRepository
+import com.lunarlog.logic.MedicationScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import java.time.LocalDate
@@ -20,7 +27,9 @@ import javax.inject.Inject
 @HiltViewModel
 class LogListViewModel @Inject constructor(
     private val repository: DailyLogRepository,
-    private val cycleRepository: CycleRepository
+    private val cycleRepository: CycleRepository,
+    private val symptomRepository: SymptomRepository,
+    private val medicationRepository: MedicationRepository
 ) : ViewModel() {
 
     // UI State
@@ -29,15 +38,35 @@ class LogListViewModel @Inject constructor(
         val entries: List<LogEntry> = emptyList(),
         val isLoading: Boolean = false,
         val isPeriodDay: Boolean = false,
-        val periodMessage: String? = null
+        val periodMessage: String? = null,
+        val symptomDefinitions: List<SymptomDefinition> = emptyList(),
+        val medications: List<Medication> = emptyList(),
+        val takenMedicationIds: Set<Int> = emptySet()
     )
     
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState())
     private var loadDateJob: Job? = null
 
+    init {
+        viewModelScope.launch {
+            symptomRepository.getAllSymptoms().collect { definitions ->
+                _uiState.value = _uiState.value.copy(symptomDefinitions = definitions)
+            }
+        }
+    }
+
     fun loadDate(date: Long) {
-        val localDate = LocalDate.ofEpochDay(date)
+        val localDate = try {
+            LocalDate.ofEpochDay(date)
+        } catch (_: Exception) {
+            _uiState.value = _uiState.value.copy(
+                isLoading = false,
+                entries = emptyList(),
+                periodMessage = "This link contains an invalid date."
+            )
+            return
+        }
         _uiState.value = _uiState.value.copy(
             date = localDate, 
             entries = emptyList(), // Clear old entries
@@ -53,13 +82,32 @@ class LogListViewModel @Inject constructor(
                 
                 repository.ensureLegacyDataHydrated(date)
                 
-                repository.getEntriesForDate(date).collect { list ->
-                    _uiState.value = _uiState.value.copy(entries = list, isLoading = false)
+                combine(
+                    repository.getEntriesForDate(date),
+                    medicationRepository.getActiveMedications(date),
+                    medicationRepository.getLogsForDate(date)
+                ) { entries, activeMedications, medicationLogs ->
+                    Triple(
+                        entries,
+                        activeMedications.filter { medication ->
+                            medication.frequency == "as_needed" ||
+                                MedicationScheduler.isMedicationDueToday(medication, localDate)
+                        },
+                        medicationLogs.filter { it.taken }.mapTo(mutableSetOf()) { it.medicationId }
+                    )
+                }.collect { (entries, medications, takenMedicationIds) ->
+                    _uiState.value = _uiState.value.copy(
+                        entries = entries,
+                        medications = medications,
+                        takenMedicationIds = takenMedicationIds,
+                        isLoading = false
+                    )
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                // In a real app, we would expose this error to the UI
-                _uiState.value = _uiState.value.copy(isLoading = false)
+            } catch (_: Exception) {
+                _uiState.value = _uiState.value.copy(
+                    isLoading = false,
+                    periodMessage = "Unable to load this day. Please try again."
+                )
             }
         }
     }
@@ -121,10 +169,9 @@ class LogListViewModel @Inject constructor(
                             details = details
                         ))
                     }
+                } else {
+                    repository.deleteEntry(editingEntry)
                 }
-                // Note: If user removed all values for the editing type, we strictly strictly don't delete it here
-                // to be safe, unless we want to support deletion via empty list.
-                // Current UI removes the type from map if empty, so it just won't be updated.
             }
 
             // 2. Handle all other types (New Entries)
@@ -171,5 +218,25 @@ class LogListViewModel @Inject constructor(
 
     fun onPeriodMessageShown() {
         _uiState.value = _uiState.value.copy(periodMessage = null)
+    }
+
+    fun addCustomSymptom(name: String, category: SymptomCategory) {
+        val normalized = name.trim().replace(Regex("\\s+"), " ").take(50)
+        if (normalized.isBlank()) return
+        viewModelScope.launch {
+            symptomRepository.addCustomSymptom(normalized, category)
+        }
+    }
+
+    fun setMedicationTaken(medicationId: Int, taken: Boolean) {
+        val state = _uiState.value
+        if (state.medications.none { it.id == medicationId }) return
+        viewModelScope.launch {
+            medicationRepository.setMedicationTaken(
+                date = state.date.toEpochDay(),
+                medicationId = medicationId,
+                taken = taken
+            )
+        }
     }
 }

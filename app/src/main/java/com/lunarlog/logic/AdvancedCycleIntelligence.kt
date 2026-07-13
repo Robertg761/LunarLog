@@ -6,40 +6,36 @@ import java.time.LocalDate
 
 object AdvancedCycleIntelligence {
 
+    private const val MINIMUM_SHIFT_CELSIUS = 0.2
+
     /**
      * Attempts to detect ovulation date based on Basal Body Temperature (BBT) shift.
      * Uses a simplified "3 over 6" rule:
      * Ovulation is likely occurred the day BEFORE the temperature shift started.
      */
     fun detectOvulationFromBBT(cycleStartDate: LocalDate, logs: List<DailyLog>): LocalDate? {
-        // Filter logs for this cycle
         val cycleLogs = logs.filter { !it.date.isBefore(cycleStartDate) }
             .sortedBy { it.date }
-            .filter { it.temperature != null }
+            .mapNotNull { log ->
+                normalizeToCelsius(log.temperature)?.let { normalized -> log to normalized }
+            }
 
-        if (cycleLogs.size < 10) return null // Need sufficient data points
+        if (cycleLogs.size < 9) return null
 
-        // Iterate to find a shift
         for (i in 6 until cycleLogs.size - 2) {
-            val preShiftWindow = cycleLogs.subList(i - 6, i).mapNotNull { it.temperature }
-            val postShiftWindow = cycleLogs.subList(i, i + 3).mapNotNull { it.temperature }
+            val window = cycleLogs.subList(i - 6, i + 3)
+            val firstDate = window.first().first.date
+            val isConsecutive = window.indices.all { index ->
+                window[index].first.date == firstDate.plusDays(index.toLong())
+            }
+            if (!isConsecutive) continue
 
-            if (preShiftWindow.size == 6 && postShiftWindow.size == 3) {
-                val minPost = postShiftWindow.minOrNull() ?: continue
+            val preShiftWindow = window.take(6).map { it.second }
+            val postShiftWindow = window.takeLast(3).map { it.second }
+            val coverLine = preShiftWindow.maxOrNull() ?: continue
 
-                // Check for shift (approx 0.2 C or 0.3 F, assuming user is consistent)
-                // We use a generic 0.2 threshold assuming Celsius for now, or 0.4 for F.
-                // To be safe, we check if minPost is strictly higher than maxPre
-                val maxPre = preShiftWindow.maxOrNull() ?: continue
-                
-                if (minPost > maxPre) {
-                    // Potential shift detected at index i
-                    // Ovulation is usually the day of the last low temp (index i-1) or day of shift (index i)
-                    // We'll return the day of the last low temp (index i-1)
-                    // cycleLogs[i].date is the first high temp day. So day before is index i-1.
-                    // But cycleLogs is filtered by temp != null, so index i-1 IS the last low temp day.
-                    return cycleLogs[i].date.minusDays(1)
-                }
+            if (postShiftWindow.all { it >= coverLine + MINIMUM_SHIFT_CELSIUS }) {
+                return window[5].first.date
             }
         }
         return null
@@ -53,25 +49,30 @@ object AdvancedCycleIntelligence {
         val cycleLogs = logs.filter { !it.date.isBefore(cycleStartDate) }
             .sortedBy { it.date }
         
-        // Find the last day with highly fertile mucus (3 or 4)
-        // followed by a day of lower fertility (0, 1, 2)
-        
-        var potentialPeak: LocalDate? = null
-        
-        for (i in 0 until cycleLogs.size - 1) {
-            val current = cycleLogs[i]
-            val next = cycleLogs[i+1]
-            
-            if (current.cervicalMucus >= 3) {
-                potentialPeak = current.date
-            }
-            
-            // If we had a peak candidate, and now it's drying up, confirm it
-            if (potentialPeak != null && next.cervicalMucus < 3 && next.date == current.date.plusDays(1)) {
-                // Confirming this block as a peak
+        for (i in cycleLogs.indices.reversed()) {
+            val candidate = cycleLogs[i]
+            if (candidate.cervicalMucus < 3) continue
+
+            val confirmation = cycleLogs.drop(i + 1).take(3)
+            val hasThreeConsecutiveLowerDays = confirmation.size == 3 &&
+                confirmation.indices.all { index ->
+                    confirmation[index].date == candidate.date.plusDays((index + 1).toLong()) &&
+                        confirmation[index].cervicalMucus < 3
+                }
+            if (hasThreeConsecutiveLowerDays) {
+                return candidate.date
             }
         }
-        
-        return potentialPeak
+
+        return null
+    }
+
+    private fun normalizeToCelsius(value: Float?): Double? {
+        val temperature = value?.toDouble() ?: return null
+        return when (temperature) {
+            in 34.0..43.0 -> temperature
+            in 90.0..110.0 -> (temperature - 32.0) * 5.0 / 9.0
+            else -> null
+        }
     }
 }

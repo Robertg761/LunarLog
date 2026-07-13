@@ -33,14 +33,14 @@ class CycleRepository @Inject constructor(
     suspend fun getAllCyclesSync(): List<Cycle> = cycleDao.getAllCyclesSync()
     fun getCyclesInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<Cycle>> = cycleDao.getCyclesInRange(startDate, endDate)
 
-    suspend fun startPeriod(date: LocalDate): PeriodChangeResult = appDatabase.withTransaction {
+    suspend fun startPeriod(date: LocalDate): PeriodChangeResult = runValidatedTransaction {
         if (date.isAfter(LocalDate.now())) {
-            return@withTransaction PeriodChangeResult.ValidationError("Cannot start a period in the future")
+            return@runValidatedTransaction PeriodChangeResult.ValidationError("Cannot start a period in the future")
         }
 
         val cycles = cycleDao.getAllCyclesSync()
         if (findCycleContainingDate(cycles, date) != null) {
-            return@withTransaction PeriodChangeResult.Success(
+            return@runValidatedTransaction PeriodChangeResult.Success(
                 action = PeriodChangeAction.NO_CHANGE,
                 message = "Period already marked for this day"
             )
@@ -49,21 +49,18 @@ class CycleRepository @Inject constructor(
         val ongoing = cycles.firstOrNull { it.endDate == null }
         if (ongoing != null) {
             if (date.isBefore(ongoing.startDate)) {
-                return@withTransaction PeriodChangeResult.ValidationError("Start date cannot be before an ongoing period start")
+                return@runValidatedTransaction PeriodChangeResult.ValidationError("Start date cannot be before an ongoing period start")
             }
 
             val closed = ongoing.copy(endDate = date.minusDays(1))
             if (!isValidCycle(closed)) {
-                return@withTransaction PeriodChangeResult.ValidationError("Invalid period range")
+                return@runValidatedTransaction PeriodChangeResult.ValidationError("Invalid period range")
             }
             cycleDao.updateCycle(closed)
         }
 
         cycleDao.insertCycle(Cycle(startDate = date, endDate = null))
-        val validation = validateAllCycleInvariants(cycleDao.getAllCyclesSync())
-        if (validation != null) {
-            return@withTransaction validation
-        }
+        requireValidCycleInvariants(cycleDao.getAllCyclesSync())
 
         PeriodChangeResult.Success(
             action = PeriodChangeAction.PERIOD_STARTED,
@@ -71,25 +68,25 @@ class CycleRepository @Inject constructor(
         )
     }
 
-    suspend fun endOngoingPeriod(date: LocalDate): PeriodChangeResult = appDatabase.withTransaction {
+    suspend fun endOngoingPeriod(date: LocalDate): PeriodChangeResult = runValidatedTransaction {
         if (date.isAfter(LocalDate.now())) {
-            return@withTransaction PeriodChangeResult.ValidationError("Cannot end a period in the future")
+            return@runValidatedTransaction PeriodChangeResult.ValidationError("Cannot end a period in the future")
         }
 
         val cycles = cycleDao.getAllCyclesSync()
         val ongoing = cycles.maxByOrNull { it.startDate }?.takeIf { it.endDate == null }
-            ?: return@withTransaction PeriodChangeResult.Success(
+            ?: return@runValidatedTransaction PeriodChangeResult.Success(
                 action = PeriodChangeAction.NO_CHANGE,
                 message = "No ongoing period to end"
             )
 
         if (date.isBefore(ongoing.startDate)) {
-            return@withTransaction PeriodChangeResult.ValidationError("End date cannot be before start date")
+            return@runValidatedTransaction PeriodChangeResult.ValidationError("End date cannot be before start date")
         }
 
         val updated = ongoing.copy(endDate = date)
         if (!isValidCycle(updated)) {
-            return@withTransaction PeriodChangeResult.ValidationError("Invalid period range")
+            return@runValidatedTransaction PeriodChangeResult.ValidationError("Invalid period range")
         }
         cycleDao.updateCycle(updated)
 
@@ -99,30 +96,27 @@ class CycleRepository @Inject constructor(
         )
     }
 
-    suspend fun resumePeriodEndedOn(date: LocalDate): PeriodChangeResult = appDatabase.withTransaction {
+    suspend fun resumePeriodEndedOn(date: LocalDate): PeriodChangeResult = runValidatedTransaction {
         if (date.isAfter(LocalDate.now())) {
-            return@withTransaction PeriodChangeResult.ValidationError("Cannot resume a future period")
+            return@runValidatedTransaction PeriodChangeResult.ValidationError("Cannot resume a future period")
         }
 
         val cycles = cycleDao.getAllCyclesSync()
         val target = cycles
             .filter { it.endDate == date }
             .maxByOrNull { it.startDate }
-            ?: return@withTransaction PeriodChangeResult.Success(
+            ?: return@runValidatedTransaction PeriodChangeResult.Success(
                 action = PeriodChangeAction.NO_CHANGE,
                 message = "No period ending today to resume"
             )
 
         if (cycles.any { it.id != target.id && it.endDate == null }) {
-            return@withTransaction PeriodChangeResult.ValidationError("Cannot resume while another period is ongoing")
+            return@runValidatedTransaction PeriodChangeResult.ValidationError("Cannot resume while another period is ongoing")
         }
 
         val updated = target.copy(endDate = null)
         cycleDao.updateCycle(updated)
-        val validation = validateAllCycleInvariants(cycleDao.getAllCyclesSync())
-        if (validation != null) {
-            return@withTransaction validation
-        }
+        requireValidCycleInvariants(cycleDao.getAllCyclesSync())
 
         PeriodChangeResult.Success(
             action = PeriodChangeAction.PERIOD_RESUMED,
@@ -131,27 +125,27 @@ class CycleRepository @Inject constructor(
     }
 
     suspend fun setPeriodDay(date: LocalDate, isPeriodDay: Boolean): PeriodChangeResult =
-        appDatabase.withTransaction {
+        runValidatedTransaction {
             if (date.isAfter(LocalDate.now())) {
-                return@withTransaction PeriodChangeResult.ValidationError("Cannot modify future days")
+                return@runValidatedTransaction PeriodChangeResult.ValidationError("Cannot modify future days")
             }
             if (isPeriodDay) addPeriodDay(date) else removePeriodDay(date)
         }
 
     suspend fun setPeriodRange(startDate: LocalDate, endDate: LocalDate): PeriodChangeResult =
-        appDatabase.withTransaction {
+        runValidatedTransaction {
             if (startDate.isAfter(endDate)) {
-                return@withTransaction PeriodChangeResult.ValidationError("Start date must be on or before end date")
+                return@runValidatedTransaction PeriodChangeResult.ValidationError("Start date must be on or before end date")
             }
             if (endDate.isAfter(LocalDate.now())) {
-                return@withTransaction PeriodChangeResult.ValidationError("Cannot modify future days")
+                return@runValidatedTransaction PeriodChangeResult.ValidationError("Cannot modify future days")
             }
 
             var day = startDate
             while (!day.isAfter(endDate)) {
                 val dayResult = addPeriodDay(day)
                 if (dayResult is PeriodChangeResult.ValidationError) {
-                    return@withTransaction dayResult
+                    throw CycleInvariantViolation(dayResult.message)
                 }
                 day = day.plusDays(1)
             }
@@ -163,23 +157,23 @@ class CycleRepository @Inject constructor(
         }
 
     suspend fun updateCycleDates(cycleId: Int, startDate: LocalDate, endDate: LocalDate?): PeriodChangeResult =
-        appDatabase.withTransaction {
+        runValidatedTransaction {
             val today = LocalDate.now()
             if (startDate.isAfter(today) || endDate?.isAfter(today) == true) {
-                return@withTransaction PeriodChangeResult.ValidationError("Cannot modify future days")
+                return@runValidatedTransaction PeriodChangeResult.ValidationError("Cannot modify future days")
             }
 
             val cycle = cycleDao.getCycleById(cycleId)
-                ?: return@withTransaction PeriodChangeResult.ValidationError("Period not found")
+                ?: return@runValidatedTransaction PeriodChangeResult.ValidationError("Period not found")
 
             val updated = cycle.copy(startDate = startDate, endDate = endDate)
             if (!isValidCycle(updated)) {
-                return@withTransaction PeriodChangeResult.ValidationError("Start date must be on or before end date")
+                return@runValidatedTransaction PeriodChangeResult.ValidationError("Start date must be on or before end date")
             }
 
             val others = cycleDao.getAllCyclesSync().filter { it.id != cycleId }
             if (hasOverlap(updated, others)) {
-                return@withTransaction PeriodChangeResult.ValidationError("Updated dates overlap another period")
+                return@runValidatedTransaction PeriodChangeResult.ValidationError("Updated dates overlap another period")
             }
 
             cycleDao.updateCycle(updated)
@@ -234,8 +228,7 @@ class CycleRepository @Inject constructor(
             }
         }
 
-        val validation = validateAllCycleInvariants(cycleDao.getAllCyclesSync())
-        if (validation != null) return validation
+        requireValidCycleInvariants(cycleDao.getAllCyclesSync())
 
         return PeriodChangeResult.Success(
             action = PeriodChangeAction.PERIOD_DAY_ADDED,
@@ -284,8 +277,7 @@ class CycleRepository @Inject constructor(
             }
         }
 
-        val validation = validateAllCycleInvariants(cycleDao.getAllCyclesSync())
-        if (validation != null) return validation
+        requireValidCycleInvariants(cycleDao.getAllCyclesSync())
 
         return PeriodChangeResult.Success(
             action = PeriodChangeAction.PERIOD_DAY_REMOVED,
@@ -330,4 +322,20 @@ class CycleRepository @Inject constructor(
         }
         return null
     }
+
+    private fun requireValidCycleInvariants(cycles: List<Cycle>) {
+        validateAllCycleInvariants(cycles)?.let { error ->
+            throw CycleInvariantViolation(error.message)
+        }
+    }
+
+    private suspend fun runValidatedTransaction(
+        block: suspend () -> PeriodChangeResult
+    ): PeriodChangeResult = try {
+        appDatabase.withTransaction { block() }
+    } catch (error: CycleInvariantViolation) {
+        PeriodChangeResult.ValidationError(error.message ?: "Period data validation failed")
+    }
+
+    private class CycleInvariantViolation(message: String) : IllegalStateException(message)
 }

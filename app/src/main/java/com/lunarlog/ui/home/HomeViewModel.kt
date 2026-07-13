@@ -27,7 +27,7 @@ data class HomeUiState(
     val daysUntilPeriod: Int = 0,
     val daysRemainingInPeriod: Int? = null,
     val currentCycleDay: Int = 0,
-    val isFertile: Boolean = false,
+    val isEstimatedFertileWindow: Boolean = false,
     val isLoading: Boolean = true,
     val isPeriodActive: Boolean = false, // Visual: Is today a period day?
     val isPeriodOngoing: Boolean = false, // Logic: Is the period open?
@@ -36,6 +36,7 @@ data class HomeUiState(
     val counterMode: CounterMode = CounterMode.NEXT_PERIOD_COUNTDOWN,
     val counterTitle: String = "Next Period",
     val counterSubtitle: String = "No cycle data yet",
+    val counterScaleDays: Int = AppConfig.DEFAULT_CYCLE_LENGTH,
     val quickLogSymptoms: List<String> = emptyList(),
     val anomalies: List<com.lunarlog.logic.CycleAnomaly> = emptyList()
 )
@@ -63,6 +64,7 @@ class HomeViewModel @Inject constructor(
                         counterMode = counter.mode,
                         counterTitle = counter.title,
                         counterSubtitle = counter.subtitle,
+                        counterScaleDays = AppConfig.DEFAULT_CYCLE_LENGTH,
                         isLoading = false
                     )
                 } else {
@@ -81,13 +83,12 @@ class HomeViewModel @Inject constructor(
                     val daysUntil = ChronoUnit.DAYS.between(today, nextPeriodStart).toInt()
                     val currentCycleDay = ChronoUnit.DAYS.between(lastCycle.startDate, today).toInt() + 1
 
-                    val ovulationByBBT = com.lunarlog.logic.AdvancedCycleIntelligence.detectOvulationFromBBT(lastCycle.startDate, logs)
-                    val peakMucus = com.lunarlog.logic.AdvancedCycleIntelligence.detectPeakMucusDay(lastCycle.startDate, logs)
-                    val refinedOvulation = ovulationByBBT ?: peakMucus ?: CyclePredictionUtils.predictOvulation(nextPeriodStart)
-                    
-                    val refinedFertileStart = refinedOvulation.minusDays(AppConfig.FERTILE_WINDOW_OFFSET_START)
-                    val refinedFertileEnd = refinedOvulation.plusDays(AppConfig.FERTILE_WINDOW_OFFSET_END)
-                    val isFertile = today >= refinedFertileStart && today <= refinedFertileEnd
+                    // Calendar predictions are estimates only. Observed BBT and mucus signals are
+                    // retrospective and must never be used to claim current contraceptive safety.
+                    val (estimatedFertileStart, estimatedFertileEnd) =
+                        CyclePredictionUtils.predictFertileWindow(nextPeriodStart)
+                    val isEstimatedFertileWindow =
+                        today >= estimatedFertileStart && today <= estimatedFertileEnd
 
                     val anomalies = com.lunarlog.logic.SmartAnomalyDetector.detectAnomalies(cycles)
 
@@ -104,7 +105,7 @@ class HomeViewModel @Inject constructor(
                         daysUntilPeriod = daysUntil,
                         daysRemainingInPeriod = daysRemainingInPeriod,
                         currentCycleDay = currentCycleDay,
-                        isFertile = isFertile,
+                        isEstimatedFertileWindow = isEstimatedFertileWindow,
                         isPeriodActive = isPeriodActive,
                         isPeriodOngoing = isPeriodOngoing,
                         isEndedToday = isEndedToday,
@@ -112,6 +113,10 @@ class HomeViewModel @Inject constructor(
                         counterMode = counter.mode,
                         counterTitle = counter.title,
                         counterSubtitle = counter.subtitle,
+                        counterScaleDays = when (counter.mode) {
+                            CounterMode.PERIOD_DAYS_LEFT, CounterMode.PERIOD_OVERAGE -> averagePeriodLength
+                            CounterMode.NEXT_PERIOD_COUNTDOWN, CounterMode.NEXT_PERIOD_OVERDUE -> averageLength
+                        }.coerceAtLeast(1),
                         isLoading = false,
                         quickLogSymptoms = quickLogSymptoms,
                         anomalies = anomalies
@@ -158,7 +163,7 @@ class HomeViewModel @Inject constructor(
                 value = symptom
             )
             
-            dailyLogRepository.addEntry(entry)
+            dailyLogRepository.addEntryIfAbsent(entry)
         }
     }
 
@@ -192,7 +197,7 @@ class HomeViewModel @Inject constructor(
             
             📊 $counterSummary
             📅 Cycle day ${state.currentCycleDay}
-            ${if (state.isFertile) "🌿 Likely Fertile Window" else ""}
+            ${if (state.isEstimatedFertileWindow) "🌿 Estimated fertile days (prediction only)" else ""}
             
             Sent from my private LunarLog
         """.trimIndent()

@@ -8,10 +8,14 @@ import kotlinx.coroutines.flow.Flow
 
 @Dao
 interface MedicationDao {
-    @Query("SELECT * FROM medications WHERE endDate IS NULL OR endDate >= :currentDate")
+    @Query("""
+        SELECT * FROM medications
+        WHERE startDate <= :currentDate AND (endDate IS NULL OR endDate >= :currentDate)
+        ORDER BY name COLLATE NOCASE
+    """)
     fun getActiveMedications(currentDate: Long): Flow<List<Medication>>
 
-    @Query("SELECT * FROM medications")
+    @Query("SELECT * FROM medications ORDER BY name COLLATE NOCASE")
     fun getAllMedications(): Flow<List<Medication>>
 
     @Query("SELECT * FROM medications")
@@ -26,9 +30,18 @@ interface MedicationDao {
     @Query("SELECT * FROM medication_logs WHERE date = :date")
     fun getLogsForDate(date: Long): Flow<List<MedicationLog>>
 
+    @Query("SELECT * FROM medication_logs WHERE date = :date")
+    suspend fun getLogsForDateSync(date: Long): List<MedicationLog>
+
+    @Query("SELECT * FROM medication_logs WHERE date = :date AND medicationId = :medicationId LIMIT 1")
+    suspend fun getLogForMedicationOnDate(date: Long, medicationId: Int): MedicationLog?
+
     @Query("SELECT * FROM medication_logs ORDER BY date ASC, timestamp ASC")
     suspend fun getAllMedicationLogsSync(): List<MedicationLog>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun logMedication(log: MedicationLog)
+
+    @Query("DELETE FROM medication_logs WHERE date = :date AND medicationId = :medicationId")
+    suspend fun deleteMedicationLog(date: Long, medicationId: Int)
 }

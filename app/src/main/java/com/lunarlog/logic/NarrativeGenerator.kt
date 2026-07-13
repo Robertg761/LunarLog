@@ -1,9 +1,8 @@
 package com.lunarlog.logic
 
-import com.lunarlog.core.model.Cycle
 import com.lunarlog.core.model.DailyLog
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
+import java.util.Locale
 
 data class CycleSummary(
     val cycleId: Int,
@@ -24,12 +23,14 @@ data class WeeklyDigest(
 
 object NarrativeGenerator {
 
-    fun generateCycleSummary(cycle: Cycle, logs: List<DailyLog>): CycleSummary? {
-        if (cycle.endDate == null) return null
-
-        val startDate = cycle.startDate
-        val endDate = cycle.endDate
-        val length = (ChronoUnit.DAYS.between(startDate, endDate) + 1).toInt()
+    fun generateCycleSummary(
+        interval: CompletedCycleInterval,
+        logs: List<DailyLog>
+    ): CycleSummary {
+        val period = interval.period
+        val startDate = interval.startDate
+        val endDate = interval.endDate
+        val length = interval.length
         
         // Filter logs specifically for this cycle
         val cycleLogs = logs.filter { !it.date.isBefore(startDate) && !it.date.isAfter(endDate) }
@@ -38,7 +39,7 @@ object NarrativeGenerator {
         val insights = mutableListOf<String>()
 
         // 1. Length Analysis
-        narrativeBuilder.append("Cycle ${cycle.id} lasted $length days. ")
+        narrativeBuilder.append("Cycle beginning $startDate lasted $length days. ")
         when {
             length < 21 -> insights.add("Short cycle length ($length days).")
             length > 35 -> insights.add("Long cycle length ($length days).")
@@ -75,7 +76,7 @@ object NarrativeGenerator {
         }
 
         return CycleSummary(
-            cycleId = cycle.id,
+            cycleId = period.id,
             startDate = startDate,
             endDate = endDate,
             length = length,
@@ -125,9 +126,10 @@ object NarrativeGenerator {
         }
 
         // Sleep Analysis
-        val avgSleep = weeklyLogs.map { it.sleepHours }.average()
-        if (avgSleep > 0) {
-            narrativeBuilder.append(String.format("Average sleep: %.1f hours.", avgSleep))
+        val recordedSleep = weeklyLogs.map { it.sleepHours }.filter { it > 0f }
+        if (recordedSleep.isNotEmpty()) {
+            val avgSleep = recordedSleep.average()
+            narrativeBuilder.append(String.format(Locale.getDefault(), "Average sleep: %.1f hours.", avgSleep))
         }
 
         return WeeklyDigest(

@@ -6,6 +6,8 @@ import androidx.work.ExistingPeriodicWorkPolicy
 import androidx.work.PeriodicWorkRequestBuilder
 import androidx.work.WorkManager
 import androidx.work.OneTimeWorkRequestBuilder
+import androidx.work.workDataOf
+import java.time.Instant
 import java.time.Duration
 import java.time.LocalTime
 import java.time.ZoneId
@@ -15,8 +17,10 @@ import java.util.concurrent.TimeUnit
 object NotificationWorkScheduler {
     const val UNIQUE_CYCLE_WORK_NAME = "CycleNotificationWork"
     const val UNIQUE_PERIOD_LOG_REMINDER_WORK_NAME = "PeriodLogReminderWork"
+    const val UNIQUE_MEDICATION_REMINDER_WORK_NAME = "MedicationReminderWork"
     private const val UNIQUE_PERIOD_LOG_REMINDER_RESCHEDULE_WORK_NAME = "PeriodLogReminderRescheduleWork"
     private const val UNIQUE_CYCLE_RESCHEDULE_WORK_NAME = "CycleNotificationRescheduleWork"
+    private const val UNIQUE_MEDICATION_RESCHEDULE_WORK_NAME = "MedicationReminderRescheduleWork"
     private const val DEFAULT_CYCLE_NOTIFICATION_TIME_MINUTES = 9L * 60L
 
     /**
@@ -101,6 +105,46 @@ object NotificationWorkScheduler {
 
         WorkManager.getInstance(context).enqueueUniqueWork(
             UNIQUE_CYCLE_RESCHEDULE_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
+    fun scheduleMedicationReminders(context: Context) {
+        val request = OneTimeWorkRequestBuilder<MedicationReminderRescheduleWorker>().build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            UNIQUE_MEDICATION_RESCHEDULE_WORK_NAME,
+            ExistingWorkPolicy.REPLACE,
+            request
+        )
+    }
+
+    fun cancelMedicationReminders(context: Context) {
+        cancelPendingMedicationReminder(context)
+        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_MEDICATION_RESCHEDULE_WORK_NAME)
+    }
+
+    fun cancelPendingMedicationReminder(context: Context) {
+        WorkManager.getInstance(context).cancelUniqueWork(UNIQUE_MEDICATION_REMINDER_WORK_NAME)
+    }
+
+    fun enqueueMedicationReminder(
+        context: Context,
+        scheduledEpochMillis: Long,
+        medicationIds: IntArray
+    ) {
+        val delayMillis = (scheduledEpochMillis - Instant.now().toEpochMilli()).coerceAtLeast(0L)
+        val request = OneTimeWorkRequestBuilder<MedicationReminderWorker>()
+            .setInitialDelay(delayMillis, TimeUnit.MILLISECONDS)
+            .setInputData(
+                workDataOf(
+                    MedicationReminderWorker.KEY_SCHEDULED_EPOCH_MILLIS to scheduledEpochMillis,
+                    MedicationReminderWorker.KEY_MEDICATION_IDS to medicationIds
+                )
+            )
+            .build()
+        WorkManager.getInstance(context).enqueueUniqueWork(
+            UNIQUE_MEDICATION_REMINDER_WORK_NAME,
             ExistingWorkPolicy.REPLACE,
             request
         )

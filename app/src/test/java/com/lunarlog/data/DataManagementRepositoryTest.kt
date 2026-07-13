@@ -13,6 +13,7 @@ import kotlinx.coroutines.test.runTest
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.Assert.assertTrue
 
 class DataManagementRepositoryTest {
 
@@ -23,6 +24,7 @@ class DataManagementRepositoryTest {
     private val medicationDao: MedicationDao = mockk(relaxed = true)
     private val symptomDao: SymptomDefinitionDao = mockk(relaxed = true)
     private val logEntryDao: LogEntryDao = mockk(relaxed = true)
+    private val userPreferencesRepository: UserPreferencesRepository = mockk(relaxed = true)
 
     @Before
     fun setUp() {
@@ -31,7 +33,7 @@ class DataManagementRepositoryTest {
         every { appDatabase.symptomDefinitionDao() } returns symptomDao
         every { appDatabase.logEntryDao() } returns logEntryDao
 
-        repository = DataManagementRepository(dailyLogRepository, appDatabase)
+        repository = DataManagementRepository(dailyLogRepository, appDatabase, userPreferencesRepository)
         mockkStatic("androidx.room.RoomDatabaseKt")
     }
 
@@ -74,5 +76,24 @@ class DataManagementRepositoryTest {
 
         coVerify { appDatabase.clearAllTables() }
         coVerify { dailyLogRepository.rebuildDailyLogAggregateInTransaction(any()) }
+    }
+
+    @Test
+    fun `invalid legacy record is rejected before current data is cleared`() = runTest {
+        val json = """
+            {
+                "cycles": [{"id": 1, "startDate": "not-a-date"}],
+                "dailyLogs": []
+            }
+        """.trimIndent()
+
+        var rejected = false
+        try {
+            repository.restoreFromJson(json)
+        } catch (_: IllegalArgumentException) {
+            rejected = true
+        }
+        assertTrue(rejected)
+        coVerify(exactly = 0) { appDatabase.clearAllTables() }
     }
 }

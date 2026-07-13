@@ -59,7 +59,6 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.lunarlog.logic.CounterMode
 import com.lunarlog.ui.theme.BrandMoon
 import com.lunarlog.ui.theme.BrandRoseDeep
 import com.lunarlog.ui.theme.BrandRoseLight
@@ -198,22 +197,26 @@ fun HomeScreen(
                     // Determine theme color for cycle
                     val cycleColor = when {
                         uiState.isPeriodActive -> PeriodRed
-                        uiState.isFertile -> FertileGreen
+                        uiState.isEstimatedFertileWindow -> FertileGreen
                         else -> MaterialTheme.colorScheme.primary
                     }
 
                     // Cycle Indicator - Responsive
-                    CycleStatusCircle(
-                        value = uiState.counterValue,
-                        mode = uiState.counterMode,
-                        title = uiState.counterTitle,
-                        subtitle = uiState.counterSubtitle,
-                        activeColor = cycleColor,
-                        scrollState = scrollState,
-                        modifier = Modifier
-                            .fillMaxWidth(0.85f)
-                            .aspectRatio(1f)
-                    )
+                    BoxWithConstraints(
+                        modifier = Modifier.fillMaxWidth(),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        val circleDiameter = (maxWidth * 0.85f).coerceAtMost(480.dp)
+                        CycleStatusCircle(
+                            value = uiState.counterValue,
+                            title = uiState.counterTitle,
+                            subtitle = uiState.counterSubtitle,
+                            progressScaleDays = uiState.counterScaleDays,
+                            activeColor = cycleColor,
+                            scrollState = scrollState,
+                            modifier = Modifier.size(circleDiameter)
+                        )
+                    }
 
                     Spacer(modifier = Modifier.height(40.dp))
 
@@ -232,7 +235,7 @@ fun HomeScreen(
 
                     Spacer(modifier = Modifier.height(24.dp))
 
-                    if (uiState.isFertile) {
+                    if (uiState.isEstimatedFertileWindow) {
                         FertilityCard()
                         Spacer(modifier = Modifier.height(24.dp))
                     }
@@ -385,12 +388,12 @@ private fun LunarLogBrandMark(modifier: Modifier = Modifier) {
 @Composable
 fun CycleStatusCircle(
     value: Int,
-    mode: CounterMode,
     title: String,
     subtitle: String,
+    progressScaleDays: Int,
     activeColor: Color,
-    scrollState: ScrollState? = null,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    scrollState: ScrollState? = null
 ) {
     val trackColor = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.4f)
     
@@ -447,13 +450,8 @@ fun CycleStatusCircle(
                 radius = radius
             )
 
-            // Dynamic Progress based on 28-day cycle assumption for visual filling
-            // Clamp to ensure it looks like a ring
-            val progressBase = when (mode) {
-                CounterMode.PERIOD_DAYS_LEFT, CounterMode.PERIOD_OVERAGE -> 10f
-                CounterMode.NEXT_PERIOD_COUNTDOWN, CounterMode.NEXT_PERIOD_OVERDUE -> 28f
-            }
-            val progress = (value / progressBase).coerceIn(0.05f, 1f)
+            val progress = (value / progressScaleDays.coerceAtLeast(1).toFloat())
+                .coerceIn(0.05f, 1f)
             
             drawArc(
                 brush = Brush.sweepGradient(
@@ -531,13 +529,18 @@ fun HomeSkeleton() {
         modifier = Modifier.fillMaxWidth()
     ) {
         // Cycle Circle Skeleton
-        Box(
-            modifier = Modifier
-                .fillMaxWidth(0.85f)
-                .aspectRatio(1f)
-                .clip(CircleShape)
-                .shimmerEffect()
-        )
+        BoxWithConstraints(
+            modifier = Modifier.fillMaxWidth(),
+            contentAlignment = Alignment.Center
+        ) {
+            val circleDiameter = (maxWidth * 0.85f).coerceAtMost(480.dp)
+            Box(
+                modifier = Modifier
+                    .size(circleDiameter)
+                    .clip(CircleShape)
+                    .shimmerEffect()
+            )
+        }
         
         Spacer(modifier = Modifier.height(40.dp))
         
@@ -657,13 +660,13 @@ fun FertilityCard() {
             
             Column {
                 Text(
-                    text = "Fertile Window",
+                    text = "Estimated Fertile Days",
                     style = MaterialTheme.typography.titleMedium,
                     color = OnFertileSurface,
                     fontWeight = FontWeight.Bold
                 )
                 Text(
-                    text = "High chance of conception",
+                    text = "Calendar estimate only — not birth control",
                     style = MaterialTheme.typography.bodyMedium,
                     color = OnFertileSurface.copy(alpha = 0.8f)
                 )

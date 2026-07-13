@@ -29,6 +29,7 @@ import com.lunarlog.R
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
 import com.lunarlog.data.PeriodChangeResult
+import com.lunarlog.data.PeriodChangeAction
 import com.lunarlog.di.WidgetEntryPoint
 import com.lunarlog.logic.CounterPresentation
 import com.lunarlog.logic.CounterPresentationCalculator
@@ -144,7 +145,9 @@ class LogPeriodAction : ActionCallback {
         
         withContext(Dispatchers.IO) {
             val periodResult = cycleRepository.startPeriod(today)
-            if (periodResult is PeriodChangeResult.Success) {
+            if (periodResult is PeriodChangeResult.Success &&
+                periodResult.action == PeriodChangeAction.PERIOD_STARTED
+            ) {
                 dailyLogRepository.addEntry(
                     LogEntry(
                         date = todayEpochDay,

@@ -3,11 +3,11 @@ package com.lunarlog.update
 import android.app.DownloadManager
 import android.content.Context
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Environment
 import android.provider.Settings
+import androidx.core.content.edit
 import androidx.core.content.FileProvider
+import androidx.core.net.toUri
 import java.io.File
 
 class ApkUpdateManager(
@@ -24,20 +24,19 @@ class ApkUpdateManager(
     )
 
     fun needsUnknownSourcesPermission(context: Context): Boolean {
-        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.O &&
-            !context.packageManager.canRequestPackageInstalls()
+        return !context.packageManager.canRequestPackageInstalls()
     }
 
     fun buildUnknownSourcesSettingsIntent(context: Context): Intent {
         return Intent(Settings.ACTION_MANAGE_UNKNOWN_APP_SOURCES).apply {
-            data = Uri.parse("package:${context.packageName}")
+            data = "package:${context.packageName}".toUri()
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
     }
 
     fun startDownload(context: Context, info: UpdateInfo): Long {
         val fileName = "LunarLog-${info.latestVersionName}.apk"
-        val request = DownloadManager.Request(Uri.parse(info.apkUrl))
+        val request = DownloadManager.Request(info.apkUrl.toUri())
             .setTitle("LunarLog update")
             .setDescription("Downloading LunarLog ${info.latestVersionName}")
             .setMimeType("application/vnd.android.package-archive")
@@ -50,11 +49,11 @@ class ApkUpdateManager(
         val downloadId = dm.enqueue(request)
 
         val file = File(context.getExternalFilesDir(Environment.DIRECTORY_DOWNLOADS), fileName)
-        prefs(context).edit()
-            .putLong(KEY_DOWNLOAD_ID, downloadId)
-            .putString(KEY_APK_PATH, file.absolutePath)
-            .putString(KEY_DOWNLOADED_VERSION_NAME, normalizeVersionName(info.latestVersionName))
-            .apply()
+        prefs(context).edit {
+            putLong(KEY_DOWNLOAD_ID, downloadId)
+            putString(KEY_APK_PATH, file.absolutePath)
+            putString(KEY_DOWNLOADED_VERSION_NAME, normalizeVersionName(info.latestVersionName))
+        }
 
         return downloadId
     }
@@ -144,11 +143,11 @@ class ApkUpdateManager(
             }
         }
 
-        prefs(context).edit()
-            .remove(KEY_DOWNLOAD_ID)
-            .remove(KEY_APK_PATH)
-            .remove(KEY_DOWNLOADED_VERSION_NAME)
-            .apply()
+        prefs(context).edit {
+            remove(KEY_DOWNLOAD_ID)
+            remove(KEY_APK_PATH)
+            remove(KEY_DOWNLOADED_VERSION_NAME)
+        }
     }
 
     fun buildInstallIntentFromDownloadedApk(context: Context): Intent? {
@@ -176,11 +175,7 @@ class ApkUpdateManager(
 
             val downloadedSemVer = SemVer.parseOrNull(downloaded)
             val currentSemVer = SemVer.parseOrNull(current)
-            return if (downloadedSemVer != null && currentSemVer != null) {
-                downloadedSemVer > currentSemVer
-            } else {
-                downloaded != current
-            }
+            return downloadedSemVer != null && currentSemVer != null && downloadedSemVer > currentSemVer
         }
 
         internal fun normalizeVersionName(raw: String): String {

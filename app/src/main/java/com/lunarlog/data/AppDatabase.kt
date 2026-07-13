@@ -19,8 +19,8 @@ import com.lunarlog.data.Converters
         MedicationLog::class,
         SymptomDefinition::class
     ],
-    version = 8,
-    exportSchema = false
+    version = 9,
+    exportSchema = true
 )
 @TypeConverters(Converters::class)
 abstract class AppDatabase : RoomDatabase() {
@@ -31,6 +31,43 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun symptomDefinitionDao(): SymptomDefinitionDao
 
     companion object {
+        val MIGRATION_8_9 = object : Migration(8, 9) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL(
+                    """
+                    CREATE TABLE IF NOT EXISTS `medication_logs_new` (
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `date` INTEGER NOT NULL,
+                        `medicationId` INTEGER NOT NULL,
+                        `taken` INTEGER NOT NULL,
+                        `timestamp` INTEGER NOT NULL,
+                        FOREIGN KEY(`medicationId`) REFERENCES `medications`(`id`) ON UPDATE NO ACTION ON DELETE CASCADE
+                    )
+                    """
+                )
+                db.execSQL(
+                    """
+                    INSERT INTO `medication_logs_new` (`id`, `date`, `medicationId`, `taken`, `timestamp`)
+                    SELECT logs.`id`, logs.`date`, logs.`medicationId`, logs.`taken`, logs.`timestamp`
+                    FROM `medication_logs` AS logs
+                    INNER JOIN `medications` AS medications ON medications.`id` = logs.`medicationId`
+                    WHERE logs.`id` = (
+                        SELECT duplicates.`id`
+                        FROM `medication_logs` AS duplicates
+                        WHERE duplicates.`date` = logs.`date`
+                          AND duplicates.`medicationId` = logs.`medicationId`
+                        ORDER BY duplicates.`timestamp` DESC, duplicates.`id` DESC
+                        LIMIT 1
+                    )
+                    """
+                )
+                db.execSQL("DROP TABLE `medication_logs`")
+                db.execSQL("ALTER TABLE `medication_logs_new` RENAME TO `medication_logs`")
+                db.execSQL("CREATE INDEX IF NOT EXISTS `index_medication_logs_medicationId` ON `medication_logs` (`medicationId`)")
+                db.execSQL("CREATE UNIQUE INDEX IF NOT EXISTS `index_medication_logs_date_medicationId` ON `medication_logs` (`date`, `medicationId`)")
+            }
+        }
+
         val MIGRATION_7_8 = object : Migration(7, 8) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Drop manual triggers

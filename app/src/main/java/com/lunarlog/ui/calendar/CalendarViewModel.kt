@@ -92,9 +92,9 @@ class CalendarViewModel @Inject constructor(
             )
             
             while (currentStart.toEpochDay() < predictionLimit) {
-                // Period Prediction (Assuming 5 days for prediction visualization)
+                // Period Prediction based on the user's observed period length.
                 val pStart = currentStart.toEpochDay()
-                val pEnd = currentStart.plusDays(4).toEpochDay()
+                val pEnd = currentStart.plusDays((avgPeriodLength - 1).coerceAtLeast(0).toLong()).toEpochDay()
                 
                 for (day in pStart..pEnd) {
                     val current = dayMap[day] ?: DayData()

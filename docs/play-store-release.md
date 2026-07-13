@@ -2,7 +2,7 @@
 
 LunarLog now has two release channels:
 
-- `playRelease`: Google Play build without the sideload updater permission.
+- `playRelease`: Google Play build without internet or sideload-updater permissions.
 - `githubRelease`: direct-download APK build with the existing GitHub updater flow.
 
 ## Local Signing
@@ -47,13 +47,13 @@ Build the GitHub APK:
 2. Enroll in Play App Signing and register your upload key.
 3. Upload `app/build/outputs/bundle/playRelease/app-play-release.aab` to the Internal testing track first.
 4. Complete the Data safety form. LunarLog handles menstrual-cycle and wellness data, so answer this carefully and keep it aligned with the app’s actual local-first behavior.
-5. Add a privacy policy URL before production rollout. A repo version is available at `docs/privacy-policy.md`; publish it at a stable public URL before submitting.
-6. Fill in App content declarations, store listing copy, screenshots, icon, and feature graphic.
-7. Verify the notification permission explanation and any health-related positioning in the store listing are accurate and non-misleading.
+5. Enter the live privacy policy URL: `https://robertg761.github.io/LunarLog/`.
+6. Use `docs/play-store-listing.md` as the reviewed store copy, then add screenshots, icon, and feature graphic.
+7. In the Health apps declaration, review `Period Tracking` and `Medication and Treatment Management`; verify all notification and health positioning is accurate and non-misleading.
 
 ## Notes
 
 - `playRelease` targets API 35, which is required for current Google Play submissions.
-- The Play build removes `REQUEST_INSTALL_PACKAGES`, which avoids sending the app through restricted-permission review for its updater flow.
+- The Play build removes `INTERNET` and `REQUEST_INSTALL_PACKAGES`, which keeps the updater isolated to direct-download builds and avoids restricted-permission review for that flow.
 - The existing GitHub Actions release workflow now builds `githubRelease` so the sideload APK path still works.
 - If you want existing sideload users to upgrade in place to the Play build, you still need the original release keystore that signed those GitHub APKs. A new upload key alone does not preserve that upgrade path.

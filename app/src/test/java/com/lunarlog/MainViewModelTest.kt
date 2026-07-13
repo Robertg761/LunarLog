@@ -54,6 +54,7 @@ class MainViewModelTest {
 
         viewModel.onAppResumed()
 
+        assertTrue(viewModel.isLockStateReady.value)
         assertTrue(viewModel.isLocked.value)
     }
 
@@ -65,9 +66,21 @@ class MainViewModelTest {
         advanceUntilIdle()
 
         viewModel.unlock()
+        viewModel.onAppBackgrounded()
         viewModel.onAppResumed()
 
         assertFalse(viewModel.isLocked.value)
     }
-}
 
+    @Test
+    fun `onAppBackgrounded locks immediately when configured`() = runTest {
+        val viewModel = MainViewModel(userPreferencesRepository, updateRepository)
+        backgroundScope.launch { viewModel.uiState.collect() }
+        advanceUntilIdle()
+        viewModel.unlock()
+
+        viewModel.onAppBackgrounded()
+
+        assertTrue(viewModel.isLocked.value)
+    }
+}

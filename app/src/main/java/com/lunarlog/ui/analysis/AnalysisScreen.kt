@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import android.widget.Toast
+import java.io.IOException
 import java.time.LocalDate
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
@@ -73,18 +74,17 @@ fun AnalysisScreen(
     ) { uri ->
         uri?.let {
             try {
-                context.contentResolver.openOutputStream(it)?.use { stream ->
-                    ReportGenerator.generatePdf(
-                        stream,
-                        uiState.cycleHistory,
-                        uiState.symptomCounts,
-                        uiState.moodCounts
-                    )
-                }
+                val stream = context.contentResolver.openOutputStream(it)
+                    ?: throw IOException("The selected destination could not be opened")
+                ReportGenerator.generatePdf(
+                    stream,
+                    uiState.cycleHistory,
+                    uiState.symptomCounts,
+                    uiState.moodCounts
+                )
                 Toast.makeText(context, "PDF saved successfully", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(context, "Error saving PDF: ${e.message}", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, "Unable to save PDF. Please try another location.", Toast.LENGTH_SHORT).show()
             }
         }
     }
@@ -94,13 +94,17 @@ fun AnalysisScreen(
     ) { uri ->
         uri?.let {
             try {
-                context.contentResolver.openOutputStream(it)?.use { stream ->
-                    ReportGenerator.generateCsv(stream, uiState.cycleHistory)
-                }
+                val stream = context.contentResolver.openOutputStream(it)
+                    ?: throw IOException("The selected destination could not be opened")
+                ReportGenerator.generateCsv(
+                    stream,
+                    uiState.periods,
+                    uiState.dailyLogs,
+                    uiState.logEntries
+                )
                 Toast.makeText(context, "CSV saved successfully", Toast.LENGTH_LONG).show()
-            } catch (e: Exception) {
-                e.printStackTrace()
-                Toast.makeText(context, "Error saving CSV: ${e.message}", Toast.LENGTH_SHORT).show()
+            } catch (_: Exception) {
+                Toast.makeText(context, "Unable to save CSV. Please try another location.", Toast.LENGTH_SHORT).show()
             }
         }
     }

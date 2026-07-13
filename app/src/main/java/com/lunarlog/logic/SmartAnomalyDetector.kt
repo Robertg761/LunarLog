@@ -2,7 +2,6 @@ package com.lunarlog.logic
 
 import com.lunarlog.core.model.Cycle
 import java.time.LocalDate
-import java.time.temporal.ChronoUnit
 
 enum class AnomalyType {
     IRREGULAR, // Random variance
@@ -23,14 +22,7 @@ object SmartAnomalyDetector {
         val anomalies = mutableListOf<CycleAnomaly>()
         if (cycles.size < 4) return anomalies
 
-        // Calculate lengths
-        val sortedCycles = cycles.sortedBy { it.startDate }
-        val lengths = mutableListOf<Int>()
-        for (i in 0 until sortedCycles.size - 1) {
-            val start = sortedCycles[i].startDate
-            val nextStart = sortedCycles[i+1].startDate
-            lengths.add(ChronoUnit.DAYS.between(start, nextStart).toInt())
-        }
+        val lengths = CyclePredictionUtils.completedCycleIntervals(cycles).map { it.length }
 
         if (lengths.size < 3) return anomalies
 

@@ -18,6 +18,8 @@ import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.stateIn
 import javax.inject.Inject
+import kotlin.time.TimeMark
+import kotlin.time.TimeSource
 
 data class MainActivityUiState(
     val isLoading: Boolean = true,
@@ -65,25 +67,30 @@ class MainViewModel @Inject constructor(
     
     private val _isLocked = MutableStateFlow(false)
     val isLocked = _isLocked.asStateFlow()
-    private var lastUnlockAtMillis: Long? = null
+    private val _isLockStateReady = MutableStateFlow(false)
+    val isLockStateReady = _isLockStateReady.asStateFlow()
+    private var backgroundedAtMark: TimeMark? = null
 
     init {
         viewModelScope.launch {
             userPreferencesRepository.appLockMode.collectLatest { mode ->
                 if (mode == AppLockMode.NONE) {
                     _isLocked.value = false
+                    backgroundedAtMark = null
+                    _isLockStateReady.value = true
                     return@collectLatest
                 }
-                if (lastUnlockAtMillis == null) {
+                if (_isLocked.value || backgroundedAtMark == null) {
                     _isLocked.value = true
                 }
+                _isLockStateReady.value = true
             }
         }
     }
 
     fun unlock() {
         _isLocked.value = false
-        lastUnlockAtMillis = System.currentTimeMillis()
+        backgroundedAtMark = null
     }
 
     fun lock() {
@@ -96,6 +103,7 @@ class MainViewModel @Inject constructor(
         val state = uiState.value
         if (!state.isAppLockEnabled) {
             _isLocked.value = false
+            backgroundedAtMark = null
             return
         }
 
@@ -105,15 +113,17 @@ class MainViewModel @Inject constructor(
             return
         }
 
-        val lastUnlock = lastUnlockAtMillis
-        val elapsedMillis = if (lastUnlock == null) Long.MAX_VALUE else (System.currentTimeMillis() - lastUnlock)
-        _isLocked.value = elapsedMillis >= timeoutSeconds * 1000L
+        val backgroundedAt = backgroundedAtMark
+        if (backgroundedAt != null) {
+            _isLocked.value = backgroundedAt.elapsedNow().inWholeMilliseconds >= timeoutSeconds * 1000L
+        }
+        backgroundedAtMark = null
     }
 
     fun onAppBackgrounded() {
-        if (uiState.value.isAppLockEnabled && uiState.value.appLockTimeoutSeconds == 0L) {
-            _isLocked.value = true
-        }
+        if (!uiState.value.isAppLockEnabled) return
+        backgroundedAtMark = TimeSource.Monotonic.markNow()
+        if (uiState.value.appLockTimeoutSeconds == 0L) _isLocked.value = true
     }
 
     fun checkForUpdates() {

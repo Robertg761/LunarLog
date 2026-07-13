@@ -1,6 +1,8 @@
 package com.lunarlog.data
 
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.emitAll
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.flowOf
 import com.lunarlog.core.model.DailyLog
 import java.time.LocalDate
@@ -85,8 +87,15 @@ class DailyLogRepository @Inject constructor(
         return dailyLogDao.searchLogsFts(ftsQuery)
     }
 
-    fun searchLogsBySymptom(symptom: String): Flow<List<DailyLog>> {
-        return dailyLogDao.searchLogsBySymptom(symptom)
+    fun searchLogsBySymptom(symptom: String): Flow<List<DailyLog>> = flow {
+        // Older databases may have aggregate daily_logs rows that predate granular
+        // log_entries. Hydrate them once so the exact-match join remains complete.
+        appDatabase.withTransaction {
+            dailyLogDao.getLogsWithoutEntriesSync().forEach { legacyLog ->
+                ensureLegacyDataHydrated(legacyLog.date.toEpochDay())
+            }
+        }
+        emitAll(dailyLogDao.searchLogsBySymptom(symptom))
     }
 
     // --- Granular Log Entry Support ---
@@ -95,12 +104,24 @@ class DailyLogRepository @Inject constructor(
         return logEntryDao.getEntriesForDate(date)
     }
 
+    fun getAllEntries(): Flow<List<LogEntry>> = logEntryDao.getAllEntries()
+
     suspend fun addEntry(entry: LogEntry) {
         appDatabase.withTransaction {
             ensureLegacyDataHydrated(entry.date)
             logEntryDao.insertEntry(entry)
             updateDailyLogAggregateInTransaction(entry.date)
         }
+    }
+
+    suspend fun addEntryIfAbsent(entry: LogEntry): Boolean = appDatabase.withTransaction {
+        ensureLegacyDataHydrated(entry.date)
+        if (logEntryDao.entryExists(entry.date, entry.type, entry.value)) {
+            return@withTransaction false
+        }
+        logEntryDao.insertEntry(entry)
+        updateDailyLogAggregateInTransaction(entry.date)
+        true
     }
 
     /**
@@ -212,6 +233,10 @@ class DailyLogRepository @Inject constructor(
         if (legacyLog.cervicalMucus > 0) {
             logEntryDao.insertEntry(LogEntry(date = date, time = defaultTime, type = LogEntryType.MUCUS, value = legacyLog.cervicalMucus.toString()))
         }
+
+        if (logEntryDao.getEntriesForDateSync(date).isEmpty()) {
+            dailyLogDao.deleteLog(legacyLog.date)
+        }
     }
 
     suspend fun rebuildDailyLogAggregate(date: Long) {
@@ -241,7 +266,7 @@ class DailyLogRepository @Inject constructor(
         val entries = logEntryDao.getEntriesForDateSync(date)
         
         if (entries.isEmpty()) {
-            dailyLogDao.insertLog(DailyLog(date = LocalDate.ofEpochDay(date)))
+            dailyLogDao.deleteLog(LocalDate.ofEpochDay(date))
             return
         }
 

@@ -37,11 +37,13 @@ android {
         applicationId = "com.lunarlog"
         minSdk = 26
         targetSdk = 35
-        versionCode = 21
-        versionName = "1.7.9"
+        versionCode = 22
+        versionName = "1.8.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
+
+    sourceSets["androidTest"].assets.srcDir("$projectDir/schemas")
 
     if (llHasSigning) {
         signingConfigs {
@@ -113,6 +115,10 @@ android {
     }
 }
 
+ksp {
+    arg("room.schemaLocation", "$projectDir/schemas")
+}
+
 dependencies {
     // Core Android
     implementation(libs.androidx.core.ktx)
@@ -153,6 +159,7 @@ dependencies {
     testImplementation(libs.mockk)
     androidTestImplementation(libs.androidx.test.ext.junit)
     androidTestImplementation(libs.androidx.test.espresso.core)
+    androidTestImplementation(libs.androidx.room.testing)
     androidTestImplementation(platform(libs.androidx.compose.bom))
     androidTestImplementation(libs.androidx.ui.test.junit4)
     debugImplementation(libs.androidx.ui.tooling)

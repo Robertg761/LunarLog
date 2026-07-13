@@ -144,7 +144,7 @@ fun rememberShakeController(): ShakeController {
 }
 
 class ShakeController {
-    var shakeTrigger by mutableStateOf(0L)
+    var shakeTrigger by mutableLongStateOf(0L)
         private set
 
     fun shake() {

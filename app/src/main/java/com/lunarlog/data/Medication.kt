@@ -1,6 +1,8 @@
 package com.lunarlog.data
 
 import androidx.room.Entity
+import androidx.room.ForeignKey
+import androidx.room.Index
 import androidx.room.PrimaryKey
 
 @Entity(tableName = "medications")
@@ -14,7 +16,21 @@ data class Medication(
     val reminderTime: Long? = null // Minutes from midnight, or null if no reminder
 )
 
-@Entity(tableName = "medication_logs")
+@Entity(
+    tableName = "medication_logs",
+    foreignKeys = [
+        ForeignKey(
+            entity = Medication::class,
+            parentColumns = ["id"],
+            childColumns = ["medicationId"],
+            onDelete = ForeignKey.CASCADE
+        )
+    ],
+    indices = [
+        Index(value = ["medicationId"]),
+        Index(value = ["date", "medicationId"], unique = true)
+    ]
+)
 data class MedicationLog(
     @PrimaryKey(autoGenerate = true) val id: Long = 0,
     val date: Long, // Epoch Day

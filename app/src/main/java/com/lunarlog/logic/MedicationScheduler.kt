@@ -3,8 +3,9 @@ package com.lunarlog.logic
 import com.lunarlog.data.Medication
 import java.time.Instant
 import java.time.LocalDate
-import java.time.LocalDateTime
+import java.time.LocalTime
 import java.time.ZoneId
+import java.time.ZonedDateTime
 
 object MedicationScheduler {
 
@@ -23,12 +24,31 @@ object MedicationScheduler {
         }
     }
 
-    fun getNextReminderTime(medication: Medication): Long? {
-        // Return timestamp for next alarm
-        if (medication.reminderTime == null) return null
-        
-        // Logic to calculate next alarm based on frequency
-        // ... (Simplified for now)
+    fun getNextReminderTime(
+        medication: Medication,
+        now: Instant = Instant.now(),
+        zoneId: ZoneId = ZoneId.systemDefault()
+    ): Long? {
+        val reminderMinutes = medication.reminderTime ?: return null
+        if (reminderMinutes !in 0L..1439L || medication.frequency == "as_needed") return null
+
+        val nowLocal = ZonedDateTime.ofInstant(now, zoneId)
+        val medicationStart = LocalDate.ofEpochDay(medication.startDate)
+        val medicationEnd = medication.endDate?.let(LocalDate::ofEpochDay)
+        var candidateDate = maxOf(nowLocal.toLocalDate(), medicationStart)
+
+        repeat(370) {
+            if (medicationEnd != null && candidateDate.isAfter(medicationEnd)) return null
+            if (isMedicationDueToday(medication, candidateDate)) {
+                val candidate = ZonedDateTime.of(
+                    candidateDate,
+                    LocalTime.MIDNIGHT.plusMinutes(reminderMinutes),
+                    zoneId
+                ).toInstant()
+                if (candidate.isAfter(now)) return candidate.toEpochMilli()
+            }
+            candidateDate = candidateDate.plusDays(1)
+        }
         return null
     }
 }

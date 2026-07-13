@@ -27,6 +27,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -44,12 +45,12 @@ import androidx.navigation.navDeepLink
 import com.lunarlog.ui.analysis.AnalysisScreen
 import com.lunarlog.ui.calendar.CalendarScreen
 import com.lunarlog.ui.home.HomeScreen
-import com.lunarlog.ui.logdetails.LogDetailsScreen
 import com.lunarlog.ui.loglist.LogListScreen
 import com.lunarlog.ui.logperiod.LogPeriodScreen
 import com.lunarlog.ui.onboarding.OnboardingScreen
 import com.lunarlog.ui.settings.SettingsScreen
 import java.time.LocalDate
+import java.net.URI
 
 sealed class Screen(
     val route: String,
@@ -109,6 +110,8 @@ private fun AnimatedContentTransitionScope<NavBackStackEntry>.macExitTransition(
 fun LunarLogNavGraph(
     startDestination: String = Screen.Home.route,
     isUpdateAvailable: Boolean = false,
+    pendingDeepLink: String? = null,
+    onDeepLinkHandled: (Boolean) -> Unit = {},
     onInstallUpdate: () -> Unit = {}
 ) {
     val navController = rememberNavController()
@@ -117,6 +120,19 @@ fun LunarLogNavGraph(
 
     val bottomNavItems = listOf(Screen.Home, Screen.PeriodHistory, Screen.Calendar, Screen.Analysis)
     val showBottomBar = bottomNavItems.any { it.route == currentDestination?.route }
+
+    LaunchedEffect(pendingDeepLink, startDestination) {
+        val link = pendingDeepLink ?: return@LaunchedEffect
+        if (startDestination == Screen.Onboarding.route) return@LaunchedEffect
+
+        val route = lunarLogRouteForDeepLink(link)
+        if (route != null) {
+            navController.navigate(route) {
+                launchSingleTop = true
+            }
+        }
+        onDeepLinkHandled(route != null)
+    }
 
     Scaffold(
         bottomBar = {
@@ -291,5 +307,40 @@ fun LunarLogNavGraph(
                 }
             }
         }
+    }
+}
+
+internal fun lunarLogRouteForDeepLink(rawLink: String): String? {
+    val uri = try {
+        URI(rawLink)
+    } catch (_: Exception) {
+        return null
+    }
+    if (!uri.scheme.equals("lunarlog", ignoreCase = true) ||
+        uri.userInfo != null ||
+        uri.port != -1 ||
+        uri.rawQuery != null ||
+        uri.rawFragment != null
+    ) return null
+
+    val path = uri.path.orEmpty()
+    return when (uri.host?.lowercase()) {
+        "calendar" -> Screen.Calendar.route.takeIf { path.isEmpty() }
+        "analysis" -> Screen.Analysis.route.takeIf { path.isEmpty() }
+        "logging" -> Screen.Logging.route.takeIf { path.isEmpty() }
+        "details" -> {
+            val epochDayText = path.removePrefix("/")
+            if (path != "/$epochDayText" || epochDayText.isEmpty() || "/" in epochDayText) {
+                return null
+            }
+            val epochDay = epochDayText.toLongOrNull() ?: return null
+            try {
+                LocalDate.ofEpochDay(epochDay)
+            } catch (_: Exception) {
+                return null
+            }
+            Screen.Details.createRoute(epochDay)
+        }
+        else -> null
     }
 }

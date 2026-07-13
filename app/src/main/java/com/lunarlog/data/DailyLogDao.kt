@@ -18,6 +18,9 @@ interface DailyLogDao {
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertLog(dailyLog: DailyLog)
+
+    @Query("DELETE FROM daily_logs WHERE date = :date")
+    suspend fun deleteLog(date: LocalDate)
     
     @Query("SELECT * FROM daily_logs WHERE date BETWEEN :startDate AND :endDate")
     fun getLogsForRange(startDate: LocalDate, endDate: LocalDate): Flow<List<DailyLog>>
@@ -28,6 +31,14 @@ interface DailyLogDao {
 
     @Query("SELECT * FROM daily_logs")
     suspend fun getAllLogsSync(): List<DailyLog>
+
+    @Query("""
+        SELECT daily_logs.* FROM daily_logs
+        WHERE NOT EXISTS (
+            SELECT 1 FROM log_entries WHERE log_entries.date = daily_logs.date
+        )
+    """)
+    suspend fun getLogsWithoutEntriesSync(): List<DailyLog>
 
     @Query("SELECT * FROM daily_logs ORDER BY date DESC")
     fun getAllLogs(): Flow<List<DailyLog>>
@@ -40,6 +51,11 @@ interface DailyLogDao {
     """)
     fun searchLogsFts(query: String): Flow<List<DailyLog>>
 
-    @Query("SELECT * FROM daily_logs WHERE symptoms LIKE '%' || :symptom || '%' ORDER BY date DESC")
+    @Query("""
+        SELECT DISTINCT daily_logs.* FROM daily_logs
+        INNER JOIN log_entries ON log_entries.date = daily_logs.date
+        WHERE log_entries.type = 'SYMPTOM' AND log_entries.value = :symptom
+        ORDER BY daily_logs.date DESC
+    """)
     fun searchLogsBySymptom(symptom: String): Flow<List<DailyLog>>
 }

@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import javax.inject.Inject
 import javax.inject.Singleton
+import com.lunarlog.data.backup.BackupPreferencesDto
 
 val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "user_prefs")
 
@@ -147,6 +148,27 @@ class UserPreferencesRepository @Inject constructor(
 
     suspend fun getCycleNotificationEnabledSync(): Boolean {
         return context.dataStore.data.first()[CYCLE_NOTIFICATION_ENABLED] ?: false
+    }
+
+    suspend fun createBackupPreferences(): BackupPreferencesDto {
+        val preferences = context.dataStore.data.first()
+        return BackupPreferencesDto(
+            themeSeedColor = preferences[THEME_SEED_COLOR],
+            periodLogReminderEnabled = preferences[PERIOD_LOG_REMINDER_ENABLED] ?: false,
+            periodLogReminderTimeMinutes = preferences[PERIOD_LOG_REMINDER_TIME_MINUTES] ?: (20L * 60L),
+            cycleNotificationEnabled = preferences[CYCLE_NOTIFICATION_ENABLED] ?: false
+        )
+    }
+
+    suspend fun restoreBackupPreferences(backup: BackupPreferencesDto) {
+        context.dataStore.edit { preferences ->
+            val theme = backup.themeSeedColor
+            if (theme == null) preferences.remove(THEME_SEED_COLOR) else preferences[THEME_SEED_COLOR] = theme
+            preferences[PERIOD_LOG_REMINDER_ENABLED] = backup.periodLogReminderEnabled
+            preferences[PERIOD_LOG_REMINDER_TIME_MINUTES] =
+                backup.periodLogReminderTimeMinutes.coerceIn(0L, (24L * 60L) - 1L)
+            preferences[CYCLE_NOTIFICATION_ENABLED] = backup.cycleNotificationEnabled
+        }
     }
 
     suspend fun clearAll() {

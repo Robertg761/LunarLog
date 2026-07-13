@@ -45,13 +45,7 @@ class Converters {
     }
 
     @TypeConverter
-    fun toSymptomCategory(value: String): SymptomCategory {
-        return try {
-            SymptomCategory.valueOf(value)
-        } catch (e: IllegalArgumentException) {
-            SymptomCategory.OTHER
-        }
-    }
+    fun toSymptomCategory(value: String): SymptomCategory = SymptomCategory.valueOf(value)
 
     @TypeConverter
     fun fromLogEntryType(value: LogEntryType): String {
@@ -59,11 +53,5 @@ class Converters {
     }
 
     @TypeConverter
-    fun toLogEntryType(value: String): LogEntryType {
-        return try {
-            LogEntryType.valueOf(value)
-        } catch (e: IllegalArgumentException) {
-            LogEntryType.NOTE
-        }
-    }
+    fun toLogEntryType(value: String): LogEntryType = LogEntryType.valueOf(value)
 }

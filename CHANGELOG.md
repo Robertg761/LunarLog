@@ -1,5 +1,23 @@
 # Changelog
 
+## [1.8.0] - 2026-07-13
+
+### Added
+- **Medication Tracking**: Added daily, weekly, and as-needed medications with optional private reminders and dose history.
+- **Richer Daily Logs**: Added timed entries, custom symptoms, temperature, cervical-mucus observations, sleep quality, hydration, libido, and improved exact filtering.
+- **Safer Data Tools**: Added detailed CSV reports plus bounded, validated JSON backup and transactional restore for logs, medications, and preferences.
+
+### Changed
+- **Predictions and Insights**: Cycle statistics now use start-to-next-start intervals from completed cycles, fertility estimates require more conservative evidence, and insights avoid overstating sparse data.
+- **Reports and Navigation**: Improved PDF pagination, report completeness, responsive layouts, deep-link handling, and daily-log editing flows.
+- **Privacy**: Sensitive screens now block screenshots and recents previews; notifications use private visibility with generic lock-screen text; Android cloud and device-transfer backup are disabled.
+
+### Fixed
+- **Database Safety**: Added the Room 8-to-9 migration, committed schema history, validated foreign-key relationships, and made restore replacement atomic.
+- **Reminder Reliability**: Fixed scheduling and rescheduling for cycle, daily-log, and medication reminders, including reboot/time-change recovery.
+- **Update Safety**: Hardened SemVer parsing, APK download validation, install-state handling, and stable-versus-prerelease selection.
+- **Build and Maintenance**: Added CI, CodeQL, Dependabot, lint policy, immutable workflow action pins, and removed committed build artifacts and unused code.
+
 ## [1.7.9] - 2026-05-11
 
 ### Fixed

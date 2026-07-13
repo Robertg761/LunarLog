@@ -20,12 +20,7 @@ class UpdateRepository @Inject constructor() {
 
         val latestVer = SemVer.parseOrNull(latestTag)
         val currentVer = SemVer.parseOrNull(currentVersionName)
-        val isNewer = if (latestVer != null && currentVer != null) {
-            latestVer > currentVer
-        } else {
-            // Fallback for non-semver tags: any tag mismatch is considered "new".
-            latestTag.removePrefix("v") != currentVersionName.removePrefix("v")
-        }
+        val isNewer = latestVer != null && currentVer != null && latestVer > currentVer
 
         if (!isNewer) return@withContext null
 

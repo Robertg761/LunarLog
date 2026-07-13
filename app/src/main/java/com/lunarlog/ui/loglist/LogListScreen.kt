@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
+import com.lunarlog.data.Medication
 import java.time.Instant
 import java.time.LocalDate
 import java.time.ZoneId
@@ -99,6 +100,15 @@ fun LogListScreen(
                     isPeriodDay = uiState.isPeriodDay,
                     onToggle = { checked -> viewModel.togglePeriod(checked) }
                 )
+
+                if (uiState.medications.isNotEmpty()) {
+                    MedicationSection(
+                        medications = uiState.medications,
+                        takenMedicationIds = uiState.takenMedicationIds,
+                        onTakenChange = viewModel::setMedicationTaken,
+                        modifier = Modifier.padding(horizontal = 16.dp)
+                    )
+                }
                 
                 // Empty State
                 Box(
@@ -138,6 +148,15 @@ fun LogListScreen(
                         onToggle = { checked -> viewModel.togglePeriod(checked) },
                         modifier = Modifier.padding(bottom = 8.dp)
                     )
+                }
+                if (uiState.medications.isNotEmpty()) {
+                    item {
+                        MedicationSection(
+                            medications = uiState.medications,
+                            takenMedicationIds = uiState.takenMedicationIds,
+                            onTakenChange = viewModel::setMedicationTaken
+                        )
+                    }
                 }
                 items(uiState.entries) { entry ->
                     LogEntryCard(
@@ -206,6 +225,8 @@ fun LogListScreen(
         AddEntrySheet(
             date = uiState.date,
             initialEntry = editingEntry,
+            symptomDefinitions = uiState.symptomDefinitions,
+            onAddCustomSymptom = viewModel::addCustomSymptom,
             onDismiss = { showAddSheet = false },
             onSave = { payload, time, details ->
                 viewModel.saveEntries(
@@ -218,6 +239,52 @@ fun LogListScreen(
                 editingEntry = null
             }
         )
+    }
+}
+
+@Composable
+private fun MedicationSection(
+    medications: List<Medication>,
+    takenMedicationIds: Set<Int>,
+    onTakenChange: (Int, Boolean) -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(modifier = modifier.fillMaxWidth()) {
+        Column(modifier = Modifier.padding(16.dp)) {
+            Text("Medications", style = MaterialTheme.typography.titleMedium)
+            Text(
+                "Record doses taken on this day",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+            Spacer(Modifier.height(8.dp))
+            medications.forEach { medication ->
+                val isTaken = medication.id in takenMedicationIds
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clickable { onTakenChange(medication.id, !isTaken) },
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Checkbox(
+                        checked = isTaken,
+                        onCheckedChange = { checked -> onTakenChange(medication.id, checked) }
+                    )
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(medication.name)
+                        val details = listOfNotNull(
+                            medication.dosage.takeIf { it.isNotBlank() },
+                            medication.frequency.replace('_', ' ').replaceFirstChar { it.uppercase() }
+                        ).joinToString(" • ")
+                        Text(
+                            details,
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                    }
+                }
+            }
+        }
     }
 }
 

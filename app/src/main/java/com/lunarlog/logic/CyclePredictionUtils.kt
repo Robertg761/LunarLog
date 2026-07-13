@@ -7,28 +7,32 @@ import java.time.temporal.ChronoUnit
 import kotlin.math.pow
 import kotlin.math.sqrt
 
+data class CompletedCycleInterval(
+    val period: Cycle,
+    val nextPeriodStart: LocalDate
+) {
+    val startDate: LocalDate = period.startDate
+    val endDate: LocalDate = nextPeriodStart.minusDays(1)
+    val length: Int = ChronoUnit.DAYS.between(startDate, nextPeriodStart).toInt()
+}
+
 object CyclePredictionUtils {
 
-    private fun getValidCycleLengths(cycles: List<Cycle>): List<Int> {
-        if (cycles.size < 2) return emptyList()
-
-        val sortedCycles = cycles.sortedByDescending { it.startDate }
-
-        val lengths = mutableListOf<Int>()
-        for (i in 0 until sortedCycles.size - 1) {
-            val currentCycleStart = sortedCycles[i].startDate
-            val previousCycleStart = sortedCycles[i+1].startDate
-
-            val length = ChronoUnit.DAYS.between(previousCycleStart, currentCycleStart).toInt()
-            if (length in 15..50) {
-                 lengths.add(length)
+    fun completedCycleIntervals(cycles: List<Cycle>): List<CompletedCycleInterval> {
+        val sortedCycles = cycles.sortedBy { it.startDate }
+        return sortedCycles.zipWithNext()
+            .map { (period, nextPeriod) ->
+                CompletedCycleInterval(period, nextPeriod.startDate)
             }
-        }
-        return lengths
+            .filter { it.length > 0 }
     }
 
     fun calculateAverageCycleLength(cycles: List<Cycle>): Int {
-        val lengths = getValidCycleLengths(cycles)
+        // Keep the historical prediction guardrail so a mistaken or unusually long
+        // gap does not dominate the next-date estimate. Other analysis still sees it.
+        val lengths = completedCycleIntervals(cycles)
+            .map { it.length }
+            .filter { it in 15..50 }
         return if (lengths.isEmpty()) {
             AppConfig.DEFAULT_CYCLE_LENGTH
         } else {
@@ -53,7 +57,7 @@ object CyclePredictionUtils {
     }
 
     fun calculateStandardDeviation(cycles: List<Cycle>): Double {
-        val lengths = getValidCycleLengths(cycles)
+        val lengths = completedCycleIntervals(cycles).map { it.length }
         if (lengths.size < 2) return 0.0
 
         val mean = lengths.average()

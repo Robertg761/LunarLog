@@ -2,7 +2,6 @@ package com.lunarlog.logic
 
 import com.lunarlog.core.model.Cycle
 import com.lunarlog.core.model.DailyLog
-import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 
 data class SymptomCorrelation(
@@ -17,54 +16,43 @@ object SymptomCorrelationEngine {
     fun analyzeCorrelations(cycles: List<Cycle>, logs: List<DailyLog>): List<SymptomCorrelation> {
         if (cycles.isEmpty() || logs.isEmpty()) return emptyList()
 
-        val sortedCycles = cycles.sortedBy { it.startDate }
-        val symptomMap = mutableMapOf<String, MutableMap<Int, Int>>() // Symptom -> Day -> Count
-        val cycleCountPerDay = mutableMapOf<Int, Int>() // Day -> How many cycles reached this day
+        val intervals = CyclePredictionUtils.completedCycleIntervals(cycles)
+        if (intervals.isEmpty()) return emptyList()
 
-        // 1. Map logs to cycle days
+        val observedCyclesByDay = mutableMapOf<Int, MutableSet<java.time.LocalDate>>()
+        val symptomCyclesByDay = mutableMapOf<String, MutableMap<Int, MutableSet<java.time.LocalDate>>>()
+
         for (log in logs) {
-            val logDate = log.date
-            // Find the cycle this log belongs to
-            // findLast implies we want the latest cycle that started before or on the log date
-            val cycle = sortedCycles.findLast { !it.startDate.isAfter(log.date) } ?: continue
-            
-            val cycleStart = cycle.startDate
-            val dayOfCycle = ChronoUnit.DAYS.between(cycleStart, logDate).toInt() + 1
+            val interval = intervals.findLast {
+                !log.date.isBefore(it.startDate) && !log.date.isAfter(it.endDate)
+            } ?: continue
+            val dayOfCycle = ChronoUnit.DAYS.between(interval.startDate, log.date).toInt() + 1
+            val cycleKey = interval.startDate
 
-            if (dayOfCycle > 50) continue // Ignore extremely long outlier days
-
-            // 2. Tally symptoms
-            for (symptom in log.symptoms) {
-                val dayMap = symptomMap.getOrPut(symptom) { mutableMapOf() }
-                dayMap[dayOfCycle] = dayMap.getOrDefault(dayOfCycle, 0) + 1
+            observedCyclesByDay.getOrPut(dayOfCycle) { mutableSetOf() }.add(cycleKey)
+            for (symptom in log.symptoms.distinct()) {
+                symptomCyclesByDay
+                    .getOrPut(symptom) { mutableMapOf() }
+                    .getOrPut(dayOfCycle) { mutableSetOf() }
+                    .add(cycleKey)
             }
         }
 
-        // 3. Calculate denominator (How many cycles actually *have* a Day X?)
-        // E.g. If I have 5 cycles, but only 2 of them were 30 days long, then Day 30 statistics should be based on 2, not 5.
-        // However, this is complex because we need to know if the cycle *ended* before that day.
-        // Simplified approach: Count how many cycles have a duration >= X.
-        val cycleLengths = sortedCycles.map { 
-             val start = it.startDate
-             val end = it.endDate ?: LocalDate.now()
-             ChronoUnit.DAYS.between(start, end).toInt() + 1
-        }
-        
-        // Find max cycle length to iterate
-        val maxDay = cycleLengths.maxOrNull() ?: 28
-        for (d in 1..maxDay) {
-            cycleCountPerDay[d] = cycleLengths.count { it >= d }
-        }
-
-        // 4. Generate results
         val results = mutableListOf<SymptomCorrelation>()
-        for ((symptom, dayMap) in symptomMap) {
-            for ((day, count) in dayMap) {
-                val denominator = cycleCountPerDay[day] ?: 0
-                if (denominator >= 3) { // Minimum 3 cycles to form a pattern
-                    val frequency = count.toFloat() / denominator
-                    if (frequency >= 0.5f) { // Only report if it happens > 50% of the time
-                        results.add(SymptomCorrelation(symptom, day, frequency, count))
+        for ((symptom, dayMap) in symptomCyclesByDay) {
+            for ((day, matchingCycles) in dayMap) {
+                val observedCycles = observedCyclesByDay[day]?.size ?: 0
+                if (observedCycles >= 3) {
+                    val frequency = matchingCycles.size.toFloat() / observedCycles
+                    if (frequency >= 0.5f) {
+                        results.add(
+                            SymptomCorrelation(
+                                symptom = symptom,
+                                cycleDay = day,
+                                frequency = frequency,
+                                totalOccurrences = matchingCycles.size
+                            )
+                        )
                     }
                 }
             }

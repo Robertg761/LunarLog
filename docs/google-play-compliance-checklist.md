@@ -1,6 +1,6 @@
 # Google Play Compliance Checklist
 
-Last reviewed: April 3, 2026
+Last reviewed: July 13, 2026
 
 This checklist is for LunarLog's Google Play submission. Items are checked only when they can be verified from the repository, live public assets, or completed work in this thread. Play Console choices that cannot be read from the repo stay unchecked even if we discussed them.
 
@@ -12,19 +12,24 @@ This checklist is for LunarLog's Google Play submission. Items are checked only 
 - [x] Privacy policy names the app and describes data handling, sharing, retention, and contact method
 - [x] App does not require account creation, login, password, membership, subscription, or reviewer-provided credentials to access core functionality
 - [x] App stores core cycle and wellness data locally on-device using Room/DataStore
-- [x] Android automatic cloud backup is disabled via `android:allowBackup="false"`
+- [x] Android automatic cloud backup and device transfer are disabled via `android:allowBackup="false"` plus explicit backup/extraction exclusions
 - [x] Play build disables the GitHub updater flow (`ENABLE_GITHUB_UPDATES = false` for the `play` flavor)
+- [x] Play build does not request `INTERNET` or `REQUEST_INSTALL_PACKAGES`; those permissions exist only in the direct-download GitHub flavor
 - [x] App does not include ad SDKs in Gradle dependencies
 - [x] App does not include analytics or crash-reporting SDKs in Gradle dependencies
 - [x] App does not include billing / in-app purchase SDKs in Gradle dependencies
 - [x] App does not request location permissions
 - [x] App does not include user-to-user chat, voice, image, or audio exchange features
 - [x] App does not appear to sell or promote age-restricted products or activities
+- [x] In-app About copy and prepared store listing include the required non-medical-device disclaimer and advise consulting a healthcare professional
+- [x] Fertility surfaces label results as estimates and state that predictions are not birth control
+- [x] Sensitive screens use secure-window protection; notifications use private visibility with generic public content
+- [x] Store listing copy is prepared at [docs/play-store-listing.md](play-store-listing.md)
 
 ## Still To Do
 
-- [ ] Complete the Health apps declaration in Play Console and select the applicable health feature category
-  - Expected category for LunarLog: `Period tracking`
+- [ ] Complete the Health apps declaration in Play Console and select every applicable health feature category
+  - Expected categories for current behavior: `Period Tracking` and `Medication and Treatment Management`
 - [x] Add a privacy policy link or privacy policy text inside the app itself
   - Verified in the Settings screen `About` section
 - [ ] Complete the Data safety form in Play Console so it matches the app's actual behavior
@@ -61,7 +66,9 @@ This checklist is for LunarLog's Google Play submission. Items are checked only 
 - Google Play Health apps declaration:
   - [Provide information for the health apps declaration form](https://support.google.com/googleplay/android-developer/answer/14738291?hl=en-GB)
 - Google Play Health Content and Services:
-  - [Health Content and Services](https://support.google.com/googleplay/android-developer/answer/12261419?hl=en)
+  - [Health Content and Services](https://support.google.com/googleplay/android-developer/answer/16679511?hl=en)
+- Google Play target API requirements:
+  - [Target API level requirements for Google Play apps](https://support.google.com/googleplay/android-developer/answer/11926878?hl=en-EN)
 - Google Play User data / privacy policy requirements:
   - [User data](https://support.google.com/googleplay/android-developer/answer/10144311?hl=en-AU)
 - Google Play target audience and content:
@@ -74,5 +81,5 @@ This checklist is for LunarLog's Google Play submission. Items are checked only 
 ## Notes
 
 - This is a submission checklist, not legal advice.
-- The riskiest currently open item is the missing in-app privacy policy link or text. Google Play's health and privacy policies explicitly require that the privacy policy be available in Play Console and within the app itself.
+- Repository-side health disclosures, privacy copy, and store copy are complete; the remaining declaration and audience items require Play Console access and deliberate owner selections.
 - Keeping `13-15` and `16-17` selected increases policy surface area even without ads or login. The app is in a much safer policy position than an ad-supported social app, but audience selection still needs deliberate review.

@@ -5,6 +5,7 @@ import androidx.hilt.work.HiltWorkerFactory
 import androidx.work.Configuration
 import com.lunarlog.data.AppDatabase
 import com.lunarlog.data.DatabaseInitializer
+import com.lunarlog.workers.NotificationWorkScheduler
 import dagger.hilt.android.HiltAndroidApp
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -31,6 +32,7 @@ class LunarLogApplication : Application(), Configuration.Provider {
 
     override fun onCreate() {
         super.onCreate()
+        NotificationWorkScheduler.scheduleMedicationReminders(this)
         
         applicationScope.launch(Dispatchers.IO) {
             databaseInitializer.initialize()

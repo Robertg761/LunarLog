@@ -18,8 +18,14 @@ interface LogEntryDao {
     @Query("SELECT * FROM log_entries ORDER BY date ASC, time ASC")
     suspend fun getAllEntriesSync(): List<LogEntry>
 
+    @Query("SELECT * FROM log_entries ORDER BY date ASC, time ASC")
+    fun getAllEntries(): Flow<List<LogEntry>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntry(entry: LogEntry): Long
+
+    @Query("SELECT EXISTS(SELECT 1 FROM log_entries WHERE date = :date AND type = :type AND value = :value)")
+    suspend fun entryExists(date: Long, type: LogEntryType, value: String): Boolean
 
     @Update
     suspend fun updateEntry(entry: LogEntry)

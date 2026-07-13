@@ -26,7 +26,8 @@ import javax.inject.Singleton
 @Singleton
 class DataManagementRepository @Inject constructor(
     private val dailyLogRepository: DailyLogRepository,
-    private val appDatabase: AppDatabase
+    private val appDatabase: AppDatabase,
+    private val userPreferencesRepository: UserPreferencesRepository
 ) {
     private val gson = Gson()
 
@@ -37,13 +38,14 @@ class DataManagementRepository @Inject constructor(
         val medicationDao = appDatabase.medicationDao()
         val symptomDao = appDatabase.symptomDefinitionDao()
 
-        val cycles = cycleDao.getAllCyclesSync().map {
-            CycleDto(
-                id = it.id,
-                startEpochDay = it.startDate.toEpochDay(),
-                endEpochDay = it.endDate?.toEpochDay()
-            )
-        }
+        val data = appDatabase.withTransaction {
+            val cycles = cycleDao.getAllCyclesSync().map {
+                CycleDto(
+                    id = it.id,
+                    startEpochDay = it.startDate.toEpochDay(),
+                    endEpochDay = it.endDate?.toEpochDay()
+                )
+            }
 
         val dailyLogs = dailyLogDao.getAllLogsSync().map {
             DailyLogDto(
@@ -104,10 +106,7 @@ class DataManagementRepository @Inject constructor(
             )
         }
 
-        val payload = BackupPayloadV2(
-            exportedAtMillis = System.currentTimeMillis(),
-            appVersionName = BuildConfig.VERSION_NAME,
-            data = BackupDataV2(
+            BackupDataV2(
                 cycles = cycles,
                 dailyLogs = dailyLogs,
                 logEntries = logEntries,
@@ -115,6 +114,12 @@ class DataManagementRepository @Inject constructor(
                 medicationLogs = medicationLogs,
                 symptomDefinitions = symptomDefinitions
             )
+        }
+
+        val payload = BackupPayloadV2(
+            exportedAtMillis = System.currentTimeMillis(),
+            appVersionName = BuildConfig.VERSION_NAME,
+            data = data.copy(preferences = userPreferencesRepository.createBackupPreferences())
         )
 
         gson.toJson(payload)
@@ -123,6 +128,8 @@ class DataManagementRepository @Inject constructor(
     suspend fun restoreFromJson(json: String) = withContext(Dispatchers.IO) {
         val payload = parseBackupPayload(json)
             ?: throw IllegalArgumentException("Unsupported or invalid backup format")
+
+        validatePayload(payload)
 
         val cycleDao = appDatabase.cycleDao()
         val medicationDao = appDatabase.medicationDao()
@@ -140,19 +147,16 @@ class DataManagementRepository @Inject constructor(
             appDatabase.clearAllTables()
 
             // Symptom definitions
-            symptomDao.insertAllReplace(payload.data.symptomDefinitions.map {
+            val restoredSymptoms = payload.data.symptomDefinitions.map {
                 SymptomDefinition(
                     id = it.id,
                     name = it.name,
                     displayName = it.displayName,
-                    category = try {
-                        SymptomCategory.valueOf(it.category)
-                    } catch (_: IllegalArgumentException) {
-                        SymptomCategory.OTHER
-                    },
+                    category = SymptomCategory.valueOf(it.category),
                     isCustom = it.isCustom
                 )
-            })
+            }
+            symptomDao.insertAllReplace(restoredSymptoms.ifEmpty { SymptomData.defaultSymptoms })
 
             // Medications + logs (medicationId must remain stable)
             payload.data.medications.forEach {
@@ -199,11 +203,7 @@ class DataManagementRepository @Inject constructor(
                         id = it.id,
                         date = it.dateEpochDay,
                         time = it.timeEpochMillis,
-                        type = try {
-                            LogEntryType.valueOf(it.type)
-                        } catch (_: IllegalArgumentException) {
-                            LogEntryType.NOTE
-                        },
+                        type = LogEntryType.valueOf(it.type),
                         value = it.value,
                         details = it.details
                     )
@@ -244,22 +244,6 @@ class DataManagementRepository @Inject constructor(
                 if (dl.temperature != null) add(LogEntryType.TEMPERATURE, dl.temperature.toString())
                 if (dl.cervicalMucus > 0) add(LogEntryType.MUCUS, dl.cervicalMucus.toString())
 
-                // If the daily log was completely empty, we still want a row to exist.
-                if (
-                    dl.flowLevel == 0 &&
-                    dl.symptoms.isNullOrEmpty() &&
-                    dl.mood.isNullOrEmpty() &&
-                    dl.waterIntake == 0 &&
-                    dl.sleepHours == 0f &&
-                    dl.sleepQuality == 0 &&
-                    dl.sexDrive == 0 &&
-                    notes.isEmpty() &&
-                    dl.temperature == null &&
-                    dl.cervicalMucus == 0
-                ) {
-                    // Force aggregate row creation below.
-                }
-
                 datesWithEntries.add(dl.dateEpochDay)
             }
 
@@ -269,6 +253,8 @@ class DataManagementRepository @Inject constructor(
                 dailyLogRepository.rebuildDailyLogAggregateInTransaction(dateEpochDay)
             }
         }
+
+        payload.data.preferences?.let { userPreferencesRepository.restoreBackupPreferences(it) }
     }
 
     suspend fun nukeData() = withContext(Dispatchers.IO) {
@@ -282,40 +268,56 @@ class DataManagementRepository @Inject constructor(
             return null
         }
         if (!root.isJsonObject) return null
-        val obj = root.asJsonObject
-        val version = obj.get("version")?.takeIf { it.isJsonPrimitive }?.asInt ?: 1
-        return if (version == 2 && obj.has("data")) {
-            gson.fromJson(obj, BackupPayloadV2::class.java)
-        } else {
-            parseLegacyPayload(obj)
+        return try {
+            val obj = root.asJsonObject
+            val version = obj.get("version")?.takeIf { it.isJsonPrimitive }?.asInt ?: 1
+            if (version == 2 && obj.has("data")) {
+                gson.fromJson(obj, BackupPayloadV2::class.java)
+            } else {
+                parseLegacyPayload(obj)
+            }
+        } catch (error: IllegalArgumentException) {
+            throw error
+        } catch (error: Exception) {
+            throw IllegalArgumentException("Backup contains malformed fields", error)
         }
     }
 
     /**
-     * Best-effort support for older backups that were created by serializing Room entities directly.
-     * We only require cycles + dailyLogs to be present.
+     * Strict support for older backups that were created by serializing Room entities directly.
+     * Every record must parse successfully; a lossy legacy restore is never accepted.
      */
     private fun parseLegacyPayload(obj: JsonObject): BackupPayloadV2? {
         val cyclesEl = obj.get("cycles") ?: return null
         val dailyLogsEl = obj.get("dailyLogs") ?: return null
         if (!cyclesEl.isJsonArray || !dailyLogsEl.isJsonArray) return null
 
-        val cycles = cyclesEl.asJsonArray.mapNotNull { el ->
+        val cycles = cyclesEl.asJsonArray.mapIndexed { index, el ->
+            if (!el.isJsonObject) throw IllegalArgumentException("Legacy cycle $index is not an object")
             val o = el.asJsonObject
             val id = o.get("id")?.asInt ?: 0
-            val start = parseEpochDay(o.get("startDate")) ?: return@mapNotNull null
-            val end = parseEpochDay(o.get("endDate"))
+            val start = parseEpochDay(o.get("startDate"))
+                ?: throw IllegalArgumentException("Legacy cycle $index has an invalid start date")
+            val endElement = o.get("endDate")
+            val end = if (endElement == null || endElement.isJsonNull) {
+                null
+            } else {
+                parseEpochDay(endElement)
+                    ?: throw IllegalArgumentException("Legacy cycle $index has an invalid end date")
+            }
             CycleDto(id = id, startEpochDay = start, endEpochDay = end)
         }
 
-        val dailyLogs = dailyLogsEl.asJsonArray.mapNotNull { el ->
+        val dailyLogs = dailyLogsEl.asJsonArray.mapIndexed { index, el ->
+            if (!el.isJsonObject) throw IllegalArgumentException("Legacy daily log $index is not an object")
             val o = el.asJsonObject
-            val date = parseEpochDay(o.get("date")) ?: return@mapNotNull null
+            val date = parseEpochDay(o.get("date"))
+                ?: throw IllegalArgumentException("Legacy daily log $index has an invalid date")
             DailyLogDto(
                 dateEpochDay = date,
                 flowLevel = o.get("flowLevel")?.asInt ?: 0,
-                mood = o.get("mood")?.asJsonArray?.mapNotNull { it.asString } ?: emptyList(),
-                symptoms = o.get("symptoms")?.asJsonArray?.mapNotNull { it.asString } ?: emptyList(),
+                mood = parseLegacyStringList(o.get("mood"), "daily log $index mood"),
+                symptoms = parseLegacyStringList(o.get("symptoms"), "daily log $index symptoms"),
                 waterIntake = o.get("waterIntake")?.asInt ?: 0,
                 sleepHours = o.get("sleepHours")?.asFloat ?: 0f,
                 sleepQuality = o.get("sleepQuality")?.asInt ?: 0,
@@ -338,6 +340,129 @@ class DataManagementRepository @Inject constructor(
                 symptomDefinitions = emptyList()
             )
         )
+    }
+
+    private fun parseLegacyStringList(element: JsonElement?, label: String): List<String> {
+        if (element == null || element.isJsonNull) return emptyList()
+        if (!element.isJsonArray) throw IllegalArgumentException("Legacy $label is not an array")
+        return element.asJsonArray.mapIndexed { index, item ->
+            if (!item.isJsonPrimitive || !item.asJsonPrimitive.isString) {
+                throw IllegalArgumentException("Legacy $label item $index is not text")
+            }
+            item.asString
+        }
+    }
+
+    private fun validatePayload(payload: BackupPayloadV2) {
+        val data = payload.data
+
+        fun requireDate(epochDay: Long, label: String): LocalDate = try {
+            LocalDate.ofEpochDay(epochDay)
+        } catch (error: Exception) {
+            throw IllegalArgumentException("$label is outside the supported date range", error)
+        }
+
+        fun requireUniquePositiveIds(ids: List<Long>, label: String) {
+            val positiveIds = ids.filter { it > 0 }
+            if (positiveIds.size != positiveIds.toSet().size) {
+                throw IllegalArgumentException("Backup contains duplicate $label IDs")
+            }
+        }
+
+        requireUniquePositiveIds(data.cycles.map { it.id.toLong() }, "period")
+        val periodRanges = data.cycles.mapIndexed { index, cycle ->
+            val start = requireDate(cycle.startEpochDay, "Period $index start date")
+            val end = cycle.endEpochDay?.let { requireDate(it, "Period $index end date") }
+            if (end != null && end.isBefore(start)) {
+                throw IllegalArgumentException("Period $index ends before it starts")
+            }
+            start to end
+        }.sortedBy { it.first }
+        periodRanges.zipWithNext().forEachIndexed { index, (current, next) ->
+            val currentEnd = current.second ?: LocalDate.MAX
+            if (!currentEnd.isBefore(next.first)) {
+                throw IllegalArgumentException("Periods $index and ${index + 1} overlap")
+            }
+        }
+
+        val dailyLogDates = mutableSetOf<Long>()
+        data.dailyLogs.forEachIndexed { index, log ->
+            requireDate(log.dateEpochDay, "Daily log $index date")
+            if (!dailyLogDates.add(log.dateEpochDay)) {
+                throw IllegalArgumentException("Backup contains duplicate daily log dates")
+            }
+            require(log.flowLevel in 0..4) { "Daily log $index has an invalid flow level" }
+            require(log.waterIntake >= 0) { "Daily log $index has invalid water intake" }
+            require(log.sleepHours in 0f..24f) { "Daily log $index has invalid sleep hours" }
+            require(log.sleepQuality in 0..5) { "Daily log $index has invalid sleep quality" }
+            require(log.sexDrive in 0..5) { "Daily log $index has invalid sex drive" }
+            require(log.cervicalMucus in 0..4) { "Daily log $index has invalid cervical mucus" }
+            val temperature = log.temperature
+            require(
+                temperature == null || temperature in 34f..43f || temperature in 90f..110f
+            ) { "Daily log $index has an invalid temperature" }
+        }
+
+        requireUniquePositiveIds(data.logEntries.map { it.id }, "log entry")
+        data.logEntries.forEachIndexed { index, entry ->
+            requireDate(entry.dateEpochDay, "Log entry $index date")
+            try {
+                LogEntryType.valueOf(entry.type)
+            } catch (error: IllegalArgumentException) {
+                throw IllegalArgumentException("Log entry $index has an unknown type", error)
+            }
+            require(entry.value.isNotBlank()) { "Log entry $index has an empty value" }
+        }
+
+        requireUniquePositiveIds(data.medications.map { it.id.toLong() }, "medication")
+        data.medications.forEachIndexed { index, medication ->
+            val start = requireDate(medication.startDateEpochDay, "Medication $index start date")
+            val end = medication.endDateEpochDay?.let { requireDate(it, "Medication $index end date") }
+            require(medication.name.isNotBlank()) { "Medication $index has no name" }
+            require(medication.id > 0) { "Medication $index has an invalid ID" }
+            require(medication.frequency in setOf("daily", "weekly", "as_needed")) {
+                "Medication $index has an invalid frequency"
+            }
+            require(end == null || !end.isBefore(start)) { "Medication $index ends before it starts" }
+            require(medication.reminderTimeMinutes == null || medication.reminderTimeMinutes in 0L..1439L) {
+                "Medication $index has an invalid reminder time"
+            }
+        }
+
+        val medicationIds = data.medications.map { it.id }.toSet()
+        requireUniquePositiveIds(data.medicationLogs.map { it.id }, "medication log")
+        val medicationLogKeys = mutableSetOf<Pair<Long, Int>>()
+        data.medicationLogs.forEachIndexed { index, log ->
+            requireDate(log.dateEpochDay, "Medication log $index date")
+            require(log.medicationId in medicationIds) {
+                "Medication log $index references a missing medication"
+            }
+            require(medicationLogKeys.add(log.dateEpochDay to log.medicationId)) {
+                "Backup contains duplicate medication doses for one day"
+            }
+        }
+
+        requireUniquePositiveIds(data.symptomDefinitions.map { it.id }, "symptom definition")
+        val symptomNames = mutableSetOf<String>()
+        data.symptomDefinitions.forEachIndexed { index, symptom ->
+            require(symptom.name.isNotBlank() && symptom.displayName.isNotBlank()) {
+                "Symptom definition $index has an empty name"
+            }
+            require(symptomNames.add(symptom.name)) {
+                "Backup contains duplicate symptom definition names"
+            }
+            try {
+                SymptomCategory.valueOf(symptom.category)
+            } catch (error: IllegalArgumentException) {
+                throw IllegalArgumentException("Symptom definition $index has an unknown category", error)
+            }
+        }
+
+        data.preferences?.let { preferences ->
+            require(preferences.periodLogReminderTimeMinutes in 0L..1439L) {
+                "Backup has an invalid period reminder time"
+            }
+        }
     }
 
     private fun parseEpochDay(el: JsonElement?): Long? {
@@ -368,4 +493,3 @@ class DataManagementRepository @Inject constructor(
         return null
     }
 }
-

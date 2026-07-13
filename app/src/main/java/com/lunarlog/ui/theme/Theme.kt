@@ -12,22 +12,11 @@ import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.SideEffect
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.luminance
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalView
 import androidx.core.view.WindowCompat
-// Use standard library Color class for MCU compatibility if needed, but for now we manually map
-// Actually, Compose Material3 doesn't expose a public "generate from seed" easily without libraries like material-color-utilities (which is JS/Dart mainly, the Android one is embedded in dynamic*).
-// However, since we want a CUSTOM seed that is NOT the wallpaper, we need a way to generate the tonal palettes.
-// For simplicity in this iteration without adding a heavy external color engine library manually, 
-// we will implement a simplified generator or just a few preset themes. 
-// BUT, the user asked for "Dynamic Theming Engine". 
-// Let's implement a basic "Tonal Palette" generator or just use a few predefined palettes for robustness if MCU is not easily accessible in pure Kotlin without KMP setup.
-// Wait, I can use `androidx.core.graphics.ColorUtils` or similar? No, that's not full Material 3.
-// Let's stick to the prompt: "User-selectable Seed Color".
-// I'll assume we can't easily generate the FULL accessible M3 scheme from scratch without `com.google.material.color:material-color-utilities` which I added via npm but that's for JS...
-// Ah, the proper Android dependency is `com.google.android.material:material` but that's View-based.
-// Okay, I will implement a "Simple" dynamic theme that tints the primary/secondary colors based on the seed.
 
 private val DarkColorScheme = darkColorScheme(
     primary = Primary80,
@@ -103,7 +92,6 @@ fun LunarLogTheme(
     if (!view.isInEditMode) {
         SideEffect {
             val window = (view.context as Activity).window
-            window.statusBarColor = Color.Transparent.toArgb()
             WindowCompat.getInsetsController(window, view).isAppearanceLightStatusBars = !darkTheme
         }
     }
@@ -116,38 +104,71 @@ fun LunarLogTheme(
     )
 }
 
-// Simple generation logic (Placeholder for full MCU)
-// Real implementation would use HCT color space.
 fun generateLightSchemeFromSeed(seed: Color): ColorScheme {
+    val primary = seed.copy(alpha = 1f)
+    val secondary = lerp(primary, BrandPlum, 0.18f)
+    val tertiary = lerp(primary, Color(0xFF6750A4), 0.35f)
+    val primaryContainer = lerp(primary, Color.White, 0.78f)
+    val secondaryContainer = lerp(secondary, Color.White, 0.82f)
     return lightColorScheme(
-        primary = seed,
-        onPrimary = Color.White,
-        primaryContainer = seed.copy(alpha = 0.3f),
-        onPrimaryContainer = Color.Black,
-        secondary = seed.copy(alpha = 0.8f),
-        onSecondary = Color.White,
-        tertiary = seed.copy(alpha = 0.6f),
+        primary = primary,
+        onPrimary = bestContentColor(primary),
+        primaryContainer = primaryContainer,
+        onPrimaryContainer = bestContentColor(primaryContainer),
+        secondary = secondary,
+        onSecondary = bestContentColor(secondary),
+        secondaryContainer = secondaryContainer,
+        onSecondaryContainer = bestContentColor(secondaryContainer),
+        tertiary = tertiary,
+        onTertiary = bestContentColor(tertiary),
         background = BackgroundLight,
+        onBackground = BrandInk,
         surface = SurfaceLight,
+        onSurface = BrandInk,
         surfaceContainer = SurfaceContainerLight,
         surfaceVariant = SurfaceVariantLight,
+        onSurfaceVariant = Color(0xFF72535F),
         outline = OutlineLight
     )
 }
 
 fun generateDarkSchemeFromSeed(seed: Color): ColorScheme {
+    val primary = lerp(seed.copy(alpha = 1f), Color.White, 0.28f)
+    val secondary = lerp(seed.copy(alpha = 1f), Color.White, 0.4f)
+    val tertiary = lerp(seed.copy(alpha = 1f), Color(0xFFD0BCFF), 0.45f)
+    val primaryContainer = lerp(seed.copy(alpha = 1f), BackgroundDark, 0.55f)
+    val secondaryContainer = lerp(seed.copy(alpha = 1f), BackgroundDark, 0.68f)
     return darkColorScheme(
-        primary = seed,
-        onPrimary = Color.Black,
-        primaryContainer = seed.copy(alpha = 0.3f),
-        onPrimaryContainer = Color.White,
-        secondary = seed.copy(alpha = 0.8f),
-        onSecondary = Color.Black,
-        tertiary = seed.copy(alpha = 0.6f),
+        primary = primary,
+        onPrimary = bestContentColor(primary),
+        primaryContainer = primaryContainer,
+        onPrimaryContainer = bestContentColor(primaryContainer),
+        secondary = secondary,
+        onSecondary = bestContentColor(secondary),
+        secondaryContainer = secondaryContainer,
+        onSecondaryContainer = bestContentColor(secondaryContainer),
+        tertiary = tertiary,
+        onTertiary = bestContentColor(tertiary),
         background = BackgroundDark,
+        onBackground = Color(0xFFFFECF2),
         surface = SurfaceDark,
+        onSurface = Color(0xFFFFECF2),
         surfaceContainer = SurfaceContainerDark,
         surfaceVariant = SurfaceVariantDark,
+        onSurfaceVariant = Color(0xFFE5C1CC),
         outline = OutlineDark
     )
+}
+
+internal fun bestContentColor(background: Color): Color =
+    if (contrastRatio(background, Color.Black) >= contrastRatio(background, Color.White)) {
+        Color.Black
+    } else {
+        Color.White
+    }
+
+internal fun contrastRatio(first: Color, second: Color): Float {
+    val lighter = maxOf(first.luminance(), second.luminance())
+    val darker = minOf(first.luminance(), second.luminance())
+    return (lighter + 0.05f) / (darker + 0.05f)
 }

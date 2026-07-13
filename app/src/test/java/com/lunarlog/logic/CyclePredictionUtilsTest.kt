@@ -8,6 +8,20 @@ import java.time.LocalDate
 class CyclePredictionUtilsTest {
 
     @Test
+    fun completedCycleIntervals_usesConsecutivePeriodStarts() {
+        val cycles = listOf(
+            Cycle(id = 2, startDate = LocalDate.of(2023, 1, 29), endDate = LocalDate.of(2023, 2, 2)),
+            Cycle(id = 1, startDate = LocalDate.of(2023, 1, 1), endDate = LocalDate.of(2023, 1, 5))
+        )
+
+        val intervals = CyclePredictionUtils.completedCycleIntervals(cycles)
+
+        assertEquals(1, intervals.size)
+        assertEquals(28, intervals.single().length)
+        assertEquals(LocalDate.of(2023, 1, 28), intervals.single().endDate)
+    }
+
+    @Test
     fun calculateAverageCycleLength_returnsDefault_whenNotEnoughData() {
         val cycles = listOf(
             Cycle(startDate = LocalDate.of(2023, 1, 1))
@@ -31,6 +45,19 @@ class CyclePredictionUtilsTest {
 
         val result = CyclePredictionUtils.calculateAverageCycleLength(cycles)
         assertEquals(29, result)
+    }
+
+    @Test
+    fun unusualCompletedInterval_isVisibleToAnalysis_butExcludedFromPredictionAverage() {
+        val cycles = listOf(
+            Cycle(startDate = LocalDate.of(2026, 1, 1)),
+            Cycle(startDate = LocalDate.of(2026, 1, 29)),
+            Cycle(startDate = LocalDate.of(2026, 4, 9))
+        )
+
+        assertEquals(listOf(28, 70), CyclePredictionUtils.completedCycleIntervals(cycles).map { it.length })
+        assertEquals(28, CyclePredictionUtils.calculateAverageCycleLength(cycles))
+        assertEquals(true, CyclePredictionUtils.isCycleIrregular(cycles))
     }
 
     @Test
