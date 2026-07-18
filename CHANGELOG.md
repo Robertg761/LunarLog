@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.8.1] - 2026-07-17
+
+### Changed
+- **Faster Flow Logging**: Add Log now opens directly on Flow and shows Flow as the first entry type, while edits still open on the existing entry's type.
+
 ## [1.8.0] - 2026-07-13
 
 ### Added

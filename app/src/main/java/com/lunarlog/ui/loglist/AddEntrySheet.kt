@@ -27,6 +27,9 @@ import java.time.LocalTime
 import java.time.ZoneId
 import java.util.Locale
 
+private val addEntryTypeOrder = listOf(LogEntryType.FLOW) +
+    LogEntryType.values().filterNot { it == LogEntryType.FLOW }
+
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AddEntrySheet(
@@ -38,7 +41,7 @@ fun AddEntrySheet(
     onSave: (Map<LogEntryType, List<String>>, Long, String?) -> Unit
 ) {
     // Current active tab
-    var selectedType by remember { mutableStateOf(initialEntry?.type ?: LogEntryType.SYMPTOM) }
+    var selectedType by remember { mutableStateOf(initialEntry?.type ?: LogEntryType.FLOW) }
     var customCategory by remember { mutableStateOf<SymptomCategory?>(null) }
     var customName by remember { mutableStateOf("") }
     
@@ -187,10 +190,10 @@ fun AddEntrySheet(
 
             // Type Selector
             ScrollableTabRow(
-                selectedTabIndex = LogEntryType.values().indexOf(selectedType),
+                selectedTabIndex = addEntryTypeOrder.indexOf(selectedType),
                 edgePadding = 0.dp
             ) {
-                LogEntryType.values().forEach { type ->
+                addEntryTypeOrder.forEach { type ->
                     Tab(
                         selected = selectedType == type,
                         onClick = { selectedType = type },
