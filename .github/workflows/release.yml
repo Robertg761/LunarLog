@@ -2,6 +2,8 @@ name: Release
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*.*.*"
 
@@ -9,14 +11,16 @@ permissions:
   contents: write
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-publication
   cancel-in-progress: false
 
 jobs:
-  validate:
+  resolve:
     outputs:
       release_version: ${{ steps.release_meta.outputs.release_version }}
+      release_tag: ${{ steps.release_meta.outputs.release_tag }}
       is_prerelease: ${{ steps.release_meta.outputs.is_prerelease }}
+      should_release: ${{ steps.release_meta.outputs.should_release }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
@@ -24,89 +28,23 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Setup Java
-        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
-        with:
-          distribution: temurin
-          java-version: "17"
-          cache: gradle
-
       - name: Setup Node
         uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
         with:
           node-version: "24"
 
       - id: release_meta
-        name: Resolve Release Version From Tag
+        name: Resolve Release Trigger
         env:
-          RELEASE_TAG: ${{ github.ref_name }}
-        shell: bash
-        run: |
-          set -euo pipefail
+          BEFORE_SHA: ${{ github.event.before }}
+        run: node scripts/resolve_release_trigger.js
 
-          if [ -z "${RELEASE_TAG:-}" ]; then
-            echo "Release tag is missing." >&2
-            exit 1
-          fi
-
-          if [[ ! "$RELEASE_TAG" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
-            echo "Invalid release tag: $RELEASE_TAG. Expected a SemVer tag such as v1.8.0 or v1.8.0-rc.1." >&2
-            exit 1
-          fi
-
-          RELEASE_VERSION="${RELEASE_TAG#v}"
-          echo "release_version=$RELEASE_VERSION" >> "$GITHUB_OUTPUT"
-          VERSION_WITHOUT_BUILD="${RELEASE_VERSION%%+*}"
-          if [[ "$VERSION_WITHOUT_BUILD" == *-* ]]; then
-            echo "is_prerelease=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "is_prerelease=false" >> "$GITHUB_OUTPUT"
-          fi
-          echo "Resolved release version $RELEASE_VERSION from tag $RELEASE_TAG"
-
-      - name: Verify Tag Points To Main HEAD
-        shell: bash
-        run: |
-          set -euo pipefail
-          git fetch origin main --depth=1
-          main_head="$(git rev-parse origin/main)"
-          tag_sha="$(git rev-parse "$GITHUB_SHA")"
-
-          if [ "$tag_sha" != "$main_head" ]; then
-            echo "Release tag must point to the current origin/main HEAD." >&2
-            echo "Tag commit:  $tag_sha" >&2
-            echo "origin/main: $main_head" >&2
-            exit 1
-          fi
-
-      - name: Align Android Version To Release Tag
-        env:
-          RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
-        run: node scripts/sync_android_version.js "$RELEASE_VERSION"
-
-      - name: Verify Android Version Metadata
-        env:
-          RELEASE_VERSION: ${{ steps.release_meta.outputs.release_version }}
-        shell: bash
-        run: |
-          set -euo pipefail
-          node scripts/get_version.js
-
-          actual_version="$(node -e 'const fs = require("fs"); const txt = fs.readFileSync("app/build.gradle.kts", "utf8"); const match = txt.match(/versionName\s*=\s*"([^"]+)"/); if (!match) process.exit(1); process.stdout.write(match[1]);')"
-
-          if [ "$actual_version" != "$RELEASE_VERSION" ]; then
-            echo "Release tag must match Android versionName. Expected $RELEASE_VERSION; found $actual_version." >&2
-            exit 1
-          fi
-
-      - name: Run Tests
-        run: ./gradlew test
-
-  build-and-release:
-    needs: validate
+  validate:
+    needs: resolve
+    if: needs.resolve.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout Tagged Commit
+      - name: Checkout Release Commit
         uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
         with:
           ref: ${{ github.sha }}
@@ -124,10 +62,67 @@ jobs:
         with:
           node-version: "24"
 
-      - name: Align Android Version To Release Tag
+      - name: Verify Release Commit Is Main HEAD
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main --depth=1
+          main_head="$(git rev-parse origin/main)"
+          release_sha="$(git rev-parse "$GITHUB_SHA")"
+
+          if [ "$release_sha" != "$main_head" ]; then
+            echo "Release commit must be the current origin/main HEAD." >&2
+            echo "Release commit: $release_sha" >&2
+            echo "origin/main: $main_head" >&2
+            exit 1
+          fi
+
+      - name: Verify Android Version Metadata
         env:
-          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
-        run: node scripts/sync_android_version.js "$RELEASE_VERSION"
+          RELEASE_VERSION: ${{ needs.resolve.outputs.release_version }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          node scripts/get_version.js
+
+          actual_version="$(node -e 'const fs = require("fs"); const txt = fs.readFileSync("app/build.gradle.kts", "utf8"); const match = txt.match(/versionName\s*=\s*"([^"]+)"/); if (!match) process.exit(1); process.stdout.write(match[1]);')"
+
+          if [ "$actual_version" != "$RELEASE_VERSION" ]; then
+            echo "Release metadata changed after trigger resolution. Expected $RELEASE_VERSION; found $actual_version." >&2
+            exit 1
+          fi
+
+      - name: Test Release Trigger Logic
+        run: node --test scripts/tests/*.test.js
+
+      - name: Run Release Gate
+        run: >-
+          ./gradlew --no-daemon
+          test
+          lintPlayDebug lintGithubDebug
+          assemblePlayDebug assembleGithubDebug
+
+  build-and-release:
+    needs: [resolve, validate]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Release Commit
+        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
+        with:
+          ref: ${{ github.sha }}
+          fetch-depth: 0
+
+      - name: Setup Java
+        uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4
+        with:
+          distribution: temurin
+          java-version: "17"
+          cache: gradle
+
+      - name: Setup Node
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: "24"
 
       - name: Verify Signing Secrets
         env:
@@ -171,7 +166,7 @@ jobs:
       - name: Prepare Dist
         id: dist
         env:
-          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.release_version }}
         shell: bash
         run: |
           set -euo pipefail
@@ -191,7 +186,7 @@ jobs:
 
       - name: Extract Release Notes
         env:
-          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.release_version }}
         shell: bash
         run: |
           set -euo pipefail
@@ -206,58 +201,19 @@ jobs:
       - name: Create GitHub Release
         uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
         with:
-          tag_name: ${{ github.ref_name }}
-          name: ${{ github.ref_name }}
+          tag_name: ${{ needs.resolve.outputs.release_tag }}
+          name: ${{ needs.resolve.outputs.release_tag }}
+          target_commitish: ${{ github.sha }}
           body_path: dist/release-notes.md
           files: |
             ${{ steps.dist.outputs.apk_path }}
             ${{ steps.dist.outputs.logo_path }}
           draft: false
-          prerelease: ${{ needs.validate.outputs.is_prerelease == 'true' }}
+          prerelease: ${{ needs.resolve.outputs.is_prerelease == 'true' }}
 
       - name: Upload Artifacts
         if: ${{ always() }}
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
-          name: release-dist
+          name: release-dist-${{ needs.resolve.outputs.release_version }}
           path: dist/*
-
-  sync-version:
-    needs: [validate, build-and-release]
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout Tagged Commit
-        uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
-        with:
-          ref: ${{ github.sha }}
-          fetch-depth: 0
-
-      - name: Setup Node
-        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
-        with:
-          node-version: "24"
-
-      - name: Align Android Version To Release Tag
-        env:
-          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
-        run: node scripts/sync_android_version.js "$RELEASE_VERSION"
-
-      - name: Commit Version Bump Back To Main
-        env:
-          RELEASE_TAG: ${{ github.ref_name }}
-          RELEASE_VERSION: ${{ needs.validate.outputs.release_version }}
-        shell: bash
-        run: |
-          set -euo pipefail
-
-          if git diff --quiet -- app/build.gradle.kts; then
-            echo "app/build.gradle.kts already matches $RELEASE_TAG on the tagged commit."
-            exit 0
-          fi
-
-          git config user.name "github-actions[bot]"
-          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git switch -c "release-version-sync-$RELEASE_VERSION"
-          git add app/build.gradle.kts
-          git commit -m "chore: bump version to $RELEASE_VERSION"
-          git push origin HEAD:main

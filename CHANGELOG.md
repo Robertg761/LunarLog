@@ -4,6 +4,7 @@
 
 ### Changed
 - **Faster Flow Logging**: Add Log now opens directly on Flow and shows Flow as the first entry type, while edits still open on the existing entry's type.
+- **Release Automation**: Pushing a validated version bump to `main` now automatically creates the matching tag and GitHub Release.
 
 ## [1.8.0] - 2026-07-13
 

@@ -72,10 +72,10 @@ Cycle and fertile-day predictions are estimates. LunarLog is not a medical devic
 ## Versioning and Releases
 
 - App version is defined in `app/build.gradle.kts` (`versionCode`, `versionName`).
-- `CHANGELOG.md` is used for release notes when it has a matching section for the pushed tag.
+- `CHANGELOG.md` is used for release notes when it has a matching section for the bumped version.
 - `playRelease` builds the Play Store `.aab` bundle.
 - `githubRelease` builds the signed sideload APK used by GitHub Releases.
-- The release workflow runs when a stable or prerelease SemVer tag is pushed to the current `main` HEAD. It tests and builds a signed `githubRelease` APK, marks prereleases correctly, and syncs each version bump back to `main` so every installable release gets a higher Android `versionCode`.
+- Pushing to `main` automatically starts a release when `versionName` increases, `versionCode` also increases, and `CHANGELOG.md` contains a matching section. The workflow tests and builds a signed `githubRelease` APK, creates the matching SemVer tag and GitHub Release, and marks prereleases correctly. Manual SemVer tags on the current `main` HEAD remain supported; ordinary pushes without a `versionName` bump do not publish a release.
 
 ## Play Console Release Documentation
 
