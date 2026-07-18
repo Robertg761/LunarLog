@@ -14,9 +14,14 @@ function parseAndroidVersion(text) {
     throw new Error("Android versionName/versionCode could not be read from app/build.gradle.kts");
   }
 
+  const versionCode = Number(versionCodeMatch[1]);
+  if (!Number.isSafeInteger(versionCode) || versionCode < 1) {
+    throw new Error(`Invalid Android versionCode: ${versionCodeMatch[1]}`);
+  }
+
   return {
     versionName: versionNameMatch[1],
-    versionCode: Number(versionCodeMatch[1]),
+    versionCode,
   };
 }
 

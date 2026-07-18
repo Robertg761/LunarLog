@@ -16,6 +16,13 @@ test("reads Android version metadata", () => {
   );
 });
 
+test("rejects a non-positive Android versionCode", () => {
+  assert.throws(
+    () => parseAndroidVersion('versionCode = 0\nversionName = "1.8.1"'),
+    /Invalid Android versionCode/
+  );
+});
+
 test("orders stable and prerelease SemVer values", () => {
   assert.equal(compareSemVer("1.8.1", "1.8.0"), 1);
   assert.equal(compareSemVer("1.8.1", "1.8.1-rc.1"), 1);
