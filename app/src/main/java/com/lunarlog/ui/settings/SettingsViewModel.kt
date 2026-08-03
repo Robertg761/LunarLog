@@ -14,6 +14,9 @@ import dagger.hilt.android.lifecycle.HiltViewModel
 import dagger.hilt.android.qualifiers.ApplicationContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.Dispatchers
@@ -61,6 +64,27 @@ class SettingsViewModel @Inject constructor(
 
     val medications = medicationRepository.getAllMedications()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+
+    /**
+     * False until DataStore has answered for every preference the screen renders as a Switch.
+     *
+     * Each `stateIn` above hands out its default (app lock off, alerts off, 8:00 PM) until the first
+     * real read lands, so composing the rows immediately draws them wrong and then animates each
+     * Switch across. Combining the *repository* flows — which emit nothing until DataStore reads —
+     * gives the screen a real signal to gate on instead of counting frames.
+     */
+    val isLoaded: StateFlow<Boolean> = combine(
+        userPreferencesRepository.appLockMode,
+        userPreferencesRepository.appLockTimeoutSeconds,
+        userPreferencesRepository.cycleNotificationEnabled,
+        userPreferencesRepository.themeSeedColor,
+        userPreferencesRepository.periodLogReminderEnabled
+    ) { _, _, _, _, _ -> true }
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+
+    // restoreFromJson can run for seconds on a large backup with nothing on screen to say so.
+    private val _isRestoring = MutableStateFlow(false)
+    val isRestoring: StateFlow<Boolean> = _isRestoring.asStateFlow()
 
     private val _message = MutableStateFlow<String?>(null)
     val message = _message
@@ -189,6 +213,7 @@ class SettingsViewModel @Inject constructor(
 
     fun importData(uri: Uri) {
         viewModelScope.launch {
+            _isRestoring.value = true
             try {
                 val jsonString = withContext(Dispatchers.IO) {
                     val declaredLength = context.contentResolver
@@ -221,6 +246,8 @@ class SettingsViewModel @Inject constructor(
                 _message.value = "Data restored successfully."
             } catch (e: Exception) {
                 _message.value = "Restore failed: ${e.localizedMessage}"
+            } finally {
+                _isRestoring.value = false
             }
         }
     }

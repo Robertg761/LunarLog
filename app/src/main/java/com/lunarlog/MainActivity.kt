@@ -2,13 +2,20 @@ package com.lunarlog
 
 import android.content.Intent
 import android.os.Bundle
+import android.provider.Settings
 import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
 import androidx.biometric.BiometricPrompt
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.snap
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
 import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
@@ -16,11 +23,11 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
-import android.widget.Toast
 import com.lunarlog.ui.navigation.LunarLogNavGraph
 import com.lunarlog.ui.theme.LunarLogTheme
 import dagger.hilt.android.AndroidEntryPoint
@@ -32,7 +39,6 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.padding
 import androidx.compose.ui.unit.dp
 
 import androidx.activity.enableEdgeToEdge
@@ -45,6 +51,7 @@ import androidx.compose.runtime.remember
 import com.lunarlog.update.ApkUpdateManager
 import com.lunarlog.ui.update.UpdateBottomSheet
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 
 @AndroidEntryPoint
 class MainActivity : AppCompatActivity() {
@@ -52,6 +59,12 @@ class MainActivity : AppCompatActivity() {
     private val viewModel: MainViewModel by viewModels()
     private val apkUpdateManager = ApkUpdateManager()
     private val pendingDeepLink = MutableStateFlow<String?>(null)
+
+    /**
+     * Set when [authenticateUser] cannot start a prompt. Surfaced through the shared
+     * [SnackbarHostState] rather than a Toast so the lock screen offers a way out.
+     */
+    private val authUnavailableMessage = MutableStateFlow<String?>(null)
 
     override fun onCreate(savedInstanceState: Bundle?) {
         val splashScreen = installSplashScreen()
@@ -77,7 +90,9 @@ class MainActivity : AppCompatActivity() {
             val isLocked by viewModel.isLocked.collectAsState()
             val isLockStateReady by viewModel.isLockStateReady.collectAsState()
             val deepLink by pendingDeepLink.collectAsState()
+            val authError by authUnavailableMessage.collectAsState()
             val snackbarHostState = remember { SnackbarHostState() }
+            val scope = rememberCoroutineScope()
             val updateSheetInfo = remember { androidx.compose.runtime.mutableStateOf<com.lunarlog.update.UpdateInfo?>(null) }
             val promptedDownloaded = remember { androidx.compose.runtime.mutableStateOf(false) }
 
@@ -128,6 +143,21 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            // App lock with no usable authenticator used to be an unrecoverable dead end behind a
+            // Toast. The snackbar hands the user a route to device security settings.
+            LaunchedEffect(authError) {
+                val message = authError ?: return@LaunchedEffect
+                val result = snackbarHostState.showSnackbar(
+                    message = message,
+                    actionLabel = "Settings",
+                    duration = SnackbarDuration.Long
+                )
+                authUnavailableMessage.value = null
+                if (result == SnackbarResult.ActionPerformed) {
+                    runCatching { startActivity(Intent(Settings.ACTION_SECURITY_SETTINGS)) }
+                }
+            }
+
             LunarLogTheme(
                 seedColor = uiState.themeSeedColor
             ) {
@@ -136,17 +166,40 @@ class MainActivity : AppCompatActivity() {
                     color = MaterialTheme.colorScheme.background
                 ) {
                     if (!uiState.isLoading && isLockStateReady) {
-                        if (uiState.isAppLockEnabled && isLocked) {
-                            // Show Lock Screen / Prompt
-                            LockScreenContent(
-                                onUnlock = { authenticateUser() }
-                            )
-                            // Auto-trigger auth on first show
-                            LaunchedEffect(Unit) {
-                                authenticateUser()
-                            }
-                        } else {
-                            Box(modifier = Modifier.fillMaxSize()) {
+                        val showLockScreen = uiState.isAppLockEnabled && isLocked
+                        Crossfade(
+                            targetState = showLockScreen,
+                            modifier = Modifier.fillMaxSize(),
+                            // Fades on unlock; snaps on lock. A crossfade composes and draws BOTH
+                            // branches at once, and the re-lock decision is made in onResume() —
+                            // after the window is already showing content — so fading into the lock
+                            // screen would leave the user's cycle data legible underneath it for
+                            // the length of the animation. FLAG_SECURE does not help here: it stops
+                            // screenshots and recents thumbnails, not what is on the display.
+                            // Locking is the direction where the guarantee matters, so it is instant.
+                            animationSpec = if (showLockScreen) snap() else tween(280),
+                            label = "lockState"
+                        ) { locked ->
+                            if (locked) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    LockScreenContent(
+                                        onUnlock = { authenticateUser() }
+                                    )
+                                    // The nav graph's Scaffold is not composed while locked, so the
+                                    // lock screen hosts the shared snackbar itself — inset-aware
+                                    // rather than offset by a hardcoded guess.
+                                    SnackbarHost(
+                                        hostState = snackbarHostState,
+                                        modifier = Modifier
+                                            .align(Alignment.BottomCenter)
+                                            .windowInsetsPadding(WindowInsets.safeDrawing)
+                                    )
+                                }
+                                // Auto-trigger auth on first show
+                                LaunchedEffect(Unit) {
+                                    authenticateUser()
+                                }
+                            } else {
                                 LunarLogNavGraph(
                                     startDestination = uiState.startDestination,
                                     isUpdateAvailable = uiState.isUpdateAvailable,
@@ -154,22 +207,22 @@ class MainActivity : AppCompatActivity() {
                                     onDeepLinkHandled = { handled ->
                                         pendingDeepLink.value = null
                                         if (!handled) {
-                                            Toast.makeText(
-                                                this@MainActivity,
-                                                "Unable to open that LunarLog link.",
-                                                Toast.LENGTH_LONG
-                                            ).show()
+                                            scope.launch {
+                                                snackbarHostState.showSnackbar(
+                                                    message = "Unable to open that LunarLog link.",
+                                                    duration = SnackbarDuration.Long
+                                                )
+                                            }
                                         }
                                     },
                                     onInstallUpdate = {
                                         if (BuildConfig.ENABLE_GITHUB_UPDATES) {
                                             viewModel.triggerInstallUpdate()
                                         }
-                                    }
-                                )
-                                SnackbarHost(
-                                    hostState = snackbarHostState,
-                                    modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 80.dp) // Avoid covering nav bar
+                                    },
+                                    // The graph's Scaffold positions the snackbar above the bottom
+                                    // nav bar and the system inset automatically.
+                                    snackbarHostState = snackbarHostState
                                 )
                             }
                         }
@@ -233,11 +286,8 @@ class MainActivity : AppCompatActivity() {
 
             biometricPrompt.authenticate(promptInfo)
         } else {
-            Toast.makeText(
-                this,
-                "App Lock is enabled, but no device authentication is available.",
-                Toast.LENGTH_LONG
-            ).show()
+            authUnavailableMessage.value =
+                "App Lock is enabled, but no device authentication is available."
         }
     }
 

@@ -2,6 +2,7 @@ package com.lunarlog.ui.components
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.size
@@ -26,12 +27,22 @@ import kotlin.random.Random
 
 /**
  * A full-screen overlay that plays a success checkmark animation.
+ *
+ * The disc is `primary`, not the stock material green it used to hardcode: this plays over the app's
+ * own screens, and a saturated green landing in the middle of a pink theme read as a system dialog
+ * rather than as LunarLog confirming a save. A scrim underneath keeps the content behind it from
+ * competing with the check.
+ *
  * @param onAnimationFinished Callback when the animation completes (approx 1.5s).
  */
 @Composable
 fun SuccessOverlay(onAnimationFinished: () -> Unit) {
     var startAnimation by remember { mutableStateOf(false) }
-    
+
+    val discColor = MaterialTheme.colorScheme.primary
+    val checkColor = MaterialTheme.colorScheme.onPrimary
+    val scrimColor = MaterialTheme.colorScheme.scrim
+
     val scale by animateFloatAsState(
         targetValue = if (startAnimation) 1f else 0f,
         animationSpec = spring(
@@ -56,7 +67,8 @@ fun SuccessOverlay(onAnimationFinished: () -> Unit) {
     Box(
         modifier = Modifier
             .fillMaxSize()
-            .graphicsLayer { this.alpha = alpha },
+            .graphicsLayer { this.alpha = alpha }
+            .background(scrimColor.copy(alpha = 0.32f)),
         contentAlignment = Alignment.Center
     ) {
         // Background Circle
@@ -64,14 +76,14 @@ fun SuccessOverlay(onAnimationFinished: () -> Unit) {
             scaleX = scale
             scaleY = scale
         }) {
-            drawCircle(color = Color(0xFF4CAF50)) // Success Green
+            drawCircle(color = discColor)
         }
 
         // Check Icon
         Icon(
             imageVector = Icons.Default.Check,
             contentDescription = "Success",
-            tint = Color.White,
+            tint = checkColor,
             modifier = Modifier
                 .size(64.dp)
                 .graphicsLayer {
@@ -84,15 +96,24 @@ fun SuccessOverlay(onAnimationFinished: () -> Unit) {
 
 /**
  * A confetti explosion effect.
+ *
  * @param modifier Modifier for the container.
  * @param durationMillis How long the particles last.
+ * @param colors The palette particles are drawn from. Defaults to the theme's accent roles, so a
+ *   user who has picked a seed colour gets confetti in their own palette rather than the fixed
+ *   amber/blue/pink/green set this used to hardcode.
  */
 @Composable
 fun ConfettiExplosion(
     modifier: Modifier = Modifier,
-    durationMillis: Int = 1000
+    durationMillis: Int = 1000,
+    colors: List<Color> = listOf(
+        MaterialTheme.colorScheme.primary,
+        MaterialTheme.colorScheme.secondary,
+        MaterialTheme.colorScheme.tertiary
+    )
 ) {
-    val particles = remember { List(50) { ConfettiParticle() } }
+    val particles = remember(colors) { List(50) { ConfettiParticle(color = colors.random()) } }
     val anim = remember { Animatable(0f) }
 
     LaunchedEffect(Unit) {
@@ -123,15 +144,10 @@ fun ConfettiExplosion(
 }
 
 private data class ConfettiParticle(
+    val color: Color,
     val angle: Double = Random.nextDouble() * 2 * Math.PI,
     val maxRadius: Float = Random.nextFloat() * 300f + 100f,
-    val size: Float = Random.nextFloat() * 10f + 5f,
-    val color: Color = listOf(
-        Color(0xFFFFC107), // Amber
-        Color(0xFF2196F3), // Blue
-        Color(0xFFE91E63), // Pink
-        Color(0xFF4CAF50)  // Green
-    ).random()
+    val size: Float = Random.nextFloat() * 10f + 5f
 )
 
 /**

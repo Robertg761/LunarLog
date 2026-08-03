@@ -1,56 +1,96 @@
 package com.lunarlog.ui.calendar
 
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
-import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material.icons.filled.Today
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.PathEffect
 import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.role
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
+import com.lunarlog.ui.components.LunarLogCenterTopAppBar
+import com.lunarlog.ui.components.CardDivider
+import com.lunarlog.ui.components.LoadingState
 import com.lunarlog.ui.theme.*
+import com.lunarlog.ui.util.FullDayDate
+import com.lunarlog.ui.util.flowLabel
 import java.time.LocalDate
 import java.time.YearMonth
-import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
+import kotlin.math.abs
 import kotlinx.coroutines.launch
 
-@OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
+/**
+ * The horizontal gutter shared by the weekday header and the six-week grid.
+ *
+ * One value for both is what makes the columns line up: the header's seven `weight(1f)` slots and
+ * the grid's seven cells resolve against the same available width. Deliberately 8dp rather than the
+ * usual 16dp screen inset — seven columns inside a 360dp screen leaves each cell at 49dp, which is
+ * still a valid touch target; a 16dp gutter would push it under 48dp.
+ */
+private val CalendarGridInset = Spacing.sm
+
+/** Fill and stroke alphas for the predicted-period pill, shared by the grid and the legend swatch. */
+private const val PredictedFillAlpha = 0.08f
+private const val PredictedStrokeAlpha = 0.55f
+
+/** The predicted-period dash, defined once so the legend swatch cannot drift from the real cell. */
+private val PredictedDash = PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+
+private fun DrawScope.predictedStroke(): Stroke =
+    Stroke(width = 2.dp.toPx(), pathEffect = PredictedDash)
+
+/** The legend's stand-in for a single-day predicted pill, drawn from the same alphas and dash. */
+private fun DrawScope.drawPredictedSwatch(accent: Color) {
+    val corner = CornerRadius(size.height / 2, size.height / 2)
+    drawRoundRect(
+        color = accent.copy(alpha = PredictedFillAlpha),
+        cornerRadius = corner
+    )
+    drawRoundRect(
+        color = accent.copy(alpha = PredictedStrokeAlpha),
+        cornerRadius = corner,
+        style = predictedStroke()
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarScreen(
     onDayClicked: (Long) -> Unit,
-    viewModel: CalendarViewModel = hiltViewModel(),
-    sharedTransitionScope: SharedTransitionScope? = null,
-    animatedVisibilityScope: AnimatedVisibilityScope? = null
+    viewModel: CalendarViewModel = hiltViewModel()
 ) {
     // Collect the GLOBAL data state
     val calendarState by viewModel.calendarState.collectAsState()
@@ -60,12 +100,15 @@ fun CalendarScreen(
     val pagerState = rememberPagerState(initialPage = initialPage) { 10000 }
     val scope = rememberCoroutineScope()
     var previewDay by remember { mutableStateOf<CalendarDayUiModel?>(null) }
-    
-    // Calculate current visible month based on Pager
-    // Optimization: Derive state to avoid unnecessary recompositions
+    val sheetState = rememberModalBottomSheetState()
+
+    // Calculate current visible month based on Pager.
+    // targetPage rather than currentPage: currentPage only updates once a page *settles*, so the
+    // title used to lag a swipe by the whole fling animation. targetPage flips as the gesture
+    // commits, which is when the user expects the month name to change.
     val currentMonth by remember {
         derivedStateOf {
-            YearMonth.now().plusMonths((pagerState.currentPage - initialPage).toLong())
+            YearMonth.now().plusMonths((pagerState.targetPage - initialPage).toLong())
         }
     }
 
@@ -80,22 +123,30 @@ fun CalendarScreen(
                     scope.launch { pagerState.animateScrollToPage(pagerState.currentPage + 1) }
                 },
                 onToday = {
-                    scope.launch { pagerState.animateScrollToPage(initialPage) }
+                    scope.launch {
+                        // The pager has 10000 pages; animating from an arbitrary one to page 5000
+                        // composes every page in between. Only animate a near jump.
+                        if (abs(pagerState.currentPage - initialPage) > 2) {
+                            pagerState.scrollToPage(initialPage)
+                        } else {
+                            pagerState.animateScrollToPage(initialPage)
+                        }
+                    }
                 }
             )
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
-            // Day Headers (S M T W T F S)
-            CalendarWeekDaysHeader()
-            
+            // Day Headers (S M T W T F S) — same gutter as the grid, so the columns align.
+            CalendarWeekDaysHeader(modifier = Modifier.padding(horizontal = CalendarGridInset))
+
             // The Infinite Pager
             HorizontalPager(
                 state = pagerState,
                 modifier = Modifier.weight(1f) // Fill remaining space
             ) { page ->
                 val pageMonth = YearMonth.now().plusMonths((page - initialPage).toLong())
-                
+
                 // Fetch the 42 days for this page from the global state
                 // This is a fast CPU operation
                 val days = remember(calendarState, pageMonth) {
@@ -103,101 +154,106 @@ fun CalendarScreen(
                 }
 
                 if (calendarState is CalendarDataState.Loading) {
-                    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                        CircularProgressIndicator()
-                    }
+                    LoadingState()
                 } else {
                     CalendarMonthPage(
                         days = days,
-                        onDaySelected = { previewDay = it }
+                        onDaySelected = { previewDay = it },
+                        modifier = Modifier.padding(horizontal = CalendarGridInset)
                     )
                 }
             }
-            
+
             // Legend
-            CalendarLegend(modifier = Modifier.padding(16.dp))
+            CalendarLegend(
+                modifier = Modifier.padding(
+                    horizontal = Spacing.screenHorizontal,
+                    vertical = Spacing.md
+                )
+            )
         }
     }
 
     previewDay?.let { day ->
         ModalBottomSheet(
-            onDismissRequest = { previewDay = null }
+            onDismissRequest = { previewDay = null },
+            sheetState = sheetState,
+            // Sheets take the same warm `surfaceContainer` as LunarLogCard rather than
+            // BottomSheetDefaults' `surfaceContainerLow`, so a sheet reads as the same material
+            // as the cards it slides over instead of a second, paler one.
+            containerColor = MaterialTheme.colorScheme.surfaceContainer
         ) {
             CalendarDayPreviewSheet(
                 day = day,
                 onEdit = {
-                    previewDay = null
-                    onDayClicked(day.date.toEpochDay())
+                    // Let the sheet animate down before the nav push; clearing previewDay first
+                    // yanks it out of composition and the user sees a blink instead of a transition.
+                    val epochDay = day.date.toEpochDay()
+                    scope.launch { sheetState.hide() }.invokeOnCompletion {
+                        previewDay = null
+                        onDayClicked(epochDay)
+                    }
                 }
             )
         }
     }
 }
 
+/**
+ * Four evenly weighted swatch columns over a flow ramp.
+ *
+ * The old layout was two 2-item rows at 82% width plus a third ramp row on its own vertical rhythm,
+ * which read as three unrelated blocks and ate a sixth of the grid's height. One row of four equal
+ * columns is both shorter and self-evidently a set.
+ */
 @Composable
 fun CalendarLegend(modifier: Modifier = Modifier) {
+    val cycle = cycleColors
     Column(
         modifier = modifier.fillMaxWidth(),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(10.dp)
+        verticalArrangement = Arrangement.spacedBy(Spacing.md)
     ) {
         Row(
-            modifier = Modifier.fillMaxWidth(0.82f),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+            verticalAlignment = Alignment.Top
         ) {
-            LegendItem(text = "Period") {
-                drawCircle(color = PeriodSurface)
+            LegendItem(text = "Period", modifier = Modifier.weight(1f)) {
+                drawCircle(color = cycle.periodContainer)
             }
-            LegendItem(text = "Predicted") {
-                drawRoundRect(
-                    color = PeriodRed.copy(alpha = 0.08f),
-                    cornerRadius = CornerRadius(size.height / 2, size.height / 2)
-                )
-                drawRoundRect(
-                    color = PeriodRed.copy(alpha = 0.55f),
-                    cornerRadius = CornerRadius(size.height / 2, size.height / 2),
-                    style = Stroke(
-                        width = 2.dp.toPx(),
-                        pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                    )
-                )
+            LegendItem(text = "Predicted", modifier = Modifier.weight(1f)) {
+                drawPredictedSwatch(cycle.period)
             }
-        }
-
-        Row(
-            modifier = Modifier.fillMaxWidth(0.82f),
-            horizontalArrangement = Arrangement.SpaceEvenly,
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            LegendItem(text = "Fertile") {
+            LegendItem(text = "Fertile", modifier = Modifier.weight(1f)) {
                 drawCircle(
-                    color = FertileGreen,
+                    color = cycle.fertile,
                     radius = size.minDimension / 4
                 )
             }
-            LegendItem(text = "Ovulation") {
-                drawCircle(color = OvulationBlue.copy(alpha = 0.2f))
+            LegendItem(text = "Ovulation", modifier = Modifier.weight(1f)) {
+                drawCircle(color = cycle.ovulation.copy(alpha = 0.2f))
                 drawCircle(
-                    color = OvulationBlue,
+                    color = cycle.ovulation,
                     radius = size.minDimension / 4,
                     center = Offset(center.x, center.y - size.minDimension / 3)
                 )
             }
         }
 
-        FlowIntensityLegendItem(modifier = Modifier.padding(top = 2.dp))
+        FlowIntensityLegendItem(modifier = Modifier.fillMaxWidth())
     }
 }
 
 @Composable
 fun LegendItem(
     text: String,
-    icon: androidx.compose.ui.graphics.drawscope.DrawScope.() -> Unit
+    modifier: Modifier = Modifier,
+    icon: DrawScope.() -> Unit
 ) {
     Column(
+        modifier = modifier,
         horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(4.dp)
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
         Canvas(modifier = Modifier.size(20.dp)) {
             icon()
@@ -205,52 +261,73 @@ fun LegendItem(
         Text(
             text = text,
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+            textAlign = TextAlign.Center,
+            // Two lines, not one. A quarter of a 360dp phone is ~76dp, which "Ovulation" already
+            // fills at the default text size — pinned to one line with the default Clip overflow it
+            // lost its tail mid-word as soon as the user raised the font scale. Wrapping is the
+            // graceful degradation here; the ellipsis is only the backstop past two lines.
+            maxLines = 2,
+            overflow = TextOverflow.Ellipsis
         )
     }
 }
 
 @Composable
 fun FlowIntensityLegendItem(modifier: Modifier = Modifier) {
-    Column(
+    val cycle = cycleColors
+    val labelColor = MaterialTheme.colorScheme.onSurfaceVariant
+    Row(
         modifier = modifier,
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.spacedBy(3.dp)
+        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+        verticalAlignment = Alignment.CenterVertically
     ) {
+        // The weight lives on the caption rather than on a Spacer between the two groups. A Row
+        // measures its unweighted children first and hands each the space the previous ones left,
+        // so with the slack parked in a Spacer the *last* child paid for any overflow: at a raised
+        // font scale "Heavy" was measured against whatever remained and squeezed to nothing, and
+        // the ramp lost the half of its key that says which end is which. Carrying the slack here
+        // instead means this caption is what gives — it wraps to a second line, and "Light",
+        // the swatches and "Heavy" keep their intrinsic widths.
         Text(
             text = "Flow intensity",
+            modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.labelSmall,
-            color = MaterialTheme.colorScheme.onSurfaceVariant
+            color = labelColor
         )
-        Row(
-            horizontalArrangement = Arrangement.spacedBy(8.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Text(
-                text = "Light",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-            )
-            Canvas(modifier = Modifier.size(width = 76.dp, height = 18.dp)) {
-                val radius = size.height / 2
-                val spacing = size.width / 4
-                for (level in 1..4) {
-                    drawCircle(
-                        color = lerp(PeriodSurface, PeriodRed, level / 4f),
-                        radius = radius,
-                        center = Offset(spacing * (level - 0.5f), center.y)
-                    )
-                }
+        Text(
+            text = "Light",
+            style = MaterialTheme.typography.labelSmall,
+            color = labelColor
+        )
+        Canvas(modifier = Modifier.size(width = 80.dp, height = 16.dp)) {
+            val radius = size.height / 2
+            val spacing = size.width / 4
+            for (level in 1..4) {
+                drawCircle(
+                    color = lerp(cycle.periodContainer, cycle.period, level / 4f),
+                    radius = radius,
+                    center = Offset(spacing * (level - 0.5f), center.y)
+                )
             }
-            Text(
-                text = "Heavy",
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.8f)
-            )
         }
+        Text(
+            text = "Heavy",
+            style = MaterialTheme.typography.labelSmall,
+            color = labelColor
+        )
     }
 }
 
+/**
+ * The month bar: [prev] [month over year] [today][next].
+ *
+ * A real `CenterAlignedTopAppBar` rather than the Row this used to be, so Calendar starts its
+ * content at the same 64dp as every other screen instead of ~105dp — switching tabs no longer makes
+ * the grid jump. "Today" moves out of the centre column onto the bar's own baseline, and is disabled
+ * rather than hidden while the current month is showing so the actions row does not reflow.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CalendarHeader(
     currentMonth: YearMonth,
@@ -258,51 +335,52 @@ fun CalendarHeader(
     onNext: () -> Unit,
     onToday: () -> Unit
 ) {
-    Row(
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 16.dp, vertical = 8.dp),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically
-    ) {
-        IconButton(onClick = onPrevious) {
-            Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Month")
+    val isViewingCurrentMonth = currentMonth == YearMonth.now()
+    LunarLogCenterTopAppBar(
+        navigationIcon = {
+            IconButton(onClick = onPrevious) {
+                Icon(Icons.AutoMirrored.Filled.ArrowBack, contentDescription = "Previous Month")
+            }
+        },
+        actions = {
+            IconButton(onClick = onToday, enabled = !isViewingCurrentMonth) {
+                Icon(Icons.Filled.Today, contentDescription = "Jump to today")
+            }
+            IconButton(onClick = onNext) {
+                Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Month")
+            }
         }
-
+    ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
                 text = currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()),
-                style = MaterialTheme.typography.headlineSmall,
-                fontWeight = FontWeight.Bold
+                style = MaterialTheme.typography.titleLarge,
+                maxLines = 1
             )
             Text(
                 text = currentMonth.year.toString(),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
-            TextButton(onClick = onToday) {
-                Text("Today")
-            }
-        }
-
-        IconButton(onClick = onNext) {
-            Icon(Icons.AutoMirrored.Filled.ArrowForward, contentDescription = "Next Month")
         }
     }
 }
 
 @Composable
-fun CalendarWeekDaysHeader() {
-    Row(modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp)) {
+fun CalendarWeekDaysHeader(modifier: Modifier = Modifier) {
+    Row(
+        modifier = modifier
+            .fillMaxWidth()
+            .padding(bottom = Spacing.sm)
+    ) {
         val weekDays = listOf("S", "M", "T", "W", "T", "F", "S")
         weekDays.forEach { day ->
             Text(
                 text = day,
                 modifier = Modifier.weight(1f),
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.labelLarge,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
-                fontWeight = FontWeight.SemiBold
+                style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
             )
         }
     }
@@ -311,17 +389,21 @@ fun CalendarWeekDaysHeader() {
 @Composable
 fun CalendarMonthPage(
     days: List<CalendarDayUiModel>,
-    onDaySelected: (CalendarDayUiModel) -> Unit
+    onDaySelected: (CalendarDayUiModel) -> Unit,
+    modifier: Modifier = Modifier
 ) {
-    // Custom Layout: fixed 6 rows x 7 cols
+    // Fixed 6 rows x 7 cols. Every row takes an equal share of the remaining height and every cell
+    // an equal share of the row, with an explicit 4dp between rows — SpaceEvenly on top of
+    // weight(1f) children was a no-op, so the rows used to sit flush against each other.
     Column(
-        modifier = Modifier.fillMaxSize(),
-        verticalArrangement = Arrangement.SpaceEvenly
+        modifier = modifier.fillMaxSize(),
+        verticalArrangement = Arrangement.spacedBy(Spacing.xs)
     ) {
         for (weekIndex in 0 until 6) {
+            // No horizontal gap: the period pill is drawn across cell boundaries and any spacing
+            // between columns would cut it into segments.
             Row(
-                modifier = Modifier.fillMaxWidth().weight(1f),
-                horizontalArrangement = Arrangement.SpaceEvenly
+                modifier = Modifier.fillMaxWidth().weight(1f)
             ) {
                 for (dayIndex in 0 until 7) {
                     val day = days.getOrNull(weekIndex * 7 + dayIndex)
@@ -332,7 +414,7 @@ fun CalendarMonthPage(
                             onClick = { onDaySelected(day) }
                         )
                     } else {
-                        Spacer(Modifier.weight(1f))
+                        Spacer(Modifier.weight(1f).fillMaxHeight())
                     }
                 }
             }
@@ -346,7 +428,7 @@ fun CalendarDayPreviewSheet(
     day: CalendarDayUiModel,
     onEdit: () -> Unit
 ) {
-    val dateFormatter = remember { DateTimeFormatter.ofPattern("EEEE, MMM d") }
+    val dateFormatter = FullDayDate
     val statusLabels = remember(day) {
         buildList {
             if (day.data.isPeriod) add("Period")
@@ -361,20 +443,20 @@ fun CalendarDayPreviewSheet(
     Column(
         modifier = Modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp)
-            .padding(bottom = 28.dp),
-        verticalArrangement = Arrangement.spacedBy(16.dp)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = Spacing.sheetHorizontal)
+            .padding(bottom = Spacing.xl),
+        verticalArrangement = Arrangement.spacedBy(Spacing.lg)
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
                 Text(
                     text = day.date.format(dateFormatter),
-                    style = MaterialTheme.typography.titleLarge,
-                    fontWeight = FontWeight.Bold
+                    style = MaterialTheme.typography.titleLarge
                 )
                 Text(
                     text = day.date.year.toString(),
@@ -384,15 +466,15 @@ fun CalendarDayPreviewSheet(
             }
             Button(onClick = onEdit) {
                 Icon(Icons.Filled.Edit, contentDescription = null)
-                Spacer(modifier = Modifier.width(8.dp))
+                Spacer(modifier = Modifier.width(Spacing.sm))
                 Text("Edit")
             }
         }
 
         if (statusLabels.isNotEmpty()) {
             FlowRow(
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
-                verticalArrangement = Arrangement.spacedBy(8.dp)
+                horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                verticalArrangement = Arrangement.spacedBy(Spacing.sm)
             ) {
                 statusLabels.forEach { label ->
                     CalendarPreviewChip(text = label)
@@ -400,16 +482,16 @@ fun CalendarDayPreviewSheet(
             }
         }
 
-        HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.6f))
+        CardDivider()
 
         Row(
-            horizontalArrangement = Arrangement.spacedBy(12.dp),
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Filled.WaterDrop,
                 contentDescription = null,
-                tint = if (day.data.flowIntensity > 0) PeriodRed else MaterialTheme.colorScheme.onSurfaceVariant
+                tint = if (day.data.flowIntensity > 0) cycleColors.period else MaterialTheme.colorScheme.onSurfaceVariant
             )
             Column {
                 Text(
@@ -425,7 +507,7 @@ fun CalendarDayPreviewSheet(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(
                 text = "Symptoms & mood",
                 style = MaterialTheme.typography.labelMedium,
@@ -439,8 +521,8 @@ fun CalendarDayPreviewSheet(
                 )
             } else {
                 FlowRow(
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    verticalArrangement = Arrangement.spacedBy(8.dp)
+                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                    verticalArrangement = Arrangement.spacedBy(Spacing.sm)
                 ) {
                     details.take(8).forEach { detail ->
                         CalendarPreviewChip(text = detail)
@@ -452,7 +534,7 @@ fun CalendarDayPreviewSheet(
             }
         }
 
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(
                 text = "Notes",
                 style = MaterialTheme.typography.labelMedium,
@@ -480,19 +562,9 @@ fun CalendarPreviewChip(text: String) {
     ) {
         Text(
             text = text,
-            modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            modifier = Modifier.padding(horizontal = Spacing.md, vertical = Spacing.sm),
             style = MaterialTheme.typography.labelMedium
         )
-    }
-}
-
-private fun flowLabel(flowIntensity: Int): String {
-    return when (flowIntensity) {
-        1 -> "Spotting"
-        2 -> "Light"
-        3 -> "Medium"
-        4 -> "Heavy"
-        else -> "None"
     }
 }
 
@@ -504,12 +576,11 @@ fun CalendarDayCell(
 ) {
     val haptic = LocalHapticFeedback.current
     val isToday = day.date == LocalDate.now()
-    val isDark = isSystemInDarkTheme()
-    
+    val cycle = cycleColors
+
     // Theme Colors
-    val periodColor = PeriodRed
-    // Dynamic Base Color
-    val periodBaseColor = if (isDark) PeriodSurfaceDark else PeriodSurface
+    val periodColor = cycle.period
+    val periodBaseColor = cycle.periodContainer
     // Interpolate Color based on Flow
     val finalPeriodColor = if (day.data.hasLog && day.data.flowIntensity > 0) {
         val t = day.data.flowIntensity / 4f // 0.25, 0.5, 0.75, 1.0
@@ -517,31 +588,44 @@ fun CalendarDayCell(
     } else {
         periodBaseColor
     }
-    
-    val fertileColor = FertileGreen
-    val ovulationColor = OvulationBlue
-    
-    // Text Color Logic
-    val onPeriodSurface = if (isDark && (day.data.flowIntensity < 3)) {
-        OnPeriodSurfaceDark 
-    } else {
-        OnPeriodSurface
-    }
-    
+
+    val fertileColor = cycle.fertile
+    val ovulationColor = cycle.ovulation
+
+    // The fill ramps from the soft container to the saturated accent, so the day number has to
+    // follow it rather than being pinned to one on-colour: at flow 4 the on-container value drops
+    // to ~3.2:1. Picking black/white per rendered fill keeps every step above 4.5:1.
+    val onPeriodSurface = bestContentColor(finalPeriodColor)
+
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
     val pressedFillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
     val pressedStrokeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
     val interactionSource = remember { MutableInteractionSource() }
     val isPressed by interactionSource.collectIsPressedAsState()
+    // The ripple is suppressed on purpose (a rectangular ripple across a connected period pill
+    // looks wrong), so the hand-drawn indicator has to supply the fade a ripple would have given
+    // it — otherwise a scroll-cancelled press flickers on and off in a single frame.
+    val pressProgress by animateFloatAsState(
+        targetValue = if (isPressed) 1f else 0f,
+        animationSpec = tween(durationMillis = 120),
+        label = "dayCellPress"
+    )
 
     Box(
         modifier = modifier
             .semantics {
                 val statuses = buildList {
-                    if (day.data.isPeriod) add("period")
+                    if (!day.isCurrentMonth) {
+                        add(day.date.month.getDisplayName(TextStyle.FULL, Locale.getDefault()))
+                    }
+                    if (day.data.isPeriod) {
+                        add("period")
+                        if (day.data.flowIntensity > 0) add(flowLabel(day.data.flowIntensity))
+                    }
                     if (day.data.isPredictedPeriod) add("predicted period")
                     if (day.data.isFertile) add("fertile")
                     if (day.data.isOvulation) add("ovulation")
+                    if (day.data.hasLog) add("entry logged")
                     if (isToday) add("today")
                 }
                 contentDescription = if (statuses.isEmpty()) {
@@ -549,10 +633,12 @@ fun CalendarDayCell(
                 } else {
                     "${day.date.dayOfMonth}, ${statuses.joinToString(", ")}"
                 }
+                role = Role.Button
             }
             .clickable(
                 interactionSource = interactionSource,
                 indication = null,
+                onClickLabel = "Open day details",
                 onClick = {
                     haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
                     onClick()
@@ -620,27 +706,27 @@ fun CalendarDayCell(
                 // Use finalPeriodColor here
                 drawConnectedFill(day.periodType, finalPeriodColor)
             } else if (day.data.isPredictedPeriod) {
-                drawConnectedFill(day.predictedPeriodType, periodColor.copy(alpha = 0.08f))
+                drawConnectedFill(day.predictedPeriodType, periodColor.copy(alpha = PredictedFillAlpha))
             }
 
-            // 2. Draw Today Ring (Refined)
+            // 2. Draw Today Ring
             if (isToday) {
-                // If period active, draw a ring outside? Or just a solid ring behind?
-                // Let's do a solid circle behind the text but distinct from period logic
                 if (!day.data.isPeriod) {
+                    // Ring only. This used to also fill the cell with the marker colour at 20%,
+                    // which turned today into a tan disc — the one warm-orange object in a pink
+                    // app, and heavier than the period days it sat beside. As an outline it stays
+                    // legible and matches the grid's own grammar: a fill means the day has data,
+                    // an outline means it is being pointed at.
                     drawCircle(
-                        color = TodayRing.copy(alpha = 0.2f),
-                        radius = radius
-                    )
-                    drawCircle(
-                        color = TodayRing,
+                        color = cycle.today,
                         style = Stroke(width = 2.dp.toPx()),
                         radius = radius
                     )
                 } else {
-                    // If on period, just a white ring to contrast
+                    // On a period fill, ring in whatever the day number uses — a hardcoded white
+                    // ring sat at 1.29:1 on the light pink fill.
                     drawCircle(
-                        color = Color.White,
+                        color = onPeriodSurface,
                         style = Stroke(width = 2.dp.toPx()),
                         radius = radius * 0.9f
                     )
@@ -666,43 +752,35 @@ fun CalendarDayCell(
                         center = Offset(cx, cy - radius - 6.dp.toPx())
                     )
                 } else if (day.data.isPredictedPeriod) {
+                    val predictedOutline = periodColor.copy(alpha = PredictedStrokeAlpha)
                     when (day.predictedPeriodType) {
                         PeriodType.START -> {
                             drawArc(
-                                color = periodColor.copy(alpha = 0.55f),
+                                color = predictedOutline,
                                 startAngle = 90f,
                                 sweepAngle = 180f,
                                 useCenter = false,
                                 topLeft = Offset(cx - radius, barTop),
                                 size = Size(diameter, diameter),
-                                style = Stroke(
-                                    width = 2.dp.toPx(),
-                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                                )
+                                style = predictedStroke()
                             )
                         }
                         PeriodType.END -> {
                             drawArc(
-                                color = periodColor.copy(alpha = 0.55f),
+                                color = predictedOutline,
                                 startAngle = 270f,
                                 sweepAngle = 180f,
                                 useCenter = false,
                                 topLeft = Offset(cx - radius, barTop),
                                 size = Size(diameter, diameter),
-                                style = Stroke(
-                                    width = 2.dp.toPx(),
-                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                                )
+                                style = predictedStroke()
                             )
                         }
                         PeriodType.SINGLE -> {
                             drawCircle(
-                                color = periodColor.copy(alpha = 0.55f),
+                                color = predictedOutline,
                                 radius = radius,
-                                style = Stroke(
-                                    width = 2.dp.toPx(),
-                                    pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
-                                )
+                                style = predictedStroke()
                             )
                         }
                         PeriodType.MIDDLE,
@@ -718,18 +796,18 @@ fun CalendarDayCell(
                     if (lineBounds != null) {
                         val (lineStart, lineEnd) = lineBounds
                         drawLine(
-                            color = periodColor.copy(alpha = 0.55f),
+                            color = predictedOutline,
                             start = Offset(lineStart, barTop),
                             end = Offset(lineEnd, barTop),
                             strokeWidth = 2.dp.toPx(),
-                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                            pathEffect = PredictedDash
                         )
                         drawLine(
-                            color = periodColor.copy(alpha = 0.55f),
+                            color = predictedOutline,
                             start = Offset(lineStart, barTop + barHeight),
                             end = Offset(lineEnd, barTop + barHeight),
                             strokeWidth = 2.dp.toPx(),
-                            pathEffect = androidx.compose.ui.graphics.PathEffect.dashPathEffect(floatArrayOf(10f, 10f), 0f)
+                            pathEffect = PredictedDash
                         )
                     }
                 }
@@ -744,14 +822,16 @@ fun CalendarDayCell(
                 )
             }
 
-            if (isPressed) {
+            if (pressProgress > 0f) {
                 drawCircle(
                     color = pressedFillColor,
-                    radius = radius * 1.08f
+                    radius = radius * 1.08f,
+                    alpha = pressProgress
                 )
                 drawCircle(
                     color = pressedStrokeColor,
                     radius = radius * 1.08f,
+                    alpha = pressProgress,
                     style = Stroke(width = 2.dp.toPx())
                 )
             }
@@ -760,11 +840,20 @@ fun CalendarDayCell(
         // 5. Date Text
         Text(
             text = day.date.dayOfMonth.toString(),
-            color = if (day.data.isPeriod) onPeriodSurface 
-                   else if (!day.isCurrentMonth) MaterialTheme.colorScheme.onSurface.copy(alpha = 0.38f) 
-                   else MaterialTheme.colorScheme.onSurface,
-            style = MaterialTheme.typography.bodyMedium,
-            fontWeight = if (day.data.isPeriod || isToday) FontWeight.Bold else FontWeight.Normal
+            // Out-of-month days used to be onSurface at 38% alpha — under 3:1 on the page and
+            // barely visible where they fall inside a predicted-period fill. onSurfaceVariant at
+            // full alpha is still clearly the secondary tier but stays legible on every fill.
+            // The period branch keeps bestContentColor(), which tracks the flow-ramped fill.
+            color = when {
+                day.data.isPeriod -> onPeriodSurface
+                !day.isCurrentMonth -> MaterialTheme.colorScheme.onSurfaceVariant
+                else -> MaterialTheme.colorScheme.onSurface
+            },
+            // labelLarge, not bodyMedium: body roles carry 0.25sp tracking, which visibly pushes a
+            // numeral off the centre of a circular fill. One weight for every state, because
+            // swapping to Bold changes each numeral's optical width and the columns shimmer as you
+            // page — period and today emphasis comes from the fill and the ring instead.
+            style = MaterialTheme.typography.labelLarge
         )
     }
 }

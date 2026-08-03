@@ -1,5 +1,24 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+  Base platform theme. MainActivity is an AppCompatActivity, so the parent has to stay an AppCompat
+  descendant — a Material Components parent throws at inflate.
+
+  DayNight rather than Light: the platform TimePickerDialog/DatePickerDialog and any system dialog
+  are themed by the activity, not by Compose, so under Light they rendered white-on-white in dark
+  mode. It also gives core-splashscreen a dark android:windowBackground to fall back to, which is
+  what removes the white cold-start flash.
+
+  Colours are literal hex rather than @color refs so the day/night pair lives entirely in these two
+  files; they mirror ui/theme/Color.kt (BrandRose / BrandRoseDeep / SurfaceLight and the Primary80 /
+  BrandPlum / SurfaceDark equivalents).
+-->
 <resources>
 
-    <style name="Theme.LunarLog" parent="Theme.AppCompat.Light.NoActionBar" />
+    <style name="Theme.LunarLog" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">#D93672</item>
+        <item name="colorPrimaryDark">#A81852</item>
+        <item name="colorAccent">#D93672</item>
+        <item name="android:colorBackground">#FFFAFB</item>
+        <item name="android:windowBackground">#FFFAFB</item>
+    </style>
 </resources>

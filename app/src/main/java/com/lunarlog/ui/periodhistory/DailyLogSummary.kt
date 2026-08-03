@@ -1,6 +1,9 @@
 package com.lunarlog.ui.periodhistory
 
 import com.lunarlog.core.model.DailyLog
+import com.lunarlog.ui.util.flowLabel
+import com.lunarlog.ui.util.mucusLabel
+import com.lunarlog.ui.util.sexDriveLabel
 import java.util.Locale
 
 data class DailyLogSummaryLines(
@@ -34,32 +37,6 @@ fun buildDailyLogSummaryLines(log: DailyLog): DailyLogSummaryLines {
         secondary = secondaryParts.joinToString(" \u2022 ")
     )
 }
-
-private fun flowLabel(level: Int): String =
-    when (level) {
-        1 -> "Spotting"
-        2 -> "Light"
-        3 -> "Medium"
-        4 -> "Heavy"
-        else -> "None"
-    }
-
-private fun sexDriveLabel(level: Int): String =
-    when (level) {
-        1 -> "Low"
-        2 -> "Medium"
-        3 -> "High"
-        else -> "None"
-    }
-
-private fun mucusLabel(level: Int): String =
-    when (level) {
-        1 -> "Sticky"
-        2 -> "Creamy"
-        3 -> "Watery"
-        4 -> "Egg White"
-        else -> "None/Dry"
-    }
 
 private fun formatTopTwo(items: List<String>): String {
     if (items.isEmpty()) return ""

@@ -10,36 +10,35 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.DateRange
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.MoreVert
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.outlined.WaterDrop
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
-import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.Button
 import androidx.compose.material3.DatePicker
 import androidx.compose.material3.DatePickerDialog
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
-import androidx.compose.material3.ListItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SelectableDates
 import androidx.compose.material3.SnackbarHost
 import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.material3.rememberDatePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -50,15 +49,24 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lunarlog.core.model.DailyLog
-import com.lunarlog.ui.theme.PeriodRed
-import java.time.Instant
+import com.lunarlog.ui.components.EmptyState
+import com.lunarlog.ui.components.CardDivider
+import com.lunarlog.ui.components.LoadingState
+import com.lunarlog.ui.components.LunarLogCard
+import com.lunarlog.ui.components.LunarLogTopAppBar
+import com.lunarlog.ui.components.SectionHeader
+import com.lunarlog.ui.theme.Spacing
+import com.lunarlog.ui.theme.cycleColors
+import com.lunarlog.ui.util.MediumDate
+import com.lunarlog.ui.util.ShortDayDate
+import com.lunarlog.ui.util.toPickerLocalDate
+import com.lunarlog.ui.util.toPickerMillis
 import java.time.LocalDate
-import java.time.ZoneId
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -90,13 +98,9 @@ fun PeriodDetailScreen(
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = { Text("Period Details") },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(Icons.AutoMirrored.Filled.ArrowBack, "Back")
-                    }
-                },
+            LunarLogTopAppBar(
+                title = "Period Details",
+                onNavigateBack = onBack,
                 actions = {
                     Box {
                         IconButton(onClick = { showMenu = true }) {
@@ -121,18 +125,10 @@ fun PeriodDetailScreen(
         },
         snackbarHost = { SnackbarHost(hostState = snackbarHostState) }
     ) { padding ->
+        val cycle = uiState.cycle
         if (uiState.isLoading) {
-            Box(
-                modifier = Modifier
-                    .fillMaxSize()
-                    .padding(padding),
-                contentAlignment = Alignment.Center
-            ) {
-                CircularProgressIndicator()
-            }
-        } else if (uiState.cycle != null) {
-            val cycle = uiState.cycle!!
-            val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
+            LoadingState(modifier = Modifier.padding(padding))
+        } else if (cycle != null) {
             val isOngoing = cycle.endDate == null
             val endDate = cycle.endDate ?: LocalDate.now()
             val duration = ChronoUnit.DAYS.between(cycle.startDate, endDate) + 1
@@ -141,90 +137,115 @@ fun PeriodDetailScreen(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                contentPadding = PaddingValues(
+                    horizontal = Spacing.screenHorizontal,
+                    vertical = Spacing.screenVertical
+                ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.md)
             ) {
                 // Date Range Card
                 item {
-                    Card(
+                    // Hand-rolled rather than LunarLogCard because this hero keeps the
+                    // primaryContainer fill; the onPrimaryContainer pairing below is measured
+                    // contrast work. Geometry and inner padding still match LunarLogCard.
+                    //
+                    // The "Duration"/"Start Date"/"End Date" labels are full-strength
+                    // onPrimaryContainer, not 70% alpha: at labelMedium's 12sp they need 4.5:1, and
+                    // fading the only content colour this container has a measured pairing for gave
+                    // up roughly a third of it. Their lower emphasis comes from the type scale.
+                    Surface(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(
-                            containerColor = MaterialTheme.colorScheme.primaryContainer
-                        )
+                        shape = MaterialTheme.shapes.large,
+                        color = MaterialTheme.colorScheme.primaryContainer,
+                        contentColor = MaterialTheme.colorScheme.onPrimaryContainer
                     ) {
-                        Column(modifier = Modifier.padding(16.dp)) {
+                        Column(modifier = Modifier.padding(Spacing.cardPadding)) {
                             Text(
-                                "Duration: $duration day${if (duration != 1L) "s" else ""}",
-                                style = MaterialTheme.typography.titleMedium,
+                                "Duration",
+                                style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
-                            Spacer(Modifier.height(16.dp))
-                            
+                            Spacer(Modifier.height(Spacing.xs))
+                            Text(
+                                "$duration day${if (duration != 1L) "s" else ""}",
+                                style = MaterialTheme.typography.headlineSmall,
+                                color = MaterialTheme.colorScheme.onPrimaryContainer
+                            )
+                            Spacer(Modifier.height(Spacing.lg))
+
                             // Start Date Row
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { showStartDatePicker = true },
+                                    .heightIn(min = 48.dp)
+                                    .clickable(onClickLabel = "Change start date") {
+                                        showStartDatePicker = true
+                                    },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     Icons.Default.DateRange,
                                     contentDescription = null,
-                                    tint = PeriodRed
+                                    tint = cycleColors.period
                                 )
-                                Spacer(Modifier.width(12.dp))
+                                Spacer(Modifier.width(Spacing.md))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         "Start Date",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                     Text(
-                                        cycle.startDate.format(dateFormatter),
+                                        cycle.startDate.format(MediumDate),
                                         style = MaterialTheme.typography.bodyLarge,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                 }
                                 Icon(
                                     Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
-                            
-                            Spacer(Modifier.height(12.dp))
-                            HorizontalDivider(color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.2f))
-                            Spacer(Modifier.height(12.dp))
-                            
+
+                            Spacer(Modifier.height(Spacing.md))
+                            CardDivider()
+                            Spacer(Modifier.height(Spacing.md))
+
                             // End Date Row
                             Row(
                                 modifier = Modifier
                                     .fillMaxWidth()
-                                    .clickable { showEndDatePicker = true },
+                                    .heightIn(min = 48.dp)
+                                    .clickable(onClickLabel = "Change end date") {
+                                        showEndDatePicker = true
+                                    },
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Icon(
                                     Icons.Default.DateRange,
                                     contentDescription = null,
-                                    tint = PeriodRed
+                                    tint = cycleColors.period
                                 )
-                                Spacer(Modifier.width(12.dp))
+                                Spacer(Modifier.width(Spacing.md))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
                                         "End Date",
                                         style = MaterialTheme.typography.labelMedium,
-                                        color = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
                                     Text(
-                                        if (isOngoing) "Ongoing" else cycle.endDate?.format(dateFormatter) ?: "",
+                                        if (isOngoing) "Ongoing" else cycle.endDate?.format(MediumDate) ?: "",
                                         style = MaterialTheme.typography.bodyLarge,
-                                        color = if (isOngoing) PeriodRed else MaterialTheme.colorScheme.onPrimaryContainer
+                                        // PeriodRed on primaryContainer measured 2.25:1.
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer,
+                                        fontWeight = if (isOngoing) FontWeight.Bold else FontWeight.Normal
                                     )
                                 }
                                 Icon(
                                     Icons.Default.Edit,
-                                    contentDescription = "Edit",
-                                    tint = MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f)
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.onPrimaryContainer
                                 )
                             }
                         }
@@ -233,19 +254,21 @@ fun PeriodDetailScreen(
 
                 // Daily Logs Section
                 item {
-                    Text(
-                        "Daily Logs",
-                        style = MaterialTheme.typography.titleMedium,
-                        modifier = Modifier.padding(top = 8.dp)
+                    // SectionHeader owns the 8dp down to its content; the 8dp here balances it
+                    // against the list's 12dp arrangement so the break reads 20/20 rather than
+                    // the old 20/12.
+                    SectionHeader(
+                        title = "Daily Logs",
+                        modifier = Modifier.padding(top = Spacing.sm)
                     )
                 }
 
                 if (uiState.dailyLogs.isEmpty()) {
                     item {
-                        Text(
-                            "No logs recorded during this period",
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        EmptyState(
+                            icon = Icons.Outlined.WaterDrop,
+                            title = "No logs recorded",
+                            description = "Nothing was logged during this period."
                         )
                     }
                 } else {
@@ -254,6 +277,28 @@ fun PeriodDetailScreen(
                             log = log,
                             onClick = { onDayClick(log.date.toEpochDay()) }
                         )
+                    }
+                }
+            }
+        } else {
+            // The cycle id can outlive the cycle — deleted from another screen, restored into a
+            // killed process, or a stale deep link. Without this the user got a bare app bar over
+            // an empty rectangle, which is indistinguishable from a crash.
+            Box(
+                modifier = Modifier
+                    .fillMaxSize()
+                    .padding(padding)
+                    .padding(horizontal = Spacing.screenHorizontal),
+                contentAlignment = Alignment.Center
+            ) {
+                Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                    EmptyState(
+                        icon = Icons.Outlined.Info,
+                        title = "This period is no longer available",
+                        description = "It may have been deleted from another screen."
+                    )
+                    Button(onClick = onBack) {
+                        Text("Back")
                     }
                 }
             }
@@ -284,69 +329,98 @@ fun PeriodDetailScreen(
         )
     }
 
+    val cycle = uiState.cycle
+
     // Start Date Picker Dialog
-    if (showStartDatePicker && uiState.cycle != null) {
-        val cycle = uiState.cycle!!
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = cycle.startDate.atStartOfDay(ZoneId.of("UTC"))
-                .toInstant().toEpochMilli()
+    if (showStartDatePicker && cycle != null) {
+        CycleDatePickerDialog(
+            initialDate = cycle.startDate,
+            // The repository rejects a start after the end date and any future date; grey those
+            // out rather than letting the user pick one and answering with a snackbar.
+            minDate = null,
+            maxDate = minOf(cycle.endDate ?: LocalDate.now(), LocalDate.now()),
+            onDismiss = { showStartDatePicker = false },
+            onDateSelected = { date -> viewModel.updateStartDate(date) }
         )
-        DatePickerDialog(
-            onDismissRequest = { showStartDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
-                    datePickerState.selectedDateMillis?.let { millis ->
-                        val newDate = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneId.of("UTC"))
-                            .toLocalDate()
-                        viewModel.updateStartDate(newDate)
-                    }
-                    showStartDatePicker = false
-                }) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showStartDatePicker = false }) {
-                    Text("Cancel")
-                }
-            }
-        ) {
-            DatePicker(state = datePickerState)
-        }
     }
 
     // End Date Picker Dialog
-    if (showEndDatePicker && uiState.cycle != null) {
-        val cycle = uiState.cycle!!
-        val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = (cycle.endDate ?: LocalDate.now())
-                .atStartOfDay(ZoneId.of("UTC"))
-                .toInstant().toEpochMilli()
+    if (showEndDatePicker && cycle != null) {
+        CycleDatePickerDialog(
+            initialDate = cycle.endDate ?: LocalDate.now(),
+            // Mirror of the start picker: never before the start, never in the future.
+            minDate = cycle.startDate,
+            maxDate = LocalDate.now(),
+            onDismiss = { showEndDatePicker = false },
+            onDateSelected = { date -> viewModel.updateEndDate(date) }
         )
-        DatePickerDialog(
-            onDismissRequest = { showEndDatePicker = false },
-            confirmButton = {
-                TextButton(onClick = {
+    }
+}
+
+/**
+ * Restricts the calendar to `[minDate, maxDate]`, both inclusive and either open-ended.
+ *
+ * The two pickers bound each other — a start date cannot land after the end date and an end date
+ * cannot land before the start — and `CycleRepository.updateCycleDates` also refuses any future
+ * day. Encoding those rules here means the invalid days are visibly disabled instead of being
+ * accepted and then rejected with an error snackbar.
+ */
+@OptIn(ExperimentalMaterial3Api::class)
+private class CycleSelectableDates(
+    private val minDate: LocalDate?,
+    private val maxDate: LocalDate?
+) : SelectableDates {
+
+    override fun isSelectableDate(utcTimeMillis: Long): Boolean {
+        val date = utcTimeMillis.toPickerLocalDate()
+        if (minDate != null && date.isBefore(minDate)) return false
+        if (maxDate != null && date.isAfter(maxDate)) return false
+        return true
+    }
+
+    override fun isSelectableYear(year: Int): Boolean {
+        if (minDate != null && year < minDate.year) return false
+        if (maxDate != null && year > maxDate.year) return false
+        return true
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun CycleDatePickerDialog(
+    initialDate: LocalDate,
+    minDate: LocalDate?,
+    maxDate: LocalDate?,
+    onDismiss: () -> Unit,
+    onDateSelected: (LocalDate) -> Unit
+) {
+    val selectableDates = remember(minDate, maxDate) { CycleSelectableDates(minDate, maxDate) }
+    val datePickerState = rememberDatePickerState(
+        initialSelectedDateMillis = initialDate.toPickerMillis(),
+        selectableDates = selectableDates
+    )
+    DatePickerDialog(
+        onDismissRequest = onDismiss,
+        confirmButton = {
+            TextButton(
+                onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        val newDate = Instant.ofEpochMilli(millis)
-                            .atZone(ZoneId.of("UTC"))
-                            .toLocalDate()
-                        viewModel.updateEndDate(newDate)
+                        onDateSelected(millis.toPickerLocalDate())
                     }
-                    showEndDatePicker = false
-                }) {
-                    Text("OK")
-                }
-            },
-            dismissButton = {
-                TextButton(onClick = { showEndDatePicker = false }) {
-                    Text("Cancel")
-                }
+                    onDismiss()
+                },
+                enabled = datePickerState.selectedDateMillis != null
+            ) {
+                Text("OK")
             }
-        ) {
-            DatePicker(state = datePickerState)
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("Cancel")
+            }
         }
+    ) {
+        DatePicker(state = datePickerState)
     }
 }
 
@@ -355,52 +429,45 @@ private fun DailyLogCard(
     log: DailyLog,
     onClick: () -> Unit
 ) {
-    val dateFormatter = DateTimeFormatter.ofPattern("EEE, MMM d")
-    
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = MaterialTheme.colorScheme.surfaceVariant
-        )
+    LunarLogCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
     ) {
-        ListItem(
-            headlineContent = {
-                Text(log.date.format(dateFormatter))
-            },
-            supportingContent = {
-                val lines = buildDailyLogSummaryLines(log)
+        Text(
+            text = log.date.format(ShortDayDate),
+            style = MaterialTheme.typography.titleMedium,
+            color = MaterialTheme.colorScheme.onSurface
+        )
+        Spacer(Modifier.height(Spacing.xs))
 
-                if (lines.primary.isNotBlank() || lines.secondary.isNotBlank()) {
-                    Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                        if (lines.primary.isNotBlank()) {
-                            Text(
-                                text = lines.primary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        if (lines.secondary.isNotBlank()) {
-                            Text(
-                                text = lines.secondary,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.85f)
-                            )
-                        }
-                    }
-                } else {
+        val lines = buildDailyLogSummaryLines(log)
+        if (lines.primary.isNotBlank() || lines.secondary.isNotBlank()) {
+            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+                if (lines.primary.isNotBlank()) {
                     Text(
-                        text = "No details logged",
+                        text = lines.primary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                }
+                if (lines.secondary.isNotBlank()) {
+                    Text(
+                        text = lines.secondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
-        )
+        } else {
+            Text(
+                text = "No details logged",
+                style = MaterialTheme.typography.bodySmall,
+                color = MaterialTheme.colorScheme.onSurfaceVariant
+            )
+        }
     }
 }
