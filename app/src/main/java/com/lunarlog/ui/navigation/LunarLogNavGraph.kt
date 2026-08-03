@@ -6,9 +6,13 @@ import androidx.compose.animation.ExperimentalSharedTransitionApi
 import androidx.compose.animation.ExitTransition
 import androidx.compose.animation.SharedTransitionLayout
 import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.LinearOutSlowInEasing
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.foundation.layout.consumeWindowInsets
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.DateRange
@@ -25,11 +29,17 @@ import androidx.compose.material3.NavigationBarItemDefaults
 import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
 import androidx.navigation.NavDestination.Companion.hierarchy
@@ -45,9 +55,12 @@ import androidx.navigation.navDeepLink
 import com.lunarlog.ui.analysis.AnalysisScreen
 import com.lunarlog.ui.calendar.CalendarScreen
 import com.lunarlog.ui.home.HomeScreen
+import com.lunarlog.ui.loghistory.LogHistoryScreen
 import com.lunarlog.ui.loglist.LogListScreen
 import com.lunarlog.ui.logperiod.LogPeriodScreen
 import com.lunarlog.ui.onboarding.OnboardingScreen
+import com.lunarlog.ui.periodhistory.PeriodDetailScreen
+import com.lunarlog.ui.periodhistory.PeriodHistoryScreen
 import com.lunarlog.ui.settings.SettingsScreen
 import java.time.LocalDate
 import java.net.URI
@@ -61,7 +74,7 @@ sealed class Screen(
     object Home : Screen("home", Icons.Default.Home, Icons.Outlined.Home, "Home")
     object PeriodHistory : Screen("period_history", Icons.Default.WaterDrop, Icons.Outlined.WaterDrop, "Periods")
     object Calendar : Screen("calendar", Icons.Default.DateRange, Icons.Outlined.DateRange, "Calendar")
-    object Analysis : Screen("analysis", Icons.Default.Timeline, Icons.Outlined.Timeline, "Insights")
+    object Analysis : Screen("analysis", Icons.Default.Timeline, Icons.Outlined.Timeline, "Analysis")
     object Logging : Screen("logging")
     object Details : Screen("details/{date}") {
         fun createRoute(date: Long) = "details/$date"
@@ -74,35 +87,81 @@ sealed class Screen(
     object Onboarding : Screen("onboarding")
 }
 
-private fun getScreenOrder(route: String?): Int {
-    return when (route) {
-        Screen.Home.route -> 0
-        Screen.PeriodHistory.route -> 1
-        Screen.Calendar.route -> 2
-        Screen.Analysis.route -> 3
-        else -> -1
+private val bottomNavItems = listOf(Screen.Home, Screen.PeriodHistory, Screen.Calendar, Screen.Analysis)
+
+private val tabRoutes: Set<String> = bottomNavItems.map { it.route }.toSet()
+
+private fun isTabRoute(route: String?): Boolean = route != null && route in tabRoutes
+
+// Motion has exactly two shapes in this app.
+//
+// 1. Push / pop (drill in and back out) — a directional slide plus a short fade. Declared once as
+//    the NavHost defaults so every destination that does not opt out gets it, instead of silently
+//    inheriting NavHost's 700ms cross-fade.
+// 2. Lateral tab switches — an M3 fade-through (outgoing fades out, then the incoming one fades and
+//    scales up). Deliberately *not* a slide: the four tabs are siblings, not a hierarchy, so a
+//    drill-in slide would misrepresent where you went.
+private const val PUSH_DURATION_MS = 300
+private const val PUSH_FADE_MS = 150
+private const val TAB_FADE_OUT_MS = 90
+private const val TAB_FADE_IN_MS = 210
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.pushEnterTransition(): EnterTransition =
+    slideIntoContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+        animationSpec = tween(PUSH_DURATION_MS, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(PUSH_FADE_MS, easing = LinearEasing))
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.pushExitTransition(): ExitTransition =
+    slideOutOfContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.Start,
+        animationSpec = tween(PUSH_DURATION_MS, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(PUSH_FADE_MS, easing = LinearEasing))
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.popEnterTransition(): EnterTransition =
+    slideIntoContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.End,
+        animationSpec = tween(PUSH_DURATION_MS, easing = FastOutSlowInEasing)
+    ) + fadeIn(animationSpec = tween(PUSH_FADE_MS, easing = LinearEasing))
+
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.popExitTransition(): ExitTransition =
+    slideOutOfContainer(
+        towards = AnimatedContentTransitionScope.SlideDirection.End,
+        animationSpec = tween(PUSH_DURATION_MS, easing = FastOutSlowInEasing)
+    ) + fadeOut(animationSpec = tween(PUSH_FADE_MS, easing = LinearEasing))
+
+/**
+ * Returns null — i.e. "fall through to the NavHost default push/pop" — whenever either endpoint is
+ * not a bottom-nav tab, so a Home -> Settings push animates as a push and only tab -> tab gets the
+ * fade-through.
+ */
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabEnterTransition(): EnterTransition? {
+    if (!isTabRoute(initialState.destination.route) || !isTabRoute(targetState.destination.route)) {
+        return null
     }
+    val spec = tween<Float>(
+        durationMillis = TAB_FADE_IN_MS,
+        delayMillis = TAB_FADE_OUT_MS,
+        easing = LinearOutSlowInEasing
+    )
+    return fadeIn(animationSpec = spec) +
+        scaleIn(
+            initialScale = 0.92f,
+            animationSpec = tween(
+                durationMillis = TAB_FADE_IN_MS,
+                delayMillis = TAB_FADE_OUT_MS,
+                easing = LinearOutSlowInEasing
+            )
+        )
 }
 
-private val macFadeSpec = tween<Float>(
-    durationMillis = 140,
-    easing = FastOutSlowInEasing
-)
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.macEnterTransition(): EnterTransition? {
-    val initial = getScreenOrder(initialState.destination.route)
-    val target = getScreenOrder(targetState.destination.route)
-    if (initial == -1 || target == -1) return null
-
-    return fadeIn(animationSpec = macFadeSpec)
-}
-
-private fun AnimatedContentTransitionScope<NavBackStackEntry>.macExitTransition(): ExitTransition? {
-    val initial = getScreenOrder(initialState.destination.route)
-    val target = getScreenOrder(targetState.destination.route)
-    if (initial == -1 || target == -1) return null
-
-    return fadeOut(animationSpec = tween(durationMillis = 90, easing = FastOutSlowInEasing))
+private fun AnimatedContentTransitionScope<NavBackStackEntry>.tabExitTransition(): ExitTransition? {
+    if (!isTabRoute(initialState.destination.route) || !isTabRoute(targetState.destination.route)) {
+        return null
+    }
+    // Exits fully before the enter starts (the enter is delayed by exactly this duration), so the
+    // Scaffold background never shows through mid-transition.
+    return fadeOut(animationSpec = tween(TAB_FADE_OUT_MS, easing = LinearEasing))
 }
 
 @OptIn(ExperimentalSharedTransitionApi::class)
@@ -112,14 +171,14 @@ fun LunarLogNavGraph(
     isUpdateAvailable: Boolean = false,
     pendingDeepLink: String? = null,
     onDeepLinkHandled: (Boolean) -> Unit = {},
-    onInstallUpdate: () -> Unit = {}
+    onInstallUpdate: () -> Unit = {},
+    snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
     val currentDestination = navBackStackEntry?.destination
 
-    val bottomNavItems = listOf(Screen.Home, Screen.PeriodHistory, Screen.Calendar, Screen.Analysis)
-    val showBottomBar = bottomNavItems.any { it.route == currentDestination?.route }
+    val showBottomBar = isTabRoute(currentDestination?.route)
 
     LaunchedEffect(pendingDeepLink, startDestination) {
         val link = pendingDeepLink ?: return@LaunchedEffect
@@ -137,16 +196,20 @@ fun LunarLogNavGraph(
     Scaffold(
         bottomBar = {
             if (showBottomBar) {
+                // Transparent, like the app bars: the bar sits directly on the screen background so
+                // there is no tonal seam where the content ends. Content is never underneath it —
+                // the Scaffold's innerPadding is applied (and consumed) below.
                 NavigationBar(
-                    containerColor = MaterialTheme.colorScheme.surface.copy(alpha = 0.98f),
+                    containerColor = Color.Transparent,
                     tonalElevation = 0.dp
                 ) {
                     bottomNavItems.forEach { screen ->
                         val selected = currentDestination?.hierarchy?.any { it.route == screen.route } == true
+                        val icon = if (selected) screen.selectedIcon!! else screen.unselectedIcon!!
                         NavigationBarItem(
                             colors = NavigationBarItemDefaults.colors(
                                 selectedIconColor = MaterialTheme.colorScheme.onPrimaryContainer,
-                                selectedTextColor = MaterialTheme.colorScheme.primary,
+                                selectedTextColor = MaterialTheme.colorScheme.onSurface,
                                 indicatorColor = MaterialTheme.colorScheme.primaryContainer,
                                 unselectedIconColor = MaterialTheme.colorScheme.onSurfaceVariant,
                                 unselectedTextColor = MaterialTheme.colorScheme.onSurfaceVariant
@@ -154,21 +217,24 @@ fun LunarLogNavGraph(
                             icon = {
                                 if (screen == Screen.Home && isUpdateAvailable) {
                                     androidx.compose.material3.BadgedBox(
-                                        badge = { androidx.compose.material3.Badge() }
+                                        badge = {
+                                            androidx.compose.material3.Badge(
+                                                modifier = Modifier.semantics {
+                                                    contentDescription = "Update available"
+                                                }
+                                            )
+                                        }
                                     ) {
-                                        Icon(
-                                            imageVector = if (selected) screen.selectedIcon!! else screen.unselectedIcon!!,
-                                            contentDescription = screen.label
-                                        )
+                                        // The label below is the accessible name; describing the
+                                        // icon too makes TalkBack say it twice.
+                                        Icon(imageVector = icon, contentDescription = null)
                                     }
                                 } else {
-                                    Icon(
-                                        imageVector = if (selected) screen.selectedIcon!! else screen.unselectedIcon!!,
-                                        contentDescription = screen.label
-                                    )
+                                    Icon(imageVector = icon, contentDescription = null)
                                 }
                             },
                             label = { Text(screen.label!!) },
+                            alwaysShowLabel = true,
                             selected = selected,
                             onClick = {
                                 if (!selected) {
@@ -185,17 +251,32 @@ fun LunarLogNavGraph(
                     }
                 }
             }
-        }
+        },
+        // The Scaffold owns snackbar placement, so it clears the bottom bar (and the system nav
+        // bar inset) automatically instead of an overlay guessing at a fixed offset.
+        snackbarHost = { SnackbarHost(snackbarHostState) }
     ) { innerPadding ->
-        SharedTransitionLayout(modifier = Modifier.padding(innerPadding)) {
+        // padding() offsets but does not consume, so every inner Scaffold and TopAppBar was
+        // re-applying the full system-bar inset on top of this one.
+        SharedTransitionLayout(
+            modifier = Modifier
+                .padding(innerPadding)
+                .consumeWindowInsets(innerPadding)
+        ) {
             NavHost(
                 navController = navController,
-                startDestination = startDestination
+                startDestination = startDestination,
+                enterTransition = { pushEnterTransition() },
+                exitTransition = { pushExitTransition() },
+                popEnterTransition = { popEnterTransition() },
+                popExitTransition = { popExitTransition() }
             ) {
                 composable(
                     route = Screen.Home.route,
-                    enterTransition = { macEnterTransition() },
-                    exitTransition = { macExitTransition() }
+                    enterTransition = { tabEnterTransition() },
+                    exitTransition = { tabExitTransition() },
+                    popEnterTransition = { tabEnterTransition() },
+                    popExitTransition = { tabExitTransition() }
                 ) {
                     HomeScreen(
                         onLogDetailsClicked = {
@@ -211,25 +292,27 @@ fun LunarLogNavGraph(
                 composable(
                     route = Screen.Calendar.route,
                     deepLinks = listOf(navDeepLink { uriPattern = "lunarlog://calendar" }),
-                    enterTransition = { macEnterTransition() },
-                    exitTransition = { macExitTransition() }
+                    enterTransition = { tabEnterTransition() },
+                    exitTransition = { tabExitTransition() },
+                    popEnterTransition = { tabEnterTransition() },
+                    popExitTransition = { tabExitTransition() }
                 ) {
+                    // CalendarScreen never registers a shared element, so the scopes are not passed.
                     CalendarScreen(
                         onDayClicked = { date ->
                             navController.navigate(Screen.Details.createRoute(date))
-                        },
-                        sharedTransitionScope = this@SharedTransitionLayout,
-                        animatedVisibilityScope = this
+                        }
                     )
                 }
                 composable(
                     route = Screen.Analysis.route,
                     deepLinks = listOf(navDeepLink { uriPattern = "lunarlog://analysis" }),
-                    enterTransition = { macEnterTransition() },
-                    exitTransition = { macExitTransition() }
+                    enterTransition = { tabEnterTransition() },
+                    exitTransition = { tabExitTransition() },
+                    popEnterTransition = { tabEnterTransition() },
+                    popExitTransition = { tabExitTransition() }
                 ) {
                     AnalysisScreen(
-                        onBack = { navController.popBackStack() },
                         onHistoryClick = { navController.navigate(Screen.LogHistory.route) }
                     )
                 }
@@ -241,7 +324,7 @@ fun LunarLogNavGraph(
                     )
                 }
                 composable(Screen.LogHistory.route) {
-                    com.lunarlog.ui.loghistory.LogHistoryScreen(
+                    LogHistoryScreen(
                         onBackClick = { navController.popBackStack() },
                         onLogClick = { date ->
                             navController.navigate(Screen.Details.createRoute(date))
@@ -280,25 +363,27 @@ fun LunarLogNavGraph(
                 }
                 composable(
                     route = Screen.PeriodHistory.route,
-                    enterTransition = { macEnterTransition() },
-                    exitTransition = { macExitTransition() }
+                    enterTransition = { tabEnterTransition() },
+                    exitTransition = { tabExitTransition() },
+                    popEnterTransition = { tabEnterTransition() },
+                    popExitTransition = { tabExitTransition() }
                 ) {
-                    com.lunarlog.ui.periodhistory.PeriodHistoryScreen(
+                    // PeriodHistoryScreen never registers a shared element, so the scopes are not
+                    // passed.
+                    PeriodHistoryScreen(
                         onCycleClick = { cycleId ->
                             navController.navigate(Screen.PeriodDetail.createRoute(cycleId))
                         },
                         onAddPeriodClick = {
                             navController.navigate(Screen.Logging.route)
-                        },
-                        sharedTransitionScope = this@SharedTransitionLayout,
-                        animatedVisibilityScope = this
+                        }
                     )
                 }
                 composable(
                     route = Screen.PeriodDetail.route,
                     arguments = listOf(navArgument("cycleId") { type = NavType.IntType })
                 ) {
-                    com.lunarlog.ui.periodhistory.PeriodDetailScreen(
+                    PeriodDetailScreen(
                         onBack = { navController.popBackStack() },
                         onDayClick = { date ->
                             navController.navigate(Screen.Details.createRoute(date))

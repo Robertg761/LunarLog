@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  Dark override for the base platform theme. Only the brand colours differ; the DayNight parent
+  already swaps AppCompat's own surfaces and text colours. See values/themes.xml for why the parent
+  must stay AppCompat.
+-->
+<resources>
+
+    <style name="Theme.LunarLog" parent="Theme.AppCompat.DayNight.NoActionBar">
+        <item name="colorPrimary">#FFB1CF</item>
+        <item name="colorPrimaryDark">#3D1024</item>
+        <item name="colorAccent">#FFB1CF</item>
+        <item name="android:colorBackground">#201018</item>
+        <item name="android:windowBackground">#201018</item>
+    </style>
+</resources>

@@ -23,6 +23,14 @@ data class WeeklyDigest(
 
 object NarrativeGenerator {
 
+    /**
+     * The narrative [generateWeeklyDigest] returns when the week has no logs at all.
+     *
+     * Exposed so the UI can tell "empty week" from a real digest without string-matching a literal
+     * of its own (`AnalysisScreen` renders an empty state for this value instead of a digest card).
+     */
+    const val EMPTY_WEEK_NARRATIVE = "No logs recorded this week."
+
     fun generateCycleSummary(
         interval: CompletedCycleInterval,
         logs: List<DailyLog>
@@ -95,7 +103,7 @@ object NarrativeGenerator {
             return WeeklyDigest(
                 startDate = startDay,
                 endDate = referenceDate,
-                narrative = "No logs recorded this week.",
+                narrative = EMPTY_WEEK_NARRATIVE,
                 dominantMood = null,
                 dominantSymptom = null
             )

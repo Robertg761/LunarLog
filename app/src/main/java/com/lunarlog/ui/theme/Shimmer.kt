@@ -18,6 +18,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.onGloballyPositioned
 import androidx.compose.ui.unit.IntSize
 
+import androidx.compose.animation.core.LinearEasing
 import androidx.compose.material3.MaterialTheme
 
 fun Modifier.shimmerEffect(): Modifier = composed {
@@ -27,7 +28,9 @@ fun Modifier.shimmerEffect(): Modifier = composed {
         initialValue = -2 * size.width.toFloat(),
         targetValue = 2 * size.width.toFloat(),
         animationSpec = infiniteRepeatable(
-            animation = tween(1000)
+            // The default FastOutSlowIn easing makes the band stall at each end, which reads as
+            // a stutter on a loop that never stops.
+            animation = tween(1000, easing = LinearEasing)
         ),
         label = "ShimmerOffset"
     )

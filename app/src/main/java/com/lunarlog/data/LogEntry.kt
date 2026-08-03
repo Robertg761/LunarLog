@@ -8,6 +8,26 @@ enum class LogEntryType {
     SYMPTOM, MOOD, FLOW, WATER, SLEEP, SLEEP_QUALITY, NOTE, SEX, TEMPERATURE, MUCUS
 }
 
+/**
+ * Human-readable label for a [LogEntryType].
+ *
+ * The enum name leaks into the UI otherwise, which surfaces as `SLEEP_QUALITY` on log cards and
+ * `Sleep_quality` in the add-entry sheet.
+ */
+val LogEntryType.displayName: String
+    get() = when (this) {
+        LogEntryType.SYMPTOM -> "Symptom"
+        LogEntryType.MOOD -> "Mood"
+        LogEntryType.FLOW -> "Flow"
+        LogEntryType.WATER -> "Water"
+        LogEntryType.SLEEP -> "Sleep"
+        LogEntryType.SLEEP_QUALITY -> "Sleep quality"
+        LogEntryType.NOTE -> "Note"
+        LogEntryType.SEX -> "Sex drive"
+        LogEntryType.TEMPERATURE -> "Basal temperature"
+        LogEntryType.MUCUS -> "Cervical mucus"
+    }
+
 @Entity(
     tableName = "log_entries",
     indices = [Index(value = ["date"], name = "index_log_entries_date")]

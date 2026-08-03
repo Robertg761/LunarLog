@@ -1,9 +1,21 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!--
+    Sizing mirrors the SizeMode.Responsive buckets declared in LogPeriodWidget:
+      compact 110x110dp (2x2 cells) and wide 250x110dp (4x2 cells).
+    minWidth/minHeight are the legacy (pre-API 31) sizing; targetCellWidth/Height are what
+    Android 12+ launchers actually use.
+-->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
     android:description="@string/widget_description"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:minWidth="110dp"
     android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
+    android:maxResizeWidth="320dp"
+    android:maxResizeHeight="180dp"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
     android:resizeMode="horizontal|vertical"
     android:widgetCategory="home_screen">
 </appwidget-provider>

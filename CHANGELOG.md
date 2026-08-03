@@ -1,5 +1,26 @@
 # Changelog
 
+## [1.8.2] - 2026-08-03
+
+### Changed
+- **Visual Refresh**: Rebuilt the app's surface, spacing, and typography system so cards, sheets, dialogs, and tab strips all draw from one warm palette instead of falling back to Material's default grey. Every screen now shares the same app bar, section header, card, and empty-state treatment.
+- **Motion**: Drilling into a screen and backing out now animates as a directional slide, while switching between the four main tabs uses a fade-through instead of a slow cross-fade.
+- **Home**: The cycle ring no longer shows a hard seam in its gradient, the day count sits on a solid disc so it stays legible while the halo pulses, and the hero stops animating once it is scrolled out of view.
+- **Calendar**: Today is marked with an outline instead of an amber fill, and the month title now changes as a swipe commits rather than after the animation settles.
+- **Onboarding**: The welcome card is solid rather than see-through, so text stays readable over the drifting background.
+
+### Fixed
+- **Cervical Mucus Was Recorded Under the Wrong Name**: The Add Log slider used its own wording, one step out of line with what the app actually stores, so choosing "Sticky" was saved and later shown back as "Creamy". Every level now uses one shared set of names.
+- **Sex Drive Levels That Vanished**: The slider offered levels 4 and 5, which the app does not define; anything saved at those levels was displayed as not recorded. The slider now matches the stored range.
+- **Log Readouts**: Flow, sex drive, and cervical mucus show their names instead of raw numbers, both on the sliders and on the chips listing what is about to be saved.
+- **Dark Mode**: Period, fertile, and ovulation days were nearly invisible against the dark background, system date and time pickers rendered white-on-white, and the home-screen widget glared white on a dark launcher.
+- **Light Mode**: Cards were almost indistinguishable from the page behind them, so screens of stacked cards read as one flat wash.
+- **Settings**: The theme swatches no longer push the last colour onto a line of its own, the time picker follows the device's 12- and 24-hour setting, and the screen no longer draws switches in the wrong position before your saved settings load.
+- **Layout and Accessibility**: Fixed system bar padding being applied twice, content sitting underneath floating buttons, chart labels clipping at large font sizes, and several controls that were unlabelled or announced twice by screen readers.
+
+### Added
+- **Regression Tests**: Added contrast tests for the cycle colours and label tests that pin each log level to its stored meaning, so neither can silently drift again.
+
 ## [1.8.1] - 2026-07-17
 
 ### Changed

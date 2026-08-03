@@ -8,11 +8,11 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
-import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.ModalBottomSheet
@@ -31,9 +31,10 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLifecycleOwner
 import androidx.compose.ui.text.style.TextOverflow
-import androidx.compose.ui.unit.dp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
+import com.lunarlog.ui.components.CardDivider
+import com.lunarlog.ui.theme.Spacing
 import com.lunarlog.update.ApkUpdateManager
 import com.lunarlog.update.UpdateInfo
 import kotlinx.coroutines.delay
@@ -137,20 +138,24 @@ fun UpdateBottomSheet(
 
     ModalBottomSheet(
         onDismissRequest = onDismiss,
-        sheetState = sheetState
+        sheetState = sheetState,
+        // Sheets take the same warm `surfaceContainer` as LunarLogCard rather than
+        // BottomSheetDefaults' `surfaceContainerLow`, so a sheet reads as the same material
+        // as the cards it slides over instead of a second, paler one.
+        containerColor = MaterialTheme.colorScheme.surfaceContainer
     ) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
                 .verticalScroll(scroll)
-                .padding(horizontal = 20.dp)
-                .padding(bottom = 20.dp)
+                .padding(horizontal = Spacing.sheetHorizontal)
+                .padding(bottom = Spacing.sheetHorizontal)
         ) {
             Text(
                 text = "Update LunarLog",
                 style = MaterialTheme.typography.titleLarge
             )
-            Spacer(modifier = Modifier.height(6.dp))
+            Spacer(modifier = Modifier.height(Spacing.sm))
             Text(
                 text = "New version: ${info.latestVersionName}",
                 style = MaterialTheme.typography.bodyMedium,
@@ -158,9 +163,9 @@ fun UpdateBottomSheet(
             )
 
             if (info.releaseNotes.isNotBlank()) {
-                Spacer(modifier = Modifier.height(12.dp))
-                HorizontalDivider()
-                Spacer(modifier = Modifier.height(12.dp))
+                Spacer(modifier = Modifier.height(Spacing.md))
+                CardDivider()
+                Spacer(modifier = Modifier.height(Spacing.md))
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically,
@@ -180,7 +185,7 @@ fun UpdateBottomSheet(
                 )
             }
 
-            Spacer(modifier = Modifier.height(16.dp))
+            Spacer(modifier = Modifier.height(Spacing.lg))
 
             when (stage) {
                 UpdateStage.Available -> {
@@ -189,13 +194,13 @@ fun UpdateBottomSheet(
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
                         OutlinedButton(onClick = onDismiss) { Text("Not now") }
-                        Spacer(modifier = Modifier.padding(6.dp))
+                        Spacer(modifier = Modifier.width(Spacing.md))
                         Button(onClick = {
                             errorText = null
                             progress = null
@@ -213,13 +218,13 @@ fun UpdateBottomSheet(
                         text = progressText ?: "Downloading...",
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    Spacer(modifier = Modifier.height(10.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
                     if (progress != null) {
                         LinearProgressIndicator(progress = { progress!! }, modifier = Modifier.fillMaxWidth())
                     } else {
                         LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
                     }
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
@@ -233,19 +238,19 @@ fun UpdateBottomSheet(
                         text = "To install this update, Android needs you to allow installs from LunarLog one time.",
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    Spacer(modifier = Modifier.height(8.dp))
+                    Spacer(modifier = Modifier.height(Spacing.sm))
                     Text(
                         text = "Tap \"Open settings\", enable \"Allow from this source\", then come back here to install.",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
                         OutlinedButton(onClick = onDismiss) { Text("Later") }
-                        Spacer(modifier = Modifier.padding(6.dp))
+                        Spacer(modifier = Modifier.width(Spacing.md))
                         Button(onClick = {
                             context.startActivity(apkUpdateManager.buildUnknownSourcesSettingsIntent(context))
                         }) {
@@ -259,13 +264,13 @@ fun UpdateBottomSheet(
                         text = "Ready to install. Android will show an install prompt.",
                         style = MaterialTheme.typography.bodyMedium
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
                         OutlinedButton(onClick = onDismiss) { Text("Close") }
-                        Spacer(modifier = Modifier.padding(6.dp))
+                        Spacer(modifier = Modifier.width(Spacing.md))
                         Button(onClick = {
                             if (apkUpdateManager.needsUnknownSourcesPermission(context)) {
                                 stage = UpdateStage.PermissionRequired
@@ -290,13 +295,13 @@ fun UpdateBottomSheet(
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.error
                     )
-                    Spacer(modifier = Modifier.height(12.dp))
+                    Spacer(modifier = Modifier.height(Spacing.md))
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
                         OutlinedButton(onClick = onDismiss) { Text("Close") }
-                        Spacer(modifier = Modifier.padding(6.dp))
+                        Spacer(modifier = Modifier.width(Spacing.md))
                         Button(onClick = {
                             errorText = null
                             progress = null

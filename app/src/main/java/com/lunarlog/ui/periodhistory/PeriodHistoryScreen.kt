@@ -1,9 +1,5 @@
 package com.lunarlog.ui.periodhistory
 
-import androidx.compose.animation.AnimatedVisibilityScope
-import androidx.compose.animation.ExperimentalSharedTransitionApi
-import androidx.compose.animation.SharedTransitionScope
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -12,7 +8,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -23,54 +18,50 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.DateRange
 import androidx.compose.material3.Badge
-import androidx.compose.material3.Card
-import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
 import com.lunarlog.core.model.Cycle
-import com.lunarlog.ui.theme.PeriodRed
+import com.lunarlog.ui.components.EmptyState
+import com.lunarlog.ui.components.LunarLogCard
+import com.lunarlog.ui.components.LunarLogTopAppBar
+import com.lunarlog.ui.theme.Spacing
+import com.lunarlog.ui.theme.cycleColors
+import com.lunarlog.ui.util.MediumDate
 import java.time.LocalDate
-import java.time.format.DateTimeFormatter
 import java.time.temporal.ChronoUnit
 
-@OptIn(ExperimentalMaterial3Api::class, ExperimentalSharedTransitionApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun PeriodHistoryScreen(
     onCycleClick: (Int) -> Unit,
     onAddPeriodClick: () -> Unit,
-    viewModel: PeriodHistoryViewModel = hiltViewModel(),
-    sharedTransitionScope: SharedTransitionScope? = null,
-    animatedVisibilityScope: AnimatedVisibilityScope? = null
+    viewModel: PeriodHistoryViewModel = hiltViewModel()
 ) {
     val cycles by viewModel.cycles.collectAsState()
 
     Scaffold(
-        topBar = {
-            TopAppBar(
-                title = { Text("Period History") }
-            )
-        },
+        topBar = { LunarLogTopAppBar(title = "Periods") },
         floatingActionButton = {
             FloatingActionButton(
                 onClick = onAddPeriodClick,
-                containerColor = PeriodRed
+                containerColor = cycleColors.periodStrong,
+                contentColor = cycleColors.onPeriodStrong
             ) {
                 Icon(
                     Icons.Default.Add,
-                    contentDescription = "Log New Period",
-                    tint = MaterialTheme.colorScheme.onPrimary
+                    contentDescription = "Log New Period"
                 )
             }
         }
@@ -79,36 +70,29 @@ fun PeriodHistoryScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .padding(padding),
+                    .padding(padding)
+                    .padding(horizontal = Spacing.screenHorizontal),
                 contentAlignment = Alignment.Center
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Icon(
-                        imageVector = Icons.Outlined.DateRange,
-                        contentDescription = null,
-                        modifier = Modifier.size(48.dp),
-                        tint = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Spacer(Modifier.height(16.dp))
-                    Text(
-                        text = "No periods logged yet",
-                        style = MaterialTheme.typography.bodyLarge,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
-                    Text(
-                        text = "Tap + to log your first period",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
-                    )
-                }
+                EmptyState(
+                    icon = Icons.Outlined.DateRange,
+                    title = "No periods logged yet",
+                    description = "Tap + to log your first period"
+                )
             }
         } else {
             LazyColumn(
                 modifier = Modifier
                     .fillMaxSize()
                     .padding(padding),
-                contentPadding = PaddingValues(16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp)
+                // Keep the last card's tap target clear of the FAB.
+                contentPadding = PaddingValues(
+                    start = Spacing.screenHorizontal,
+                    end = Spacing.screenHorizontal,
+                    top = Spacing.screenVertical,
+                    bottom = Spacing.fabClearance
+                ),
+                verticalArrangement = Arrangement.spacedBy(Spacing.itemGap)
             ) {
                 items(cycles, key = { it.id }) { cycle ->
                     PeriodCard(
@@ -121,61 +105,67 @@ fun PeriodHistoryScreen(
     }
 }
 
+/**
+ * One row of the history list.
+ *
+ * Every card is the same `LunarLogCard` tone: a list that alternated between `primaryContainer` and
+ * `surfaceVariant` put two unrelated neutral families next to each other and made the ongoing row
+ * look like a different kind of object. The ongoing state is carried by the accent-tinted drop and
+ * the "Ongoing" badge instead, which is louder than a fill swap anyway.
+ *
+ * Hierarchy is the date range (`titleMedium`, `onSurface`) over the duration (`bodyMedium`,
+ * `onSurfaceVariant`) — previously both resolved to `onSurfaceVariant`, so the card had no focal
+ * point.
+ */
 @Composable
 private fun PeriodCard(
     cycle: Cycle,
     onClick: () -> Unit
 ) {
-    val dateFormatter = DateTimeFormatter.ofPattern("MMM d, yyyy")
     val isOngoing = cycle.endDate == null
     val endDate = cycle.endDate ?: LocalDate.now()
     val duration = ChronoUnit.DAYS.between(cycle.startDate, endDate) + 1
+    val endLabel = if (isOngoing) "Present" else endDate.format(MediumDate)
+    val dateRange = "${cycle.startDate.format(MediumDate)} – $endLabel"
 
-    Card(
-        modifier = Modifier
-            .fillMaxWidth()
-            .clickable(onClick = onClick),
-        colors = CardDefaults.cardColors(
-            containerColor = if (isOngoing) 
-                MaterialTheme.colorScheme.primaryContainer 
-            else 
-                MaterialTheme.colorScheme.surfaceVariant
-        )
+    LunarLogCard(
+        modifier = Modifier.fillMaxWidth(),
+        onClick = onClick
     ) {
         Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(16.dp),
+            modifier = Modifier.fillMaxWidth(),
             verticalAlignment = Alignment.CenterVertically
         ) {
             Icon(
                 imageVector = Icons.Default.WaterDrop,
                 contentDescription = null,
-                tint = if (isOngoing) PeriodRed else MaterialTheme.colorScheme.onSurfaceVariant,
+                tint = if (isOngoing) cycleColors.period else MaterialTheme.colorScheme.onSurfaceVariant,
                 modifier = Modifier.size(32.dp)
             )
-            Spacer(Modifier.width(16.dp))
-            Column(modifier = Modifier.weight(1f)) {
+            Spacer(Modifier.width(Spacing.lg))
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(
-                        text = "${cycle.startDate.format(dateFormatter)} - ${
-                            if (isOngoing) "Present" else cycle.endDate?.format(dateFormatter)
-                        }",
+                        text = dateRange,
                         style = MaterialTheme.typography.titleMedium,
-                        color = if (isOngoing) 
-                            MaterialTheme.colorScheme.onPrimaryContainer 
-                        else 
-                            MaterialTheme.colorScheme.onSurfaceVariant
+                        color = MaterialTheme.colorScheme.onSurface,
+                        // Without this the badge measures to zero width and vanishes on a long date.
+                        modifier = Modifier.weight(1f, fill = false),
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
                     )
                     if (isOngoing) {
-                        Spacer(Modifier.width(8.dp))
+                        Spacer(Modifier.width(Spacing.sm))
                         Badge(
-                            containerColor = PeriodRed
+                            containerColor = cycleColors.periodStrong,
+                            contentColor = cycleColors.onPeriodStrong
                         ) {
                             Text(
                                 "Ongoing",
-                                style = MaterialTheme.typography.labelSmall,
-                                color = MaterialTheme.colorScheme.onPrimary
+                                style = MaterialTheme.typography.labelSmall
                             )
                         }
                     }
@@ -183,10 +173,7 @@ private fun PeriodCard(
                 Text(
                     text = "$duration day${if (duration != 1L) "s" else ""}",
                     style = MaterialTheme.typography.bodyMedium,
-                    color = if (isOngoing) 
-                        MaterialTheme.colorScheme.onPrimaryContainer.copy(alpha = 0.7f) 
-                    else 
-                        MaterialTheme.colorScheme.onSurfaceVariant.copy(alpha = 0.7f)
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
             }
         }
