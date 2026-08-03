@@ -169,7 +169,7 @@ fun LogHistoryItem(
                 if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                     with(sharedTransitionScope) {
                         Modifier.sharedElement(
-                            state = rememberSharedContentState(key = "day_${log.date}"),
+                            sharedContentState = rememberSharedContentState(key = "day_${log.date}"),
                             animatedVisibilityScope = animatedVisibilityScope
                         )
                     }

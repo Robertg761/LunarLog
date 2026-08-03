@@ -29,6 +29,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.filled.ColorLens
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.luminance
 import androidx.compose.material.icons.Icons
@@ -245,10 +246,12 @@ fun SettingsScreen(
         ).show()
     }
 
+    val privacyPolicyUrl = stringResource(R.string.privacy_policy_url)
+
     fun openPrivacyPolicy() {
         val intent = Intent(
             Intent.ACTION_VIEW,
-            context.getString(R.string.privacy_policy_url).toUri()
+            privacyPolicyUrl.toUri()
         )
         runCatching {
             context.startActivity(intent)

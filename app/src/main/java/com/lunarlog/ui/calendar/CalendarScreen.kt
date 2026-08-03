@@ -41,7 +41,7 @@ import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
-import java.util.Locale
+import androidx.compose.ui.platform.LocalLocale
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalSharedTransitionApi::class, ExperimentalMaterial3Api::class)
@@ -271,7 +271,7 @@ fun CalendarHeader(
 
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()),
+                text = currentMonth.month.getDisplayName(TextStyle.FULL, LocalLocale.current.platformLocale),
                 style = MaterialTheme.typography.headlineSmall,
                 fontWeight = FontWeight.Bold
             )

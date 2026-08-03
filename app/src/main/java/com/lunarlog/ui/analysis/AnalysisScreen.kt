@@ -32,14 +32,18 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
-import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
-import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
-import com.patrykandpatrick.vico.compose.chart.Chart
-import com.patrykandpatrick.vico.compose.chart.column.columnChart
-import com.patrykandpatrick.vico.compose.chart.line.lineChart
-import com.patrykandpatrick.vico.core.entry.entryModelOf
-import com.patrykandpatrick.vico.core.axis.AxisPosition
-import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
+import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStart
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.core.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModel
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianValueFormatter
+import com.patrykandpatrick.vico.core.cartesian.data.ColumnCartesianLayerModel
+import com.patrykandpatrick.vico.core.cartesian.data.LineCartesianLayerModel
 
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
@@ -224,26 +228,32 @@ fun TrendsTab(uiState: AnalysisUiState) {
             Text("Cycle Length History", style = MaterialTheme.typography.titleMedium)
             
             val model = remember(uiState.cycleHistory) {
-                entryModelOf(*uiState.cycleHistory.map { it.second.toFloat() }.toTypedArray())
+                CartesianChartModel(
+                    LineCartesianLayerModel.build {
+                        series(uiState.cycleHistory.map { it.second.toFloat() })
+                    }
+                )
             }
-            
+
             val cycleDates = remember(uiState.cycleHistory) {
                  uiState.cycleHistory.map { it.first.month.name.take(3) }
             }
-            
+
             val cycleAxisFormatter = remember(cycleDates) {
-                AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
+                CartesianValueFormatter { _, value, _ ->
                     cycleDates.getOrElse(value.toInt()) { "" }
                 }
             }
 
-            Chart(
-                chart = lineChart(),
+            CartesianChartHost(
+                chart = rememberCartesianChart(
+                    rememberLineCartesianLayer(),
+                    startAxis = VerticalAxis.rememberStart(),
+                    bottomAxis = HorizontalAxis.rememberBottom(valueFormatter = cycleAxisFormatter),
+                    marker = rememberMarker()
+                ),
                 model = model,
-                startAxis = rememberStartAxis(),
-                bottomAxis = rememberBottomAxis(valueFormatter = cycleAxisFormatter),
-                modifier = Modifier.height(200.dp),
-                marker = rememberMarker()
+                modifier = Modifier.height(200.dp)
             )
         } else {
             EmptyState(
@@ -265,21 +275,27 @@ fun TrendsTab(uiState: AnalysisUiState) {
              }
 
              if (counts.isNotEmpty()) {
-                 val model = remember(counts) { entryModelOf(*counts) }
-                 
+                 val model = remember(counts) {
+                     CartesianChartModel(
+                         ColumnCartesianLayerModel.build { series(counts.toList()) }
+                     )
+                 }
+
                  val symptomAxisFormatter = remember(symptomNames) {
-                     AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
+                     CartesianValueFormatter { _, value, _ ->
                         symptomNames.getOrElse(value.toInt()) { "" }
                      }
                  }
 
-                 Chart(
-                    chart = columnChart(),
+                 CartesianChartHost(
+                    chart = rememberCartesianChart(
+                        rememberColumnCartesianLayer(),
+                        startAxis = VerticalAxis.rememberStart(),
+                        bottomAxis = HorizontalAxis.rememberBottom(valueFormatter = symptomAxisFormatter),
+                        marker = rememberMarker()
+                    ),
                     model = model,
-                    startAxis = rememberStartAxis(),
-                    bottomAxis = rememberBottomAxis(valueFormatter = symptomAxisFormatter),
-                    modifier = Modifier.height(200.dp),
-                    marker = rememberMarker()
+                    modifier = Modifier.height(200.dp)
                  )
              }
         }
