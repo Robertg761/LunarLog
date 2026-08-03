@@ -179,6 +179,7 @@ fun SettingsScreen(
     var notificationsBlocked by remember { mutableStateOf(false) }
 
     val privacyPolicyFailedMessage = stringResource(id = R.string.privacy_policy_open_failed)
+    val privacyPolicyUrl = stringResource(id = R.string.privacy_policy_url)
 
     fun showMessage(text: String) {
         scope.launch { snackbarHostState.showSnackbar(text) }
@@ -312,7 +313,7 @@ fun SettingsScreen(
     fun openPrivacyPolicy() {
         val intent = Intent(
             Intent.ACTION_VIEW,
-            context.getString(R.string.privacy_policy_url).toUri()
+            privacyPolicyUrl.toUri()
         )
         runCatching {
             context.startActivity(intent)

@@ -266,7 +266,7 @@ fun HomeScreen(
                                 modifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
                                     with(sharedTransitionScope) {
                                         Modifier.sharedElement(
-                                            state = rememberSharedContentState(key = "day_${LocalDate.now().toEpochDay()}"),
+                                            sharedContentState = rememberSharedContentState(key = "day_${LocalDate.now().toEpochDay()}"),
                                             animatedVisibilityScope = animatedVisibilityScope
                                         )
                                     }

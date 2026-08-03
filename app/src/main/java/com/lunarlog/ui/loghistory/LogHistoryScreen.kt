@@ -253,7 +253,7 @@ fun LogHistoryItem(
                             // Epoch day, not the LocalDate's toString: HomeScreen registers the same element as
                             // "day_${LocalDate.now().toEpochDay()}", and the two keys have to be identical
                             // to pair up.
-                            state = rememberSharedContentState(key = "day_${log.date.toEpochDay()}"),
+                            sharedContentState = rememberSharedContentState(key = "day_${log.date.toEpochDay()}"),
                             animatedVisibilityScope = animatedVisibilityScope
                         )
                     }

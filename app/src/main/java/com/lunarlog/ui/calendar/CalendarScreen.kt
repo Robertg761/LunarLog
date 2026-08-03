@@ -48,7 +48,7 @@ import com.lunarlog.ui.util.flowLabel
 import java.time.LocalDate
 import java.time.YearMonth
 import java.time.format.TextStyle
-import java.util.Locale
+import androidx.compose.ui.platform.LocalLocale
 import kotlin.math.abs
 import kotlinx.coroutines.launch
 
@@ -353,7 +353,7 @@ fun CalendarHeader(
     ) {
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
             Text(
-                text = currentMonth.month.getDisplayName(TextStyle.FULL, Locale.getDefault()),
+                text = currentMonth.month.getDisplayName(TextStyle.FULL, LocalLocale.current.platformLocale),
                 style = MaterialTheme.typography.titleLarge,
                 maxLines = 1
             )
@@ -598,6 +598,7 @@ fun CalendarDayCell(
     val onPeriodSurface = bestContentColor(finalPeriodColor)
 
     val onSurfaceVariant = MaterialTheme.colorScheme.onSurfaceVariant
+    val locale = LocalLocale.current.platformLocale
     val pressedFillColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.16f)
     val pressedStrokeColor = MaterialTheme.colorScheme.primary.copy(alpha = 0.72f)
     val interactionSource = remember { MutableInteractionSource() }
@@ -616,7 +617,7 @@ fun CalendarDayCell(
             .semantics {
                 val statuses = buildList {
                     if (!day.isCurrentMonth) {
-                        add(day.date.month.getDisplayName(TextStyle.FULL, Locale.getDefault()))
+                        add(day.date.month.getDisplayName(TextStyle.FULL, locale))
                     }
                     if (day.data.isPeriod) {
                         add("period")

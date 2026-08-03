@@ -2,7 +2,6 @@ package com.lunarlog.ui.analysis
 
 import android.content.Context
 import android.content.Intent
-import android.graphics.Typeface
 import android.net.Uri
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -51,6 +50,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalLocale
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextAlign
@@ -65,23 +65,25 @@ import com.lunarlog.ui.components.LunarLogTopAppBar
 import com.lunarlog.ui.components.SectionHeader
 import com.lunarlog.ui.theme.Spacing
 import com.lunarlog.ui.util.MediumDate
-import com.patrykandpatrick.vico.compose.axis.horizontal.rememberBottomAxis
-import com.patrykandpatrick.vico.compose.axis.vertical.rememberStartAxis
-import com.patrykandpatrick.vico.compose.chart.Chart
-import com.patrykandpatrick.vico.compose.chart.column.columnChart
-import com.patrykandpatrick.vico.compose.chart.line.lineChart
-import com.patrykandpatrick.vico.compose.m3.style.m3ChartStyle
-import com.patrykandpatrick.vico.compose.style.ChartStyle
-import com.patrykandpatrick.vico.compose.style.ProvideChartStyle
-import com.patrykandpatrick.vico.core.axis.AxisPosition
-import com.patrykandpatrick.vico.core.axis.formatter.AxisValueFormatter
-import com.patrykandpatrick.vico.core.entry.entryModelOf
+import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberBottom
+import com.patrykandpatrick.vico.compose.cartesian.axis.rememberStart
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberColumnCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.layer.rememberLineCartesianLayer
+import com.patrykandpatrick.vico.compose.cartesian.rememberCartesianChart
+import com.patrykandpatrick.vico.compose.common.ProvideVicoTheme
+import com.patrykandpatrick.vico.compose.m3.common.rememberM3VicoTheme
+import com.patrykandpatrick.vico.core.cartesian.axis.HorizontalAxis
+import com.patrykandpatrick.vico.core.cartesian.axis.VerticalAxis
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianChartModel
+import com.patrykandpatrick.vico.core.cartesian.data.CartesianValueFormatter
+import com.patrykandpatrick.vico.core.cartesian.data.ColumnCartesianLayerModel
+import com.patrykandpatrick.vico.core.cartesian.data.LineCartesianLayerModel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import java.io.IOException
 import java.time.LocalDate
 import java.time.format.TextStyle
-import java.util.Locale
 
 
 private const val PDF_MIME_TYPE = "application/pdf"
@@ -270,28 +272,6 @@ private fun announceExportFailed(
     }
 }
 
-/**
- * Vico's own `ChartStyle` is neutral greys and blues with monospaced axis labels. This pins every
- * chart to the app's scheme — series in primary/secondary/tertiary, labels in `onSurfaceVariant`,
- * guidelines and axis lines in `outlineVariant` — and swaps the monospaced label face for the sans
- * face the body typography uses, so the axes read as part of the app rather than part of the chart
- * library. Arguments are positional because they are colour-typed and unambiguous.
- */
-@Composable
-private fun lunarLogChartStyle(): ChartStyle {
-    val base = m3ChartStyle(
-        MaterialTheme.colorScheme.onSurfaceVariant,
-        MaterialTheme.colorScheme.outlineVariant,
-        MaterialTheme.colorScheme.outlineVariant,
-        listOf(
-            MaterialTheme.colorScheme.primary,
-            MaterialTheme.colorScheme.secondary,
-            MaterialTheme.colorScheme.tertiary
-        )
-    )
-    return base.copy(axis = base.axis.copy(axisLabelTypeface = Typeface.DEFAULT))
-}
-
 @Composable
 fun TrendsTab(uiState: AnalysisUiState) {
     val digest = uiState.weeklyDigest
@@ -419,17 +399,22 @@ private fun CycleLengthSection(uiState: AnalysisUiState) {
             SectionPlaceholder("Two logged cycles are enough to start plotting this.")
         } else {
             val model = remember(uiState.cycleHistory) {
-                entryModelOf(*uiState.cycleHistory.map { it.second.toFloat() }.toTypedArray())
+                CartesianChartModel(
+                    LineCartesianLayerModel.build {
+                        series(uiState.cycleHistory.map { it.second.toFloat() })
+                    }
+                )
             }
 
-            val cycleDates = remember(uiState.cycleHistory) {
+            val locale = LocalLocale.current.platformLocale
+            val cycleDates = remember(uiState.cycleHistory, locale) {
                 uiState.cycleHistory.map {
-                    it.first.month.getDisplayName(TextStyle.SHORT, Locale.getDefault())
+                    it.first.month.getDisplayName(TextStyle.SHORT, locale)
                 }
             }
 
             val cycleAxisFormatter = remember(cycleDates) {
-                AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
+                CartesianValueFormatter { _, value, _ ->
                     cycleDates.getOrElse(value.toInt()) { "" }
                 }
             }
@@ -441,18 +426,20 @@ private fun CycleLengthSection(uiState: AnalysisUiState) {
             }
 
             ChartCard {
-                Chart(
-                    chart = lineChart(),
+                CartesianChartHost(
+                    chart = rememberCartesianChart(
+                        rememberLineCartesianLayer(),
+                        startAxis = VerticalAxis.rememberStart(),
+                        bottomAxis = HorizontalAxis.rememberBottom(valueFormatter = cycleAxisFormatter),
+                        marker = rememberMarker()
+                    ),
                     model = model,
-                    startAxis = rememberStartAxis(),
-                    bottomAxis = rememberBottomAxis(valueFormatter = cycleAxisFormatter),
                     modifier = Modifier
                         .fillMaxWidth()
                         // height() pins max as well as min, so at large font scales the
                         // bottom-axis labels clipped mid-glyph.
                         .heightIn(min = 200.dp)
-                        .semantics { contentDescription = cycleChartDescription },
-                    marker = rememberMarker()
+                        .semantics { contentDescription = cycleChartDescription }
                 )
             }
         }
@@ -473,10 +460,14 @@ private fun TopSymptomsSection(uiState: AnalysisUiState) {
                 uiState.symptomCounts.keys.toList()
             }
 
-            val model = remember(counts) { entryModelOf(*counts) }
+            val model = remember(counts) {
+                CartesianChartModel(
+                    ColumnCartesianLayerModel.build { series(counts.toList()) }
+                )
+            }
 
             val symptomAxisFormatter = remember(symptomNames) {
-                AxisValueFormatter<AxisPosition.Horizontal.Bottom> { value, _ ->
+                CartesianValueFormatter { _, value, _ ->
                     symptomNames.getOrElse(value.toInt()) { "" }
                 }
             }
@@ -488,16 +479,18 @@ private fun TopSymptomsSection(uiState: AnalysisUiState) {
             }
 
             ChartCard {
-                Chart(
-                    chart = columnChart(),
+                CartesianChartHost(
+                    chart = rememberCartesianChart(
+                        rememberColumnCartesianLayer(),
+                        startAxis = VerticalAxis.rememberStart(),
+                        bottomAxis = HorizontalAxis.rememberBottom(valueFormatter = symptomAxisFormatter),
+                        marker = rememberMarker()
+                    ),
                     model = model,
-                    startAxis = rememberStartAxis(),
-                    bottomAxis = rememberBottomAxis(valueFormatter = symptomAxisFormatter),
                     modifier = Modifier
                         .fillMaxWidth()
                         .heightIn(min = 200.dp)
-                        .semantics { contentDescription = symptomChartDescription },
-                    marker = rememberMarker()
+                        .semantics { contentDescription = symptomChartDescription }
                 )
             }
         }
@@ -507,14 +500,13 @@ private fun TopSymptomsSection(uiState: AnalysisUiState) {
 /**
  * A chart sits on the app's one card surface rather than bare on the page background, and every
  * component built inside this scope — including the axes, whose default label components read the
- * ambient style — picks up [lunarLogChartStyle].
+ * ambient theme — picks up the M3 Vico theme, which pins series colours to
+ * primary/secondary/tertiary and axis text and lines to the scheme's surface-variant colours.
  */
 @Composable
 private fun ChartCard(content: @Composable () -> Unit) {
     LunarLogCard(modifier = Modifier.fillMaxWidth()) {
-        ProvideChartStyle(lunarLogChartStyle()) {
-            content()
-        }
+        ProvideVicoTheme(rememberM3VicoTheme(), content)
     }
 }
 
