@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Cycle ring. 2x2 by default, resizable up to 4x4 so the legend can appear.
+
+    Matches CycleRingWidget's buckets: COMPACT 110x110dp (2x2), WIDE 250x110 (4x2), LARGE 250x250 (4x4).
+    maxResizeHeight has to reach 250dp or the LARGE bucket is unreachable and the legend never shows.
+    See widget_info.xml for the cell-dp formula and why there is no updatePeriodMillis.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:description="@string/widget_cycle_ring_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="110dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="110dp"
+    android:minResizeHeight="110dp"
+    android:maxResizeWidth="320dp"
+    android:maxResizeHeight="320dp"
+    android:previewImage="@drawable/widget_preview_image_cycle_ring"
+    android:previewLayout="@layout/widget_preview_cycle_ring"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="2"
+    android:targetCellHeight="2"
+    android:widgetCategory="home_screen"
+    tools:targetApi="s">
+</appwidget-provider>

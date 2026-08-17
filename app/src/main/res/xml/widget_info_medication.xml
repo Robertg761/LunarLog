@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Today's medications. 4x2 by default, which shows three rows; taller shows more and scrolls past
+    that.
+
+    Matches MedicationWidget's buckets: COMPACT 250x110dp (4x2) and LARGE 250x250 (4x4). See
+    widget_info.xml for the cell-dp formula and why there is no updatePeriodMillis.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:description="@string/widget_medication_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="250dp"
+    android:minHeight="110dp"
+    android:minResizeWidth="250dp"
+    android:minResizeHeight="110dp"
+    android:maxResizeWidth="320dp"
+    android:maxResizeHeight="320dp"
+    android:previewImage="@drawable/widget_preview_image_medication"
+    android:previewLayout="@layout/widget_preview_medication"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="2"
+    android:widgetCategory="home_screen"
+    tools:targetApi="s">
+</appwidget-provider>

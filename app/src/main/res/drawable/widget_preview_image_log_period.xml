@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    `previewImage` for the original counter widget, which had none — Samsung's picker fell back to the
+    launcher icon, which tells the user nothing about what they are about to place. See
+    widget_preview_image_cycle_ring for why the text is bars.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <path
+        android:pathData="M12,0 h72 a12,12 0 0,1 12,12 v72 a12,12 0 0,1 -12,12 h-72 a12,12 0 0,1 -12,-12 v-72 a12,12 0 0,1 12,-12 z"
+        android:fillColor="#FFFFFAFB" />
+
+    <!-- Title, then the count -->
+    <path
+        android:pathData="M31,20 h34 v6 h-34 z"
+        android:fillColor="#FFA81852" />
+    <path
+        android:pathData="M35,30 h26 v14 h-26 z"
+        android:fillColor="#FFA81852" />
+
+    <!-- Subtitle -->
+    <path
+        android:pathData="M24,50 h48 v5 h-48 z"
+        android:fillColor="#FF72535F" />
+
+    <!-- "+ Log Period" -->
+    <path
+        android:pathData="M28,64 h40 a10,10 0 0,1 0,20 h-40 a10,10 0 0,1 0,-20 z"
+        android:fillColor="#FFA81852" />
+    <path
+        android:pathData="M36,71 h24 v6 h-24 z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

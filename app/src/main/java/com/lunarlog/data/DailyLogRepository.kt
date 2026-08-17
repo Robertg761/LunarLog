@@ -159,6 +159,44 @@ class DailyLogRepository @Inject constructor(
         }
     }
 
+    /**
+     * Replaces just one type's entries for a date, leaving every other type on that day alone.
+     *
+     * [upsertEntries] is the wrong tool when the caller only knows about a single field: it goes
+     * through [replaceEntriesForDate], which clears the whole day, so using it to set flow from the
+     * quick-log widget would silently delete that day's symptoms, mood and notes.
+     *
+     * This exists for the "set" fields rather than the accumulating ones. `WATER` and `SLEEP` are
+     * summed across entries by the aggregate, so those are appended with [addEntry] and adding a
+     * second cup is a second row. `FLOW` is aggregated as a *max*, which means appending can only
+     * ever raise it — tapping Heavy and then Light would leave the day on Heavy — so a widget tap
+     * that means "today's flow is this" has to replace.
+     */
+    suspend fun replaceEntriesOfType(
+        date: Long,
+        type: LogEntryType,
+        values: List<String>,
+        time: Long,
+        details: String? = null
+    ) {
+        appDatabase.withTransaction {
+            ensureLegacyDataHydrated(date)
+            logEntryDao.deleteEntriesForDateAndType(date, type)
+            values.filter { it.isNotBlank() }.forEach { value ->
+                logEntryDao.insertEntry(
+                    LogEntry(
+                        date = date,
+                        time = time,
+                        type = type,
+                        value = value,
+                        details = details
+                    )
+                )
+            }
+            updateDailyLogAggregateInTransaction(date)
+        }
+    }
+
     suspend fun upsertEntries(
         date: Long,
         payload: Map<LogEntryType, List<String>>,

@@ -1,5 +1,20 @@
 # Changelog
 
+## [1.9.0] - 2026-08-17
+
+### Added
+- **Four New Home Screen Widgets**: Alongside the existing cycle counter there is now a **Cycle ring** showing your cycle day, phase, and what is coming next; a **Cycle calendar** marking this month's period, fertile, and ovulation days; a **Quick log** row for recording today's flow or a glass of water without opening the app; and a **Medications** list you can tick off from the home screen. The medications widget shows medication names on your home screen, so leave that one off if anyone else sees your device.
+- **Samsung Support**: Widgets now show a real preview in One UI's picker instead of a bare icon, each carries its own name and description rather than sharing the app's, and all five are sized to One UI's grid so they land at a usable size the moment you drop them.
+- **Widget Regression Tests**: Added 37 tests pinning the ring's phase and arc maths, the calendar's month grid and projected marks, and the medication list's ordering and day filtering.
+
+### Changed
+- **Widgets Keep Themselves Current**: Widgets now redraw when the data behind them changes, at midnight, and after a clock or time-zone change, instead of only when Android happened to poll them. The midnight update is scheduled work rather than background polling, so it survives Samsung's "Sleeping apps" throttling.
+- **Widget Colours**: Widgets paint their own opaque surface in the app's palette, which keeps One UI's widget-transparency pass from tinting them and stops light wedges showing at the corners on Android 12 and later.
+
+### Fixed
+- **Widget Picker Showed Nothing Useful**: The cycle counter widget had no preview image or layout, so pickers listed it as an unlabelled icon with no indication of what it would draw.
+- **Stale Widgets**: Logging a period, a symptom, or a dose left every widget showing the previous day's figures until something unrelated forced a redraw.
+
 ## [1.8.2] - 2026-08-03
 
 ### Changed

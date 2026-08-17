@@ -94,9 +94,15 @@
                 tools:node="remove" />
         </provider>
 
+        <!--
+            Widget providers. Each carries its own android:label: One UI's picker lists providers by
+            label, so without one all five would appear as "LunarLog" and the user would have to place
+            them to find out which is which.
+        -->
         <receiver
             android:name=".ui.widget.LogPeriodWidgetReceiver"
-            android:exported="true">
+            android:exported="true"
+            android:label="@string/widget_log_period_label">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
@@ -104,6 +110,73 @@
             <meta-data
                 android:name="android.appwidget.provider"
                 android:resource="@xml/widget_info" />
+        </receiver>
+
+        <receiver
+            android:name=".ui.widget.CycleRingWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_cycle_ring_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_cycle_ring" />
+        </receiver>
+
+        <receiver
+            android:name=".ui.widget.CycleCalendarWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_cycle_calendar_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_cycle_calendar" />
+        </receiver>
+
+        <receiver
+            android:name=".ui.widget.QuickLogWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_quick_log_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_quick_log" />
+        </receiver>
+
+        <receiver
+            android:name=".ui.widget.MedicationWidgetReceiver"
+            android:exported="true"
+            android:label="@string/widget_medication_label">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+
+            <meta-data
+                android:name="android.appwidget.provider"
+                android:resource="@xml/widget_info_medication" />
+        </receiver>
+
+        <!--
+            DATE_CHANGED is on the implicit-broadcast exception list, so unlike almost everything else
+            it can still be declared here on API 26+ — which is what lets the widgets follow midnight
+            even once One UI has put LunarLog to sleep. See WidgetDateChangeReceiver.
+        -->
+        <receiver
+            android:name=".ui.widget.WidgetDateChangeReceiver"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.DATE_CHANGED" />
+                <action android:name="android.intent.action.TIME_SET" />
+                <action android:name="android.intent.action.TIMEZONE_CHANGED" />
+            </intent-filter>
         </receiver>
 
         <service

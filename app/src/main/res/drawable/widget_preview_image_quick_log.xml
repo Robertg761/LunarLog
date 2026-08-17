@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    `previewImage` for the quick-log row. Second pill filled to show what a recorded flow level looks
+    like. See widget_preview_image_cycle_ring for why the labels are bars.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="128dp"
+    android:height="32dp"
+    android:viewportWidth="128"
+    android:viewportHeight="32">
+
+    <path
+        android:pathData="M10,0 h108 a10,10 0 0,1 10,10 v12 a10,10 0 0,1 -10,10 h-108 a10,10 0 0,1 -10,-10 v-12 a10,10 0 0,1 10,-10 z"
+        android:fillColor="#FFFFFAFB" />
+
+    <!-- Unselected flow levels -->
+    <path
+        android:pathData="M14,8 h11 a8,8 0 0,1 0,16 h-11 a8,8 0 0,1 0,-16 z M74,8 h11 a8,8 0 0,1 0,16 h-11 a8,8 0 0,1 0,-16 z M104,8 h11 a8,8 0 0,1 0,16 h-11 a8,8 0 0,1 0,-16 z"
+        android:fillColor="#FFF7E3EA" />
+
+    <!-- The level recorded for today -->
+    <path
+        android:pathData="M44,8 h11 a8,8 0 0,1 0,16 h-11 a8,8 0 0,1 0,-16 z"
+        android:fillColor="#FFA81852" />
+
+    <!-- Labels -->
+    <path
+        android:pathData="M13,14 h13 v4 h-13 z M73,14 h13 v4 h-13 z M103,14 h13 v4 h-13 z"
+        android:fillColor="#FF251018" />
+    <path
+        android:pathData="M43,14 h13 v4 h-13 z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

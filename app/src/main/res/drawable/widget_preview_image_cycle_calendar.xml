@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    `previewImage` for the month calendar widget. See widget_preview_image_cycle_ring for why the text
+    is bars. Marked days are the real colours: recorded period, fertile window, estimated ovulation.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="128dp"
+    android:height="96dp"
+    android:viewportWidth="128"
+    android:viewportHeight="96">
+
+    <path
+        android:pathData="M12,0 h104 a12,12 0 0,1 12,12 v72 a12,12 0 0,1 -12,12 h-104 a12,12 0 0,1 -12,-12 v-72 a12,12 0 0,1 12,-12 z"
+        android:fillColor="#FFFFFAFB" />
+
+    <!-- Month title -->
+    <path
+        android:pathData="M10,10 h38 v7 h-38 z"
+        android:fillColor="#FFA81852" />
+
+    <!-- Weekday header -->
+    <path
+        android:pathData="M11,24 h6 v4 h-6 z M28,24 h6 v4 h-6 z M45,24 h6 v4 h-6 z M62,24 h6 v4 h-6 z M79,24 h6 v4 h-6 z M96,24 h6 v4 h-6 z M113,24 h6 v4 h-6 z"
+        android:fillColor="#FF72535F" />
+
+    <!-- Recorded period -->
+    <path
+        android:pathData="M59,34 h12 v9 h-12 z M76,34 h12 v9 h-12 z M93,34 h12 v9 h-12 z M110,34 h12 v9 h-12 z M8,46 h12 v9 h-12 z"
+        android:fillColor="#FFFFD9E2" />
+
+    <!-- Fertile window -->
+    <path
+        android:pathData="M8,58 h12 v9 h-12 z M25,58 h12 v9 h-12 z M42,58 h12 v9 h-12 z M59,58 h12 v9 h-12 z"
+        android:fillColor="#FFE8F5E9" />
+
+    <!-- Estimated ovulation -->
+    <path
+        android:pathData="M76,58 h12 v9 h-12 z"
+        android:fillColor="#FFE3F2FD" />
+
+    <!-- Day numbers -->
+    <path
+        android:pathData="M11,36.5 h6 v4 h-6 z M28,36.5 h6 v4 h-6 z M45,36.5 h6 v4 h-6 z M62,36.5 h6 v4 h-6 z M79,36.5 h6 v4 h-6 z M96,36.5 h6 v4 h-6 z M113,36.5 h6 v4 h-6 z M11,48.5 h6 v4 h-6 z M28,48.5 h6 v4 h-6 z M45,48.5 h6 v4 h-6 z M62,48.5 h6 v4 h-6 z M79,48.5 h6 v4 h-6 z M96,48.5 h6 v4 h-6 z M113,48.5 h6 v4 h-6 z M11,60.5 h6 v4 h-6 z M28,60.5 h6 v4 h-6 z M45,60.5 h6 v4 h-6 z M62,60.5 h6 v4 h-6 z M79,60.5 h6 v4 h-6 z M96,60.5 h6 v4 h-6 z M113,60.5 h6 v4 h-6 z M11,72.5 h6 v4 h-6 z M28,72.5 h6 v4 h-6 z M45,72.5 h6 v4 h-6 z M62,72.5 h6 v4 h-6 z M79,72.5 h6 v4 h-6 z M96,72.5 h6 v4 h-6 z M113,72.5 h6 v4 h-6 z M11,84.5 h6 v4 h-6 z M28,84.5 h6 v4 h-6 z M45,84.5 h6 v4 h-6 z M62,84.5 h6 v4 h-6 z M79,84.5 h6 v4 h-6 z M96,84.5 h6 v4 h-6 z M113,84.5 h6 v4 h-6 z"
+        android:fillColor="#FF251018" />
+</vector>

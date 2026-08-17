@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    The card every widget preview sits on.
+
+    White rather than the surface colour so it can be recoloured with `android:backgroundTint` at each
+    use site — one drawable instead of one per colour, which matters because the previews between them
+    need eight fills. Radius matches what `widgetSurface()` asks the host for.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#FFFFFFFF" />
+    <corners android:radius="16dp" />
+</shape>

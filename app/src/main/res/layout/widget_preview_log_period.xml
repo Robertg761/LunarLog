@@ -1,0 +1,59 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    `previewLayout` for the cycle counter widget.
+
+    Android 12+ pickers — which is every One UI 4 device — inflate this at the widget's real cell size
+    and show it in place of `previewImage`, so the user sees something that looks like the widget they
+    are about to place rather than the launcher icon. `previewImage` stays declared alongside it for
+    API 26-30.
+
+    Colours are the light values from WidgetTheme, spelled out because the picker inflates this in the
+    launcher's context: an app theme attribute would not resolve, and a night-qualified resource would
+    follow the launcher's mode rather than ours. Sample content only — nothing here reads the database.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_surface"
+    android:backgroundTint="#FFFAFB"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="10dp">
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/widget_preview_counter_title"
+        android:textColor="#A81852"
+        android:textSize="12sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="8"
+        android:textColor="#A81852"
+        android:textSize="28sp"
+        android:textStyle="bold"
+        tools:ignore="HardcodedText" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/widget_preview_counter_subtitle"
+        android:textColor="#72535F"
+        android:textSize="11sp" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:background="@drawable/widget_preview_pill"
+        android:backgroundTint="#A81852"
+        android:paddingHorizontal="12dp"
+        android:paddingVertical="8dp"
+        android:text="@string/widget_preview_log_period_button"
+        android:textColor="#FFFFFF"
+        android:textSize="13sp" />
+</LinearLayout>

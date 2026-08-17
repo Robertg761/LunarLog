@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    `previewImage` for the cycle ring widget — the API 26-30 fallback for `previewLayout`.
+
+    A vector rather than a PNG: it scales to whatever thumbnail size the picker asks for and costs a
+    few hundred bytes. Text is drawn as bars because vectors cannot hold text; the previewLayout used
+    on API 31+ (which is every One UI 4 device) has the real thing.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="96dp"
+    android:height="96dp"
+    android:viewportWidth="96"
+    android:viewportHeight="96">
+
+    <path
+        android:pathData="M12,0 h72 a12,12 0 0,1 12,12 v72 a12,12 0 0,1 -12,12 h-72 a12,12 0 0,1 -12,-12 v-72 a12,12 0 0,1 12,-12 z"
+        android:fillColor="#FFFFFAFB" />
+
+    <group
+        android:translateX="21.6"
+        android:translateY="6"
+        android:scaleX="1.1"
+        android:scaleY="1.1">
+        <path
+            android:pathData="M24,6 A18,18 0 1,1 24,42 A18,18 0 1,1 24,6"
+            android:strokeColor="#FFF7E3EA"
+            android:strokeWidth="5.5" />
+        <path
+            android:pathData="M24,6 A18,18 0 0,1 39.89,15.55"
+            android:strokeColor="#FFD93672"
+            android:strokeWidth="5.5"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M33.27,39.43 A18,18 0 0,1 14.73,39.43"
+            android:strokeColor="#FF43A047"
+            android:strokeWidth="5.5"
+            android:strokeLineCap="round" />
+        <path
+            android:pathData="M44.66,26.91 A2.9,2.9 0 1,1 38.86,26.91 A2.9,2.9 0 1,1 44.66,26.91"
+            android:fillColor="#FFC77800" />
+    </group>
+
+    <!-- Cycle day, inside the ring -->
+    <path
+        android:pathData="M39,28 h18 v9 h-18 z"
+        android:fillColor="#FFA81852" />
+
+    <!-- Phase label, then the supporting line -->
+    <path
+        android:pathData="M28,66 h40 v7 h-40 z"
+        android:fillColor="#FFA81852" />
+    <path
+        android:pathData="M19,79 h58 v5 h-58 z"
+        android:fillColor="#FF72535F" />
+</vector>

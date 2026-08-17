@@ -1,6 +1,42 @@
 <resources>
     <string name="app_name">LunarLog</string>
+
+    <!--
+        Widgets. Each provider carries its own android:label because One UI's picker lists them by
+        label; without one they all show up as "LunarLog" and the user has to guess which is which.
+    -->
+    <string name="widget_log_period_label">Cycle counter</string>
     <string name="widget_description">Quick view of your cycle day and period logging.</string>
+    <string name="widget_cycle_ring_label">Cycle ring</string>
+    <string name="widget_cycle_ring_description">Your cycle day, phase and what is coming next, drawn as a ring.</string>
+    <string name="widget_cycle_calendar_label">Cycle calendar</string>
+    <string name="widget_cycle_calendar_description">This month at a glance, with period, fertile and ovulation days marked.</string>
+    <string name="widget_quick_log_label">Quick log</string>
+    <string name="widget_quick_log_description">Record today\'s flow and water without opening the app.</string>
+    <string name="widget_medication_label">Medications</string>
+    <string name="widget_medication_description">Today\'s scheduled medications, tickable from the home screen.</string>
+
+    <!-- Sample content for the widget picker previews. Not shown anywhere in the app. -->
+    <string name="widget_preview_counter_title">Cycle day</string>
+    <string name="widget_preview_counter_subtitle">21 days to next period</string>
+    <string name="widget_preview_log_period_button">+ Log Period</string>
+    <string name="widget_preview_phase">Follicular</string>
+    <!-- March because 1 March 2026 is a Sunday, so the preview grid fills five rows exactly. -->
+    <string name="widget_preview_month">March</string>
+    <string name="widget_preview_weekday_sun">S</string>
+    <string name="widget_preview_weekday_mon">M</string>
+    <string name="widget_preview_weekday_tue">T</string>
+    <string name="widget_preview_weekday_wed">W</string>
+    <string name="widget_preview_weekday_thu">T</string>
+    <string name="widget_preview_weekday_fri">F</string>
+    <string name="widget_preview_weekday_sat">S</string>
+    <string name="widget_preview_flow_spot">Spot</string>
+    <string name="widget_preview_flow_light">Light</string>
+    <string name="widget_preview_flow_medium">Med</string>
+    <string name="widget_preview_flow_heavy">Heavy</string>
+    <string name="widget_preview_medication_morning">Morning tablet</string>
+    <string name="widget_preview_medication_afternoon">Afternoon dose</string>
+    <string name="widget_preview_medication_evening">Evening tablet</string>
 
     <!-- Settings -->
     <string name="settings_notifications">Notifications</string>

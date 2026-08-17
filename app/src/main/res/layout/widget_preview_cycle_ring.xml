@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    `previewLayout` for the cycle ring widget. See widget_preview_log_period for why the colours are
+    literal and the content is sample data.
+
+    The ring itself is the traced vector rather than a still of CycleRingRenderer's output, because the
+    picker cannot run the renderer — the live widget draws its arcs on a Canvas for want of an arc
+    primitive in Glance.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_surface"
+    android:backgroundTint="#FFFAFB"
+    android:gravity="center"
+    android:orientation="vertical"
+    android:padding="8dp">
+
+    <FrameLayout
+        android:layout_width="58dp"
+        android:layout_height="58dp">
+
+        <ImageView
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:contentDescription="@string/widget_cycle_ring_label"
+            android:src="@drawable/widget_preview_ring" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center"
+            android:text="8"
+            android:textColor="#A81852"
+            android:textSize="17sp"
+            android:textStyle="bold"
+            tools:ignore="HardcodedText" />
+    </FrameLayout>
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="4dp"
+        android:text="@string/widget_preview_phase"
+        android:textColor="#A81852"
+        android:textSize="13sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:gravity="center"
+        android:text="@string/widget_preview_counter_subtitle"
+        android:textColor="#72535F"
+        android:textSize="11sp" />
+</LinearLayout>

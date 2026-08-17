@@ -1,9 +1,7 @@
 package com.lunarlog.ui.widget
 
 import android.content.Context
-import android.os.Build
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -34,10 +32,6 @@ import androidx.glance.text.TextAlign
 import androidx.glance.text.TextStyle
 import androidx.glance.appwidget.cornerRadius
 import androidx.glance.unit.ColorProvider
-// The day/night factory, which is a *function* named ColorProvider in a different package from the
-// ColorProvider *interface* imported above. Kotlin keeps types and functions in separate namespaces,
-// so both names coexist; the import above is the type used in the private helpers' signatures.
-import androidx.glance.color.ColorProvider
 import com.lunarlog.data.LogEntry
 import com.lunarlog.data.LogEntryType
 import com.lunarlog.data.PeriodChangeResult
@@ -81,29 +75,19 @@ class LogPeriodWidget : GlanceAppWidget() {
 
     @Composable
     private fun WidgetContent(counter: CounterPresentation) {
-        // Glance does not inherit MaterialTheme, so the widget carries its own palette — otherwise
-        // it glared white on a dark home screen. These also move it off Material Pink 600 and onto
-        // the app's brand rose.
-        //
-        // `ColorProvider(day, night)` rather than `ColorProvider(R.color.x)`: the resource-id
-        // overload is @RestrictedApi to Glance's own library group, so calling it is a lint *error*
-        // and fails the release gate. This one is the public day/night API and needs no resources,
-        // which is why there is no widget_colors.xml. Values mirror ui/theme/Color.kt —
-        // SurfaceLight/SurfaceDark, BrandRoseDeep/BrandRoseLight, and BrandPlum.
-        val primaryColor = ColorProvider(day = Color(0xFFA81852), night = Color(0xFFF26399))
-        val onPrimaryColor = ColorProvider(day = Color(0xFFFFFFFF), night = Color(0xFF3D1024))
-        val surfaceColor = ColorProvider(day = Color(0xFFFFFAFB), night = Color(0xFF201018))
-        val subtitleColor = ColorProvider(day = Color(0xFF72535F), night = Color(0xFFE5C1CC))
+        // Glance does not inherit MaterialTheme, so widgets carry their own palette — otherwise this
+        // glared white on a dark home screen. It now lives in WidgetTheme.kt, shared with the other
+        // four widgets; see there for why the colours are day/night pairs rather than resource ids.
+        val primaryColor = WidgetColors.primary
+        val onPrimaryColor = WidgetColors.onPrimary
+        val subtitleColor = WidgetColors.muted
 
         val isCompact = LocalSize.current.width < WIDE_SIZE.width
 
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
-                .background(surfaceColor)
-                // The host clips widgets to the system corner radius on Android 12+, so a square
-                // surface shows light wedges at each corner. Match the mask.
-                .widgetCornerRadius()
+                .widgetSurface()
                 .padding(if (isCompact) 10.dp else 14.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalAlignment = Alignment.CenterHorizontally
@@ -203,17 +187,6 @@ class LogPeriodWidget : GlanceAppWidget() {
     }
 }
 
-/**
- * `android.R.dimen.system_app_widget_background_radius` only exists on API 31+; below that fall back
- * to a fixed radius (where Glance's corner radius support is itself a no-op anyway).
- */
-private fun GlanceModifier.widgetCornerRadius(): GlanceModifier =
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
-        cornerRadius(android.R.dimen.system_app_widget_background_radius)
-    } else {
-        cornerRadius(16.dp)
-    }
-
 class LogPeriodWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = LogPeriodWidget()
 }
@@ -251,7 +224,8 @@ class LogPeriodAction : ActionCallback {
             }
         }
         
-        // Refresh widget
-        LogPeriodWidget().update(context, glanceId)
+        // Starting a period moves the cycle ring, the calendar marks and this counter all at once, so
+        // refresh the whole set rather than just the widget that was tapped.
+        WidgetRefresher.updateAll(context)
     }
 }

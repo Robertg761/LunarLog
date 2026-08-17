@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    `previewImage` for the medication checklist. First row ticked so the picker shows what the widget is
+    for. Deliberately no legible names here — the preview should not leak an example that reads as real
+    data. See widget_preview_image_cycle_ring for why the text is bars.
+-->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="128dp"
+    android:height="64dp"
+    android:viewportWidth="128"
+    android:viewportHeight="64">
+
+    <path
+        android:pathData="M12,0 h104 a12,12 0 0,1 12,12 v40 a12,12 0 0,1 -12,12 h-104 a12,12 0 0,1 -12,-12 v-40 a12,12 0 0,1 12,-12 z"
+        android:fillColor="#FFFFFAFB" />
+
+    <!-- "Medications", then the taken/total count -->
+    <path
+        android:pathData="M10,9 h36 v7 h-36 z"
+        android:fillColor="#FFA81852" />
+    <path
+        android:pathData="M104,10 h16 v5 h-16 z"
+        android:fillColor="#FF72535F" />
+
+    <!-- Ticked -->
+    <path
+        android:pathData="M12,24 h5 a2,2 0 0,1 2,2 v5 a2,2 0 0,1 -2,2 h-5 a2,2 0 0,1 -2,-2 v-5 a2,2 0 0,1 2,-2 z"
+        android:fillColor="#FFA81852" />
+    <path
+        android:pathData="M25,26 h60 v5 h-60 z"
+        android:fillColor="#FF72535F" />
+
+    <!-- Still to take -->
+    <path
+        android:pathData="M12,37 h5 a2,2 0 0,1 2,2 v5 a2,2 0 0,1 -2,2 h-5 a2,2 0 0,1 -2,-2 v-5 a2,2 0 0,1 2,-2 z M12,50 h5 a2,2 0 0,1 2,2 v5 a2,2 0 0,1 -2,2 h-5 a2,2 0 0,1 -2,-2 v-5 a2,2 0 0,1 2,-2 z"
+        android:strokeColor="#FF8E6C78"
+        android:strokeWidth="1.5" />
+    <path
+        android:pathData="M25,39 h48 v5 h-48 z M25,52 h66 v5 h-66 z"
+        android:fillColor="#FF251018" />
+</vector>

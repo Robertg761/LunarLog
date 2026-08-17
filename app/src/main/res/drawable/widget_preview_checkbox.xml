@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    An unticked checkbox in the medication preview. Stroked rather than tinted, so unlike the other
+    preview shapes this one carries its own colour — WidgetTheme's light `outline`.
+-->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="#00000000" />
+    <stroke
+        android:width="2dp"
+        android:color="#8E6C78" />
+    <corners android:radius="4dp" />
+</shape>

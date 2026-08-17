@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    `previewLayout` for the quick-log row, at its 4x1 shape. See widget_preview_log_period for why the
+    colours are literal and the content is sample data.
+
+    "Light" is drawn selected so the picker shows both pill states — the widget's whole point is that
+    the level you tapped stays visible on the home screen.
+-->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@drawable/widget_preview_surface"
+    android:backgroundTint="#FFFAFB"
+    android:gravity="center_vertical"
+    android:orientation="horizontal"
+    android:paddingHorizontal="8dp"
+    android:paddingVertical="4dp">
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:background="@drawable/widget_preview_pill"
+        android:backgroundTint="#F7E3EA"
+        android:gravity="center"
+        android:paddingVertical="7dp"
+        android:text="@string/widget_preview_flow_spot"
+        android:textColor="#251018"
+        android:textSize="11sp" />
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_preview_pill"
+        android:backgroundTint="#A81852"
+        android:gravity="center"
+        android:paddingVertical="7dp"
+        android:text="@string/widget_preview_flow_light"
+        android:textColor="#FFFFFF"
+        android:textSize="11sp"
+        android:textStyle="bold" />
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_preview_pill"
+        android:backgroundTint="#F7E3EA"
+        android:gravity="center"
+        android:paddingVertical="7dp"
+        android:text="@string/widget_preview_flow_medium"
+        android:textColor="#251018"
+        android:textSize="11sp" />
+
+    <TextView
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="4dp"
+        android:layout_weight="1"
+        android:background="@drawable/widget_preview_pill"
+        android:backgroundTint="#F7E3EA"
+        android:gravity="center"
+        android:paddingVertical="7dp"
+        android:text="@string/widget_preview_flow_heavy"
+        android:textColor="#251018"
+        android:textSize="11sp" />
+</LinearLayout>

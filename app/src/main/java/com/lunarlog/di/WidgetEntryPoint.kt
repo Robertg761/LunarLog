@@ -3,6 +3,7 @@ package com.lunarlog.di
 import com.lunarlog.data.AppDatabase
 import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogRepository
+import com.lunarlog.data.MedicationRepository
 import dagger.hilt.EntryPoint
 import dagger.hilt.InstallIn
 import dagger.hilt.components.SingletonComponent
@@ -13,5 +14,6 @@ interface WidgetEntryPoint {
     fun appDatabase(): AppDatabase
     fun cycleRepository(): CycleRepository
     fun dailyLogRepository(): DailyLogRepository
+    fun medicationRepository(): MedicationRepository
 }
 

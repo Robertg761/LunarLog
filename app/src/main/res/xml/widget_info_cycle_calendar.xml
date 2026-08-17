@@ -1,0 +1,26 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Month calendar. 4x3 by default rather than 4x4: a full-width, full-height widget on One UI's 4x5
+    grid takes most of a home screen, and 4x3 already fits five week rows legibly.
+
+    Matches CycleCalendarWidget's buckets: MEDIUM 250x180dp (4x3) and LARGE 250x250 (4x4). See
+    widget_info.xml for the cell-dp formula and why there is no updatePeriodMillis.
+-->
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:description="@string/widget_cycle_calendar_description"
+    android:initialLayout="@layout/glance_default_loading_layout"
+    android:minWidth="250dp"
+    android:minHeight="180dp"
+    android:minResizeWidth="250dp"
+    android:minResizeHeight="180dp"
+    android:maxResizeWidth="320dp"
+    android:maxResizeHeight="320dp"
+    android:previewImage="@drawable/widget_preview_image_cycle_calendar"
+    android:previewLayout="@layout/widget_preview_cycle_calendar"
+    android:resizeMode="horizontal|vertical"
+    android:targetCellWidth="4"
+    android:targetCellHeight="3"
+    android:widgetCategory="home_screen"
+    tools:targetApi="s">
+</appwidget-provider>

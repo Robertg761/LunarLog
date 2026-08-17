@@ -1,11 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Sizing mirrors the SizeMode.Responsive buckets declared in LogPeriodWidget:
-      compact 110x110dp (2x2 cells) and wide 250x110dp (4x2 cells).
-    minWidth/minHeight are the legacy (pre-API 31) sizing; targetCellWidth/Height are what
-    Android 12+ launchers actually use.
+    Cycle counter — the original LunarLog widget.
+
+    Sizing mirrors the SizeMode.Responsive buckets declared in LogPeriodWidget: compact 110x110dp
+    (2x2 cells) and wide 250x110dp (4x2). minWidth/minHeight are the legacy (pre-API 31) sizing;
+    targetCellWidth/Height are what Android 12+ launchers, One UI included, actually use. Cell dp comes
+    from the platform's `70n - 30` formula, so 2 cells = 110dp and 4 = 250dp; guessing round numbers
+    here is what makes a widget land one cell wider than intended on a Samsung grid.
+
+    previewLayout + previewImage were both missing until now, which is why One UI's picker showed this
+    as a bare launcher icon. See res/layout/widget_preview_log_period.xml for why both are declared.
+
+    No updatePeriodMillis, here or in any of the others: it is capped at 30 minutes, and it is the first
+    thing One UI's "Sleeping apps" suppresses. WidgetDataObserver and WidgetRefreshWorker cover the two
+    reasons this content actually changes.
 -->
 <appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:description="@string/widget_description"
     android:initialLayout="@layout/glance_default_loading_layout"
     android:minWidth="110dp"
@@ -14,8 +25,11 @@
     android:minResizeHeight="110dp"
     android:maxResizeWidth="320dp"
     android:maxResizeHeight="180dp"
+    android:previewImage="@drawable/widget_preview_image_log_period"
+    android:previewLayout="@layout/widget_preview_log_period"
+    android:resizeMode="horizontal|vertical"
     android:targetCellWidth="2"
     android:targetCellHeight="2"
-    android:resizeMode="horizontal|vertical"
-    android:widgetCategory="home_screen">
+    android:widgetCategory="home_screen"
+    tools:targetApi="s">
 </appwidget-provider>

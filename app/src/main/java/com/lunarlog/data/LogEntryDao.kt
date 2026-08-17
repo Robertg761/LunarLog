@@ -35,4 +35,7 @@ interface LogEntryDao {
     
     @Query("DELETE FROM log_entries WHERE date = :date")
     suspend fun deleteEntriesForDate(date: Long)
+
+    @Query("DELETE FROM log_entries WHERE date = :date AND type = :type")
+    suspend fun deleteEntriesForDateAndType(date: Long, type: LogEntryType)
 }
