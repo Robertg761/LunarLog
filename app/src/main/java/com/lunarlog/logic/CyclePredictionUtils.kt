@@ -5,6 +5,7 @@ import com.lunarlog.core.config.AppConfig
 import java.time.LocalDate
 import java.time.temporal.ChronoUnit
 import kotlin.math.pow
+import kotlin.math.roundToInt
 import kotlin.math.sqrt
 
 data class CompletedCycleInterval(
@@ -36,7 +37,9 @@ object CyclePredictionUtils {
         return if (lengths.isEmpty()) {
             AppConfig.DEFAULT_CYCLE_LENGTH
         } else {
-            lengths.average().toInt()
+            // Round to nearest rather than truncate: flooring 29.5 to 29 systematically
+            // biased predictions early, by up to a day.
+            lengths.average().roundToInt()
         }
     }
 
@@ -52,7 +55,9 @@ object CyclePredictionUtils {
         return if (lengths.isEmpty()) {
             AppConfig.AVERAGE_PERIOD_LENGTH_DEFAULT
         } else {
-            lengths.average().toInt()
+            // Round to nearest rather than truncate, so periods that usually run
+            // 5.7 days count as 6, not 5.
+            lengths.average().roundToInt()
         }
     }
 

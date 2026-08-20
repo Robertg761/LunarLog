@@ -173,7 +173,8 @@ class HomeViewModel @Inject constructor(
 
         val counterSummary = when (state.counterMode) {
             CounterMode.PERIOD_DAYS_LEFT -> {
-                if (state.counterValue == 0) {
+                // The counter counts today as remaining, so 1 means the last expected day.
+                if (state.counterValue == 1) {
                     "Estimated period status: ending today"
                 } else {
                     "Estimated period days left: ${state.counterValue}"

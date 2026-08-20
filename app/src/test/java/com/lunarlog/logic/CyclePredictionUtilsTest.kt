@@ -35,7 +35,7 @@ class CyclePredictionUtilsTest {
         // Cycle 1: Jan 1
         // Cycle 2: Feb 1 (31 days later)
         // Cycle 3: Mar 1 (28 days later)
-        // Average: (31 + 28) / 2 = 29.5 -> 29
+        // Average: (31 + 28) / 2 = 29.5, rounded to nearest -> 30
 
         val cycles = listOf(
             Cycle(startDate = LocalDate.of(2023, 3, 1)),
@@ -44,7 +44,20 @@ class CyclePredictionUtilsTest {
         )
 
         val result = CyclePredictionUtils.calculateAverageCycleLength(cycles)
-        assertEquals(29, result)
+        assertEquals(30, result)
+    }
+
+    @Test
+    fun calculateAveragePeriodLength_roundsToNearestDay() {
+        // Period lengths 6, 6 and 5 average 5.67; truncating to 5 understated the
+        // typical period by a day.
+        val cycles = listOf(
+            Cycle(startDate = LocalDate.of(2023, 1, 1), endDate = LocalDate.of(2023, 1, 6)),
+            Cycle(startDate = LocalDate.of(2023, 1, 29), endDate = LocalDate.of(2023, 2, 3)),
+            Cycle(startDate = LocalDate.of(2023, 2, 26), endDate = LocalDate.of(2023, 3, 2))
+        )
+
+        assertEquals(6, CyclePredictionUtils.calculateAveragePeriodLength(cycles))
     }
 
     @Test
