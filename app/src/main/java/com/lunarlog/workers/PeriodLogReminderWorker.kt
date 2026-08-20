@@ -148,10 +148,11 @@ class PeriodLogReminderWorker @AssistedInject constructor(
     }
 
     private fun buildDeepLinkPendingIntent(uri: String, requestCode: Int): PendingIntent {
-        // Explicit component (MainActivity hosts every lunarlog:// deep link), so the
+        // Constructed explicit (MainActivity hosts every lunarlog:// deep link), so the
         // PendingIntent can't be redirected by another app.
-        val intent = Intent(Intent.ACTION_VIEW, uri.toUri()).apply {
-            setClass(applicationContext, com.lunarlog.MainActivity::class.java)
+        val intent = Intent(applicationContext, com.lunarlog.MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            data = uri.toUri()
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
