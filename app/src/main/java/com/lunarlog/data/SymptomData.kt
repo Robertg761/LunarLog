@@ -30,12 +30,14 @@ object SymptomData {
         SymptomDefinition(name = "Angry", displayName = "Angry", category = SymptomCategory.EMOTIONAL),
 
         // Discharge
-        SymptomDefinition(name = "Spotting", displayName = "Spotting", category = SymptomCategory.DISCHARGE),
-        SymptomDefinition(name = "Heavy", displayName = "Heavy Flow", category = SymptomCategory.DISCHARGE), // Note: Flow is int in DailyLog, but maybe user wants to tag it?
-        // Actually, Flow is separate. Cervical Mucus is separate (int).
-        // Discharge category might be for textual descriptions like "Clotty", "Brown", etc.
+        // Flow is tracked separately as an int in DailyLog, so this category is for
+        // textual descriptions like "Clotty", "Brown", etc.
         SymptomDefinition(name = "Clots", displayName = "Clots", category = SymptomCategory.DISCHARGE),
         SymptomDefinition(name = "Watery", displayName = "Watery", category = SymptomCategory.DISCHARGE),
         SymptomDefinition(name = "Sticky", displayName = "Sticky", category = SymptomCategory.DISCHARGE)
     )
+
+    // Former defaults that duplicated the dedicated flow tracker; existing installs
+    // drop the seeded rows on startup and backups skip them on restore.
+    val retiredDefaultNames = setOf("Spotting", "Heavy")
 }

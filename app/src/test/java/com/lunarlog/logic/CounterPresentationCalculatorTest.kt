@@ -17,9 +17,43 @@ class CounterPresentationCalculatorTest {
 
         val result = CounterPresentationCalculator.calculate(cycles, today)
 
+        // Day 3 of a 5-day average: today plus two more expected days.
         assertEquals(CounterMode.PERIOD_DAYS_LEFT, result.mode)
-        assertEquals(2, result.value)
-        assertEquals("2 days left in period", result.subtitle)
+        assertEquals(3, result.value)
+        assertEquals("3 days left in period", result.subtitle)
+    }
+
+    @Test
+    fun `counts today as remaining on first day of period`() {
+        val cycles = listOf(
+            Cycle(startDate = today, endDate = null)
+        )
+
+        val result = CounterPresentationCalculator.calculate(cycles, today)
+
+        assertEquals(CounterMode.PERIOD_DAYS_LEFT, result.mode)
+        assertEquals(5, result.value)
+        assertEquals("5 days left in period", result.subtitle)
+    }
+
+    @Test
+    fun `shows full rounded average on first day regardless of predicted start`() {
+        // Three closed periods of 6, 6 and 5 days (average 5.67, rounds to 6), then a
+        // period logged on its actual start date. Day 1 must show the whole 6-day
+        // estimate — this reproduced as "4 days left" when the average truncated to 5
+        // and day 1 already counted as spent.
+        val cycles = listOf(
+            Cycle(startDate = LocalDate.of(2026, 1, 1), endDate = LocalDate.of(2026, 1, 6)),
+            Cycle(startDate = LocalDate.of(2026, 1, 29), endDate = LocalDate.of(2026, 2, 3)),
+            Cycle(startDate = LocalDate.of(2026, 2, 26), endDate = LocalDate.of(2026, 3, 2)),
+            Cycle(startDate = LocalDate.of(2026, 3, 28), endDate = null)
+        )
+
+        val result = CounterPresentationCalculator.calculate(cycles, LocalDate.of(2026, 3, 28))
+
+        assertEquals(CounterMode.PERIOD_DAYS_LEFT, result.mode)
+        assertEquals(6, result.value)
+        assertEquals("6 days left in period", result.subtitle)
     }
 
     @Test
@@ -31,7 +65,7 @@ class CounterPresentationCalculatorTest {
         val result = CounterPresentationCalculator.calculate(cycles, today)
 
         assertEquals(CounterMode.PERIOD_DAYS_LEFT, result.mode)
-        assertEquals(0, result.value)
+        assertEquals(1, result.value)
         assertEquals("Ending today", result.subtitle)
     }
 

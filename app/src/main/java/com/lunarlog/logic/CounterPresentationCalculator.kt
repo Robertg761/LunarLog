@@ -37,18 +37,23 @@ object CounterPresentationCalculator {
         val averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
 
         return if (latestCycle.endDate == null) {
-            val elapsedPeriodDays = ChronoUnit.DAYS.between(latestCycle.startDate, today).toInt() + 1
-            val daysLeft = averagePeriodLength - elapsedPeriodDays
+            val dayOfPeriod = ChronoUnit.DAYS.between(latestCycle.startDate, today).toInt() + 1
+            // Today counts as a remaining day: day 1 of a 5-day average shows "5 days left",
+            // and the last expected day shows "Ending today" instead of an ambiguous 0.
+            val daysLeft = averagePeriodLength - dayOfPeriod + 1
 
-            if (daysLeft >= 0) {
+            if (daysLeft >= 1) {
                 CounterPresentation(
                     value = daysLeft,
                     mode = CounterMode.PERIOD_DAYS_LEFT,
                     title = "Period",
-                    subtitle = if (daysLeft == 0) "Ending today" else "$daysLeft days left in period"
+                    subtitle = when (daysLeft) {
+                        1 -> "Ending today"
+                        else -> "$daysLeft days left in period"
+                    }
                 )
             } else {
-                val overage = abs(daysLeft)
+                val overage = 1 - daysLeft
                 CounterPresentation(
                     value = overage,
                     mode = CounterMode.PERIOD_OVERAGE,
