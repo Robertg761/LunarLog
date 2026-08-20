@@ -19,5 +19,8 @@ class DatabaseInitializer @Inject constructor(
         // Or checking one by one. But inserting all with ignore is safest for "defaults".
         
         symptomDao.insertAll(SymptomData.defaultSymptoms)
+
+        // Remove defaults that were seeded by older versions but have since been retired.
+        symptomDao.deleteNonCustomByNames(SymptomData.retiredDefaultNames)
     }
 }

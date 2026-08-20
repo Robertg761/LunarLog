@@ -155,7 +155,7 @@ class DataManagementRepository @Inject constructor(
                     category = SymptomCategory.valueOf(it.category),
                     isCustom = it.isCustom
                 )
-            }
+            }.filterNot { !it.isCustom && it.name in SymptomData.retiredDefaultNames }
             symptomDao.insertAllReplace(restoredSymptoms.ifEmpty { SymptomData.defaultSymptoms })
 
             // Medications + logs (medicationId must remain stable)

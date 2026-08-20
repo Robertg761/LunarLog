@@ -28,4 +28,7 @@ interface SymptomDefinitionDao {
 
     @Query("SELECT * FROM symptom_definitions WHERE name = :name LIMIT 1")
     suspend fun getSymptomByName(name: String): SymptomDefinition?
+
+    @Query("DELETE FROM symptom_definitions WHERE name IN (:names) AND isCustom = 0")
+    suspend fun deleteNonCustomByNames(names: Set<String>)
 }
