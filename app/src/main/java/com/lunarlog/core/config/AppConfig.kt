@@ -13,4 +13,11 @@ object AppConfig {
 
     // Prediction
     const val AVERAGE_PERIOD_LENGTH_DEFAULT = 5
+
+    // Sanity bounds for a single period's length in days. Recorded periods outside this range
+    // are kept but never shape the period-length average, and a "start period" that lands more
+    // than MAX_PERIOD_LENGTH_DAYS after an open period's start is treated as a new period
+    // rather than a continuation.
+    const val MIN_PERIOD_LENGTH_DAYS = 2
+    const val MAX_PERIOD_LENGTH_DAYS = 10
 }

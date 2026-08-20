@@ -16,7 +16,10 @@ import com.lunarlog.R
 import com.lunarlog.data.CycleRepository
 import com.lunarlog.data.DailyLogDao
 import com.lunarlog.data.LogEntryDao
+import com.lunarlog.data.LogEntryType
 import com.lunarlog.data.UserPreferencesRepository
+import com.lunarlog.logic.CyclePredictionUtils
+import com.lunarlog.logic.PeriodEndReminderPolicy
 import com.lunarlog.logic.PeriodLogReminderPolicy
 import dagger.assisted.Assisted
 import dagger.assisted.AssistedInject
@@ -51,10 +54,34 @@ class PeriodLogReminderWorker @AssistedInject constructor(
         val today = LocalDate.now()
         val todayEpochDay = today.toEpochDay()
 
-        val hasEntriesToday = try {
-            logEntryDao.getEntriesForDateSync(todayEpochDay).isNotEmpty()
+        val entriesToday = try {
+            logEntryDao.getEntriesForDateSync(todayEpochDay)
         } catch (_: Exception) {
             // If we can't read entries, avoid notifying to prevent false positives.
+            return Result.success()
+        }
+        val hasEntriesToday = entriesToday.isNotEmpty()
+
+        // A period left open past its expected end takes precedence over the daily logging
+        // nudge: an unrecorded end date is what quietly starves the period-length average.
+        val hasPositiveFlowToday = entriesToday.any {
+            it.type == LogEntryType.FLOW && (it.value.toFloatOrNull() ?: 0f) > 0f
+        }
+        val shouldConfirmEnd = PeriodEndReminderPolicy.shouldNotify(
+            today = today,
+            cycleStart = lastCycle.startDate,
+            cycleEnd = lastCycle.endDate,
+            reminderEnabled = enabled,
+            averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles),
+            hasPositiveFlowToday = hasPositiveFlowToday
+        )
+        if (shouldConfirmEnd) {
+            sendNotification(
+                title = "LunarLog",
+                message = "Is your period over? Open the app to log its end date.",
+                notificationId = ("period_end_reminder_$todayEpochDay").hashCode(),
+                contentIntent = buildLaunchPendingIntent()
+            )
             return Result.success()
         }
 
@@ -110,9 +137,22 @@ class PeriodLogReminderWorker @AssistedInject constructor(
             log.cervicalMucus == 0
     }
 
+    /** Opens the app at its start destination (Home), where the period button lives. */
+    private fun buildLaunchPendingIntent(): PendingIntent {
+        // Explicit component, so the PendingIntent can't be redirected by another app.
+        val intent = Intent(applicationContext, com.lunarlog.MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
+        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+        return PendingIntent.getActivity(applicationContext, "period_end_reminder".hashCode(), intent, flags)
+    }
+
     private fun buildDeepLinkPendingIntent(uri: String, requestCode: Int): PendingIntent {
-        val intent = Intent(Intent.ACTION_VIEW, uri.toUri()).apply {
-            setPackage(applicationContext.packageName)
+        // Constructed explicit (MainActivity hosts every lunarlog:// deep link), so the
+        // PendingIntent can't be redirected by another app.
+        val intent = Intent(applicationContext, com.lunarlog.MainActivity::class.java).apply {
+            action = Intent.ACTION_VIEW
+            data = uri.toUri()
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
         }
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE

@@ -107,6 +107,82 @@ class CycleRepositoryTest {
     }
 
     @Test
+    fun `startPeriod caps stale open cycle at average length and flags the end as estimated`() = runTest {
+        // Two confirmed 5-day periods, then one left open for a whole cycle.
+        val closed1 = Cycle(id = 1, startDate = LocalDate.of(2025, 11, 1), endDate = LocalDate.of(2025, 11, 5))
+        val closed2 = Cycle(id = 2, startDate = LocalDate.of(2025, 11, 29), endDate = LocalDate.of(2025, 12, 3))
+        val staleOpen = Cycle(id = 3, startDate = LocalDate.of(2025, 12, 27), endDate = null)
+        val newStart = LocalDate.of(2026, 1, 24)
+
+        coEvery { cycleDao.getAllCyclesSync() } returnsMany listOf(
+            listOf(staleOpen, closed2, closed1),
+            listOf(
+                staleOpen.copy(endDate = LocalDate.of(2025, 12, 31), endEstimated = true),
+                closed2,
+                closed1,
+                Cycle(id = 4, startDate = newStart, endDate = null)
+            )
+        )
+
+        val result = repository.startPeriod(newStart)
+
+        assertTrue(result is PeriodChangeResult.Success)
+        // Average period is 5 days, so the stale cycle closes at start + 4, not newStart - 1.
+        coVerify {
+            cycleDao.updateCycle(
+                match { it.id == 3 && it.endDate == LocalDate.of(2025, 12, 31) && it.endEstimated }
+            )
+        }
+        coVerify { cycleDao.insertCycle(match { it.startDate == newStart && it.endDate == null && !it.endEstimated }) }
+    }
+
+    @Test
+    fun `startPeriod treats a tap within a believable period length as no change`() = runTest {
+        // Day 8 of an open period: could still be real bleeding, so don't split it.
+        val ongoing = Cycle(id = 1, startDate = LocalDate.now().minusDays(7), endDate = null)
+        coEvery { cycleDao.getAllCyclesSync() } returns listOf(ongoing)
+
+        val result = repository.startPeriod(LocalDate.now())
+
+        assertTrue(result is PeriodChangeResult.Success)
+        assertTrue((result as PeriodChangeResult.Success).action == PeriodChangeAction.NO_CHANGE)
+        coVerify(exactly = 0) { cycleDao.updateCycle(any()) }
+        coVerify(exactly = 0) { cycleDao.insertCycle(any()) }
+    }
+
+    @Test
+    fun `endOngoingPeriod records a confirmed end`() = runTest {
+        val ongoing = Cycle(id = 1, startDate = LocalDate.now().minusDays(4), endDate = null)
+        coEvery { cycleDao.getAllCyclesSync() } returns listOf(ongoing)
+
+        val result = repository.endOngoingPeriod(LocalDate.now())
+
+        assertTrue(result is PeriodChangeResult.Success)
+        coVerify { cycleDao.updateCycle(match { it.id == 1 && it.endDate == LocalDate.now() && !it.endEstimated }) }
+    }
+
+    @Test
+    fun `updateCycleDates clears the estimated flag`() = runTest {
+        val estimated = Cycle(
+            id = 1,
+            startDate = LocalDate.of(2026, 1, 1),
+            endDate = LocalDate.of(2026, 1, 5),
+            endEstimated = true
+        )
+        coEvery { cycleDao.getCycleById(1) } returns estimated
+        coEvery { cycleDao.getAllCyclesSync() } returns listOf(estimated)
+
+        val result = repository.updateCycleDates(
+            cycleId = 1,
+            startDate = LocalDate.of(2026, 1, 1),
+            endDate = LocalDate.of(2026, 1, 6)
+        )
+
+        assertTrue(result is PeriodChangeResult.Success)
+        coVerify { cycleDao.updateCycle(match { it.endDate == LocalDate.of(2026, 1, 6) && !it.endEstimated }) }
+    }
+
+    @Test
     fun `startPeriod creates new ongoing when no ongoing period exists`() = runTest {
         val closed = Cycle(id = 1, startDate = LocalDate.of(2026, 1, 1), endDate = LocalDate.of(2026, 1, 5))
         val newOngoing = Cycle(id = 2, startDate = LocalDate.of(2026, 1, 10), endDate = null)

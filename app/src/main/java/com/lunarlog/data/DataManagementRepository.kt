@@ -43,7 +43,8 @@ class DataManagementRepository @Inject constructor(
                 CycleDto(
                     id = it.id,
                     startEpochDay = it.startDate.toEpochDay(),
-                    endEpochDay = it.endDate?.toEpochDay()
+                    endEpochDay = it.endDate?.toEpochDay(),
+                    endEstimated = it.endEstimated
                 )
             }
 
@@ -190,7 +191,8 @@ class DataManagementRepository @Inject constructor(
                     Cycle(
                         id = it.id,
                         startDate = LocalDate.ofEpochDay(it.startEpochDay),
-                        endDate = it.endEpochDay?.let(LocalDate::ofEpochDay)
+                        endDate = it.endEpochDay?.let(LocalDate::ofEpochDay),
+                        endEstimated = it.endEstimated && it.endEpochDay != null
                     )
                 )
             }
