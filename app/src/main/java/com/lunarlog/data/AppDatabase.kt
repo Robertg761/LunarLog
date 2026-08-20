@@ -19,7 +19,7 @@ import com.lunarlog.data.Converters
         MedicationLog::class,
         SymptomDefinition::class
     ],
-    version = 9,
+    version = 10,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -31,6 +31,12 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun symptomDefinitionDao(): SymptomDefinitionDao
 
     companion object {
+        val MIGRATION_9_10 = object : Migration(9, 10) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE `cycles` ADD COLUMN `endEstimated` INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         val MIGRATION_8_9 = object : Migration(8, 9) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL(

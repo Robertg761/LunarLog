@@ -103,6 +103,33 @@ class AppDatabaseMigrationTest {
         migrated.close()
     }
 
+    @Test
+    fun migrate9To10_addsEndEstimatedColumnDefaultingToFalse() {
+        migrationHelper.createDatabase(TEST_DATABASE, 9).apply {
+            execSQL(
+                """
+                INSERT INTO cycles (id, startDate, endDate)
+                VALUES
+                    (1, 20000, 20004),
+                    (2, 20028, NULL)
+                """.trimIndent()
+            )
+            close()
+        }
+
+        val migrated = migrationHelper.runMigrationsAndValidate(
+            TEST_DATABASE,
+            10,
+            true,
+            AppDatabase.MIGRATION_9_10
+        )
+
+        assertEquals(2, migrated.longQuery("SELECT COUNT(*) FROM cycles"))
+        assertEquals(0, migrated.longQuery("SELECT COUNT(*) FROM cycles WHERE endEstimated != 0"))
+        assertEquals(20004, migrated.longQuery("SELECT endDate FROM cycles WHERE id = 1"))
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.longQuery(sql: String): Long =
         query(sql).use { cursor ->
             check(cursor.moveToFirst()) { "Query returned no rows: $sql" }

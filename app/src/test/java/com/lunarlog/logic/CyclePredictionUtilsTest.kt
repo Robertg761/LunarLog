@@ -61,6 +61,23 @@ class CyclePredictionUtilsTest {
     }
 
     @Test
+    fun calculateAveragePeriodLength_ignoresEstimatedEnds() {
+        // The 3-day estimated close is the app's own guess (auto-closed when the next period
+        // started); only the confirmed 6-day periods may shape the average.
+        val cycles = listOf(
+            Cycle(startDate = LocalDate.of(2023, 1, 1), endDate = LocalDate.of(2023, 1, 6)),
+            Cycle(
+                startDate = LocalDate.of(2023, 1, 29),
+                endDate = LocalDate.of(2023, 1, 31),
+                endEstimated = true
+            ),
+            Cycle(startDate = LocalDate.of(2023, 2, 26), endDate = LocalDate.of(2023, 3, 3))
+        )
+
+        assertEquals(6, CyclePredictionUtils.calculateAveragePeriodLength(cycles))
+    }
+
+    @Test
     fun unusualCompletedInterval_isVisibleToAnalysis_butExcludedFromPredictionAverage() {
         val cycles = listOf(
             Cycle(startDate = LocalDate.of(2026, 1, 1)),

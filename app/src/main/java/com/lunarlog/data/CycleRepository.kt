@@ -1,9 +1,12 @@
 package com.lunarlog.data
 
 import javax.inject.Inject
+import com.lunarlog.core.config.AppConfig
 import com.lunarlog.core.model.Cycle
+import com.lunarlog.logic.CyclePredictionUtils
 import kotlinx.coroutines.flow.Flow
 import java.time.LocalDate
+import java.time.temporal.ChronoUnit
 import androidx.room.withTransaction
 
 enum class PeriodChangeAction {
@@ -39,7 +42,11 @@ class CycleRepository @Inject constructor(
         }
 
         val cycles = cycleDao.getAllCyclesSync()
-        if (findCycleContainingDate(cycles, date) != null) {
+        val containedInClosedCycle = cycles.any { cycle ->
+            val end = cycle.endDate
+            end != null && !date.isBefore(cycle.startDate) && !date.isAfter(end)
+        }
+        if (containedInClosedCycle) {
             return@runValidatedTransaction PeriodChangeResult.Success(
                 action = PeriodChangeAction.NO_CHANGE,
                 message = "Period already marked for this day"
@@ -52,7 +59,26 @@ class CycleRepository @Inject constructor(
                 return@runValidatedTransaction PeriodChangeResult.ValidationError("Start date cannot be before an ongoing period start")
             }
 
-            val closed = ongoing.copy(endDate = date.minusDays(1))
+            val dayOfOngoingPeriod = ChronoUnit.DAYS.between(ongoing.startDate, date) + 1L
+            if (dayOfOngoingPeriod <= AppConfig.MAX_PERIOD_LENGTH_DAYS) {
+                // A believable continuation of the open period, not a new one.
+                return@runValidatedTransaction PeriodChangeResult.Success(
+                    action = PeriodChangeAction.NO_CHANGE,
+                    message = "Period already marked for this day"
+                )
+            }
+
+            // The open period was never ended and this start is too far out to be the same
+            // bleeding episode, so it must be a new period. Cap the guessed end at the typical
+            // period length instead of stretching it to the day before the new start —
+            // otherwise the forgotten tap paints a whole cycle of period days on the calendar.
+            // The end stays flagged as estimated so it never feeds the period-length average.
+            val averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
+            val estimatedEnd = ongoing.startDate.plusDays((averagePeriodLength - 1).coerceAtLeast(0).toLong())
+            val closed = ongoing.copy(
+                endDate = minOf(date.minusDays(1), estimatedEnd),
+                endEstimated = true
+            )
             if (!isValidCycle(closed)) {
                 return@runValidatedTransaction PeriodChangeResult.ValidationError("Invalid period range")
             }
@@ -84,7 +110,7 @@ class CycleRepository @Inject constructor(
             return@runValidatedTransaction PeriodChangeResult.ValidationError("End date cannot be before start date")
         }
 
-        val updated = ongoing.copy(endDate = date)
+        val updated = ongoing.copy(endDate = date, endEstimated = false)
         if (!isValidCycle(updated)) {
             return@runValidatedTransaction PeriodChangeResult.ValidationError("Invalid period range")
         }
@@ -114,7 +140,7 @@ class CycleRepository @Inject constructor(
             return@runValidatedTransaction PeriodChangeResult.ValidationError("Cannot resume while another period is ongoing")
         }
 
-        val updated = target.copy(endDate = null)
+        val updated = target.copy(endDate = null, endEstimated = false)
         cycleDao.updateCycle(updated)
         requireValidCycleInvariants(cycleDao.getAllCyclesSync())
 
@@ -166,7 +192,7 @@ class CycleRepository @Inject constructor(
             val cycle = cycleDao.getCycleById(cycleId)
                 ?: return@runValidatedTransaction PeriodChangeResult.ValidationError("Period not found")
 
-            val updated = cycle.copy(startDate = startDate, endDate = endDate)
+            val updated = cycle.copy(startDate = startDate, endDate = endDate, endEstimated = false)
             if (!isValidCycle(updated)) {
                 return@runValidatedTransaction PeriodChangeResult.ValidationError("Start date must be on or before end date")
             }
@@ -202,7 +228,7 @@ class CycleRepository @Inject constructor(
 
         when {
             previous != null && next != null && previous.id != next.id -> {
-                val merged = previous.copy(endDate = next.endDate)
+                val merged = previous.copy(endDate = next.endDate, endEstimated = next.endEstimated)
                 if (!isValidCycle(merged)) {
                     return PeriodChangeResult.ValidationError("Invalid merged period")
                 }
@@ -210,7 +236,7 @@ class CycleRepository @Inject constructor(
                 cycleDao.deleteCycle(next)
             }
             previous != null -> {
-                val extended = previous.copy(endDate = date)
+                val extended = previous.copy(endDate = date, endEstimated = false)
                 if (!isValidCycle(extended)) {
                     return PeriodChangeResult.ValidationError("Invalid period range")
                 }
@@ -259,16 +285,19 @@ class CycleRepository @Inject constructor(
             }
             effectiveEnd == date -> {
                 val newEnd = date.minusDays(1)
-                val updated = cycle.copy(endDate = if (newEnd < cycle.startDate) cycle.startDate else newEnd)
+                val updated = cycle.copy(
+                    endDate = if (newEnd < cycle.startDate) cycle.startDate else newEnd,
+                    endEstimated = false
+                )
                 if (!isValidCycle(updated)) {
                     return PeriodChangeResult.ValidationError("Invalid period range")
                 }
                 cycleDao.updateCycle(updated)
             }
             date.isAfter(cycle.startDate) && date.isBefore(effectiveEnd) -> {
-                val left = cycle.copy(endDate = date.minusDays(1))
+                val left = cycle.copy(endDate = date.minusDays(1), endEstimated = false)
                 val rightEnd: LocalDate? = cycle.endDate
-                val right = Cycle(startDate = date.plusDays(1), endDate = rightEnd)
+                val right = Cycle(startDate = date.plusDays(1), endDate = rightEnd, endEstimated = cycle.endEstimated)
                 if (!isValidCycle(left) || !isValidCycle(right)) {
                     return PeriodChangeResult.ValidationError("Invalid split period")
                 }

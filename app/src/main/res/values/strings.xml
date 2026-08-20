@@ -41,7 +41,7 @@
     <!-- Settings -->
     <string name="settings_notifications">Notifications</string>
     <string name="settings_daily_period_log_reminder">Daily period log reminder</string>
-    <string name="settings_daily_period_log_reminder_desc">Remind you once per day to log details during your period</string>
+    <string name="settings_daily_period_log_reminder_desc">Remind you once per day to log details during your period, and to log its end date if a period is left open</string>
     <string name="settings_reminder_time">Reminder time</string>
     <string name="settings_change">Change</string>
     <string name="settings_privacy_policy">Privacy Policy</string>

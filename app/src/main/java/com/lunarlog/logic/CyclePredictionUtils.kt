@@ -44,13 +44,15 @@ object CyclePredictionUtils {
     }
 
     fun calculateAveragePeriodLength(cycles: List<Cycle>): Int {
-        val lengths = cycles.mapNotNull { cycle ->
+        // Estimated ends are the app's own guess (auto-closed when the next period started),
+        // so feeding them back into the average would just reinforce that guess.
+        val lengths = cycles.filterNot { it.endEstimated }.mapNotNull { cycle ->
             cycle.endDate?.let { endDate ->
                 val start = cycle.startDate
                 val end = endDate
                 ChronoUnit.DAYS.between(start, end).toInt() + 1
             }
-        }.filter { it in 2..10 } // Basic sanity check for valid period lengths
+        }.filter { it in AppConfig.MIN_PERIOD_LENGTH_DAYS..AppConfig.MAX_PERIOD_LENGTH_DAYS }
 
         return if (lengths.isEmpty()) {
             AppConfig.AVERAGE_PERIOD_LENGTH_DEFAULT

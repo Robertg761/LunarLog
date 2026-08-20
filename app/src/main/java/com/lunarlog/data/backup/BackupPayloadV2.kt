@@ -27,7 +27,9 @@ data class BackupPreferencesDto(
 data class CycleDto(
     val id: Int = 0,
     val startEpochDay: Long,
-    val endEpochDay: Long? = null
+    val endEpochDay: Long? = null,
+    // Absent in backups from older versions; Gson leaves the primitive at false, which is right.
+    val endEstimated: Boolean = false
 )
 
 data class DailyLogDto(
