@@ -139,15 +139,10 @@ class PeriodLogReminderWorker @AssistedInject constructor(
 
     /** Opens the app at its start destination (Home), where the period button lives. */
     private fun buildLaunchPendingIntent(): PendingIntent {
-        val intent = applicationContext.packageManager
-            .getLaunchIntentForPackage(applicationContext.packageName)
-            ?.apply {
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            }
-            ?: Intent(Intent.ACTION_VIEW, "lunarlog://calendar".toUri()).apply {
-                setPackage(applicationContext.packageName)
-                addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            }
+        // Explicit component, so the PendingIntent can't be redirected by another app.
+        val intent = Intent(applicationContext, com.lunarlog.MainActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        }
         val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         return PendingIntent.getActivity(applicationContext, "period_end_reminder".hashCode(), intent, flags)
     }
