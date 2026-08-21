@@ -1,5 +1,18 @@
 # Changelog
 
+## [1.10.0] - 2026-08-21
+
+### Added
+- **"Is Your Period Over?" Reminder**: If a period is left running a couple of days past your usual length, the daily reminder now asks you to log its end date instead of letting it sit open indefinitely. It uses the existing reminder toggle and time, stays quiet on days where you have logged flow, and stops after a week.
+
+### Fixed
+- **Days Left in Period Read Short**: The home counter treated day one of your period as already spent and always rounded your average period length down, so day one of a typical six-day period could show "4 days left". Today now counts as a remaining day, averages round to the nearest day, the ring starts full and drains, and the last expected day reads "Ending today". Cycle-length averages round the same way, which also stops next-period predictions from running up to a day early.
+- **Starting a Period Could Be Silently Ignored**: If a previous period was never marked as ended, tapping "start period" (including from the Quick Log widget) for the next one recorded nothing at all. The new period is now logged, and the forgotten one is closed at your average length instead of smearing across the whole month on the calendar. These app-estimated end dates are tracked internally and never shape your averages; editing the dates yourself replaces the estimate.
+
+### Changed
+- **Symptom List**: Removed "Heavy Flow" and "Spotting" from the symptom picker — both are already recorded by the flow selector. Existing installs drop the two built-in entries automatically; custom symptoms with the same names and all past logs are kept.
+- **Notification Taps**: The reminder notifications now open the app through explicit intents, so they cannot be redirected by another app.
+
 ## [1.9.0] - 2026-08-17
 
 ### Added
