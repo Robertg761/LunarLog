@@ -28,7 +28,7 @@ class UpdateRepository internal constructor(
 
         if (!isNewer) return@withContext null
 
-        val asset = selectApkAsset(latest.assets.orEmpty(), owner, repo) ?: return@withContext null
+        val asset = selectApkAsset(latest.assets.orEmpty()) ?: return@withContext null
 
         UpdateInfo(
             latestVersionName = latestTag.removePrefix("v"),
@@ -53,12 +53,12 @@ class UpdateRepository internal constructor(
      * The release's APK, preferring a non-debug build when several are attached. Assets whose
      * download URL is not a GitHub release location are ignored outright rather than offered.
      */
-    internal fun selectApkAsset(assets: List<GitHubAssetDto>, owner: String, repo: String): ApkAsset? {
+    internal fun selectApkAsset(assets: List<GitHubAssetDto>): ApkAsset? {
         val candidates = assets.mapNotNull { asset ->
             val name = asset.name?.trim().orEmpty()
             val url = asset.browser_download_url?.trim().orEmpty()
             if (name.isBlank() || !name.endsWith(".apk", ignoreCase = true)) return@mapNotNull null
-            if (!isTrustedApkUrl(url, owner, repo)) return@mapNotNull null
+            if (!isTrustedApkUrl(url)) return@mapNotNull null
             ApkAsset(
                 name = name,
                 url = url,
@@ -107,14 +107,25 @@ class UpdateRepository internal constructor(
 
         private val sha256HexPattern = Regex("^[0-9a-f]{64}$")
 
+        /** `/<owner>/<repo>/releases/download/<tag>/<file>` with no empty or dot segments. */
+        private val releaseDownloadPath = Regex("^/[^/.][^/]*/[^/.][^/]*/releases/download/[^/]+/[^/]+$")
+
         /**
          * The release JSON arrives over TLS from api.github.com, but its `browser_download_url` is
          * still data from a network response that is handed straight to DownloadManager, which
-         * fetches whatever it is given. Only HTTPS locations under this repository's releases, or
-         * GitHub's asset CDN, are accepted, so a bad response can at worst point at the wrong
-         * GitHub file, which the digest check then rejects, rather than at an arbitrary server.
+         * fetches whatever it is given. Only HTTPS release-download locations on github.com, or
+         * GitHub's asset CDN, are accepted, so a bad response can at worst point at another GitHub
+         * release file rather than at an arbitrary server. The owner and repository in the path
+         * are deliberately not pinned: GitHub redirects the API after an account or repository
+         * rename but reports assets under the new name, and pinning would silently cut every
+         * installed build off from updates the day of the rename. The digest check and Android's
+         * own refusal to install an APK signed by a different key are what stop a wrong file.
+         *
+         * Dot segments are refused outright rather than resolved: `URI.getPath()` decodes percent
+         * escapes but leaves `..` in place, while the HTTP client and GitHub both collapse it, so
+         * a URL that needs traversal to reach a release file is not one GitHub ever publishes.
          */
-        internal fun isTrustedApkUrl(raw: String, owner: String, repo: String): Boolean {
+        internal fun isTrustedApkUrl(raw: String): Boolean {
             val uri = try {
                 URI(raw)
             } catch (_: Exception) {
@@ -124,9 +135,10 @@ class UpdateRepository internal constructor(
             if (uri.userInfo != null || uri.port != -1) return false
             val host = uri.host?.lowercase() ?: return false
             val path = uri.path.orEmpty()
+            if (path.split('/').any { it == "." || it == ".." }) return false
             return when (host) {
-                "github.com" -> path.startsWith("/$owner/$repo/releases/download/", ignoreCase = true)
-                in assetCdnHosts -> true
+                "github.com" -> releaseDownloadPath.matches(path)
+                in assetCdnHosts -> path.isNotEmpty()
                 else -> false
             }
         }

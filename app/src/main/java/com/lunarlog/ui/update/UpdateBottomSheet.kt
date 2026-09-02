@@ -65,6 +65,9 @@ fun UpdateBottomSheet(
     var progress by remember { mutableStateOf<Float?>(null) }
     var progressText by remember { mutableStateOf<String?>(null) }
     var errorText by remember { mutableStateOf<String?>(null) }
+    // Install now hashes the whole APK before launching the installer, which takes long enough on
+    // a big file for a second tap to land; this keeps one verification and one installer prompt.
+    var installing by remember { mutableStateOf(false) }
     var notesExpanded by remember { mutableStateOf(false) }
     val lifecycleOwner = LocalLifecycleOwner.current
 
@@ -274,27 +277,36 @@ fun UpdateBottomSheet(
                     ) {
                         OutlinedButton(onClick = onDismiss) { Text("Close") }
                         Spacer(modifier = Modifier.width(Spacing.md))
-                        Button(onClick = {
-                            if (apkUpdateManager.needsUnknownSourcesPermission(context)) {
-                                stage = UpdateStage.PermissionRequired
-                                return@Button
-                            }
-                            scope.launch {
-                                if (!apkUpdateManager.verifyDownloadedApk(context)) {
-                                    errorText = "The downloaded file didn't match the published release and was removed. Please download it again."
-                                    stage = UpdateStage.Error
-                                    return@launch
+                        Button(
+                            enabled = !installing,
+                            onClick = {
+                                if (installing) return@Button
+                                if (apkUpdateManager.needsUnknownSourcesPermission(context)) {
+                                    stage = UpdateStage.PermissionRequired
+                                    return@Button
                                 }
-                                val intent = apkUpdateManager.buildInstallIntentFromDownloadedApk(context)
-                                if (intent == null) {
-                                    errorText = "Couldn't start installer. Please re-download the update."
-                                    stage = UpdateStage.Error
-                                    return@launch
+                                installing = true
+                                scope.launch {
+                                    try {
+                                        if (!apkUpdateManager.verifyDownloadedApk(context)) {
+                                            errorText = "The downloaded file didn't match the published release and was removed. Please download it again."
+                                            stage = UpdateStage.Error
+                                            return@launch
+                                        }
+                                        val intent = apkUpdateManager.buildInstallIntentFromDownloadedApk(context)
+                                        if (intent == null) {
+                                            errorText = "Couldn't start installer. Please re-download the update."
+                                            stage = UpdateStage.Error
+                                            return@launch
+                                        }
+                                        context.startActivity(intent)
+                                    } finally {
+                                        installing = false
+                                    }
                                 }
-                                context.startActivity(intent)
                             }
-                        }) {
-                            Text("Install")
+                        ) {
+                            Text(if (installing) "Verifying…" else "Install")
                         }
                     }
                 }

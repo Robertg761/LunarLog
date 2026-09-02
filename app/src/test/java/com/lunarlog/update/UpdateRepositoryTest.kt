@@ -74,10 +74,21 @@ class UpdateRepositoryTest {
     }
 
     @Test
-    fun `apk from another repository's releases is never offered`() = runTest {
+    fun `apk under a renamed owner or repository is still offered`() = runTest {
+        // GitHub redirects the old API URL after a rename but reports assets under the new name;
+        // pinning the old name would strand every installed build.
         stubRelease(
             "v1.11.0",
-            asset("LunarLog-1.11.0.apk", url = "https://github.com/someone-else/LunarLog/releases/download/v1.11.0/LunarLog.apk")
+            asset("LunarLog-1.11.0.apk", url = "https://github.com/new-owner/LunarLogApp/releases/download/v1.11.0/LunarLog.apk")
+        )
+        assertEquals("LunarLog-1.11.0.apk", repository.checkForUpdate(owner, repo, "1.10.0")?.apkName)
+    }
+
+    @Test
+    fun `apk url that escapes the release download path is never offered`() = runTest {
+        stubRelease(
+            "v1.11.0",
+            asset("LunarLog-1.11.0.apk", url = "https://github.com/$owner/$repo/releases/download/../../../../evil/repo/releases/download/v1/LunarLog.apk")
         )
         assertNull(repository.checkForUpdate(owner, repo, "1.10.0"))
     }
@@ -99,33 +110,43 @@ class UpdateRepositoryTest {
     @Test
     fun `malformed or absent digest is reported as unknown rather than failing the check`() = runTest {
         stubRelease("v1.11.0", asset("LunarLog-1.11.0.apk", digest = "md5:abc"))
-        assertNull(repository.checkForUpdate(owner, repo, "1.10.0")?.apkSha256)
+        val malformed = repository.checkForUpdate(owner, repo, "1.10.0")
+        assertEquals("LunarLog-1.11.0.apk", malformed?.apkName)
+        assertNull(malformed?.apkSha256)
 
         stubRelease("v1.11.0", asset("LunarLog-1.11.0.apk", digest = null))
-        assertNull(repository.checkForUpdate(owner, repo, "1.10.0")?.apkSha256)
+        val absent = repository.checkForUpdate(owner, repo, "1.10.0")
+        assertEquals("LunarLog-1.11.0.apk", absent?.apkName)
+        assertEquals(12_345L, absent?.apkSizeBytes)
+        assertNull(absent?.apkSha256)
     }
 
     @Test
     fun `isTrustedApkUrl accepts only https GitHub release locations`() {
-        assertTrue(UpdateRepository.isTrustedApkUrl(trustedUrl, owner, repo))
-        assertTrue(UpdateRepository.isTrustedApkUrl(trustedUrl.replace("Robertg761/LunarLog", "robertg761/lunarlog"), owner, repo))
+        assertTrue(UpdateRepository.isTrustedApkUrl(trustedUrl))
+        assertTrue(UpdateRepository.isTrustedApkUrl(trustedUrl.replace("Robertg761/LunarLog", "robertg761/lunarlog")))
+        assertTrue(UpdateRepository.isTrustedApkUrl("https://github.com/other/$repo/releases/download/v1/x.apk"))
         assertTrue(
             UpdateRepository.isTrustedApkUrl(
-                "https://objects.githubusercontent.com/github-production-release-asset/1/2?X-Amz-Signature=abc",
-                owner,
-                repo
+                "https://objects.githubusercontent.com/github-production-release-asset/1/2?X-Amz-Signature=abc"
             )
         )
-        assertTrue(UpdateRepository.isTrustedApkUrl("https://release-assets.githubusercontent.com/x/y.apk", owner, repo))
+        assertTrue(UpdateRepository.isTrustedApkUrl("https://release-assets.githubusercontent.com/x/y.apk"))
 
-        assertFalse(UpdateRepository.isTrustedApkUrl("http://github.com/$owner/$repo/releases/download/v1/x.apk", owner, repo))
-        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com/$owner/$repo/archive/main.zip", owner, repo))
-        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com/other/$repo/releases/download/v1/x.apk", owner, repo))
-        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com.evil.example/$owner/$repo/releases/download/v1/x.apk", owner, repo))
-        assertFalse(UpdateRepository.isTrustedApkUrl("https://user@github.com/$owner/$repo/releases/download/v1/x.apk", owner, repo))
-        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com:8443/$owner/$repo/releases/download/v1/x.apk", owner, repo))
-        assertFalse(UpdateRepository.isTrustedApkUrl("", owner, repo))
-        assertFalse(UpdateRepository.isTrustedApkUrl("not a url", owner, repo))
+        assertFalse(UpdateRepository.isTrustedApkUrl("http://github.com/$owner/$repo/releases/download/v1/x.apk"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com/$owner/$repo/archive/main.zip"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com/$owner/$repo/releases/download/v1/"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com/$owner/$repo/releases/download/v1/x.apk/extra"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com//$repo/releases/download/v1/x.apk"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com/$owner/$repo/releases/download/../../../../evil/repo/releases/download/v1/x.apk"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com/$owner/$repo/releases/download/%2e%2e/%2e%2e/evil/x.apk"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com/./$repo/releases/download/v1/x.apk"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://objects.githubusercontent.com"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com.evil.example/$owner/$repo/releases/download/v1/x.apk"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://user@github.com/$owner/$repo/releases/download/v1/x.apk"))
+        assertFalse(UpdateRepository.isTrustedApkUrl("https://github.com:8443/$owner/$repo/releases/download/v1/x.apk"))
+        assertFalse(UpdateRepository.isTrustedApkUrl(""))
+        assertFalse(UpdateRepository.isTrustedApkUrl("not a url"))
     }
 
     @Test

@@ -44,10 +44,15 @@ class ApkUpdateManager(
             .setTitle("LunarLog update")
             .setDescription("Downloading LunarLog ${info.latestVersionName}")
             .setMimeType("application/vnd.android.package-archive")
-            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
+            // VISIBLE, not VISIBLE_NOTIFY_COMPLETED: the "download complete" notification hands the
+            // file straight to the package installer with the APK MIME type, which would skip
+            // verifyDownloadedApk. With VISIBLE the progress notification simply goes away when
+            // the transfer finishes and the app's own Install prompt is the only route left.
+            .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE)
             .setAllowedOverMetered(true)
-            // Roaming is left at DownloadManager's default (off): an unannounced APK download is
-            // not worth a roaming bill, and the download resumes when the user is back on a plan.
+            // DownloadManager allows roaming by default. An unannounced APK download is not worth
+            // a roaming bill; the transfer waits until the device is back on a non-roaming network.
+            .setAllowedOverRoaming(false)
             .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
 
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -181,11 +186,12 @@ class ApkUpdateManager(
         val expectedSha256 = prefs.getString(KEY_APK_SHA256, null)
         val expectedSize = prefs.getLong(KEY_APK_SIZE_BYTES, -1L)
         val matches = try {
-            when {
-                expectedSha256 != null -> sha256Hex(apkFile) == expectedSha256
-                expectedSize > 0L -> apkFile.length() == expectedSize
-                else -> true
-            }
+            downloadMatchesRelease(
+                expectedSha256 = expectedSha256,
+                expectedSizeBytes = expectedSize,
+                actualSizeBytes = apkFile.length(),
+                actualSha256 = { sha256Hex(apkFile) }
+            )
         } catch (_: IOException) {
             false
         }
@@ -213,6 +219,23 @@ class ApkUpdateManager(
         private const val KEY_DOWNLOADED_VERSION_NAME = "downloaded_version_name"
         private const val KEY_APK_SHA256 = "apk_sha256"
         private const val KEY_APK_SIZE_BYTES = "apk_size_bytes"
+
+        /**
+         * The decision behind [verifyDownloadedApk], kept free of Android so it can be tested:
+         * a published digest is authoritative; without one the advertised size is the best
+         * available check; with neither there is nothing to compare against and the file is
+         * accepted. [actualSha256] is only invoked when a digest is there to compare it with.
+         */
+        internal fun downloadMatchesRelease(
+            expectedSha256: String?,
+            expectedSizeBytes: Long,
+            actualSizeBytes: Long,
+            actualSha256: () -> String
+        ): Boolean = when {
+            expectedSha256 != null -> actualSha256() == expectedSha256
+            expectedSizeBytes > 0L -> actualSizeBytes == expectedSizeBytes
+            else -> true
+        }
 
         internal fun sha256Hex(file: File): String {
             val digest = MessageDigest.getInstance("SHA-256")

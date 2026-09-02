@@ -23,21 +23,49 @@ object NotificationChannels {
     /**
      * Safe to call before every notification: creating an existing channel only refreshes its
      * name and description, and deleting an absent one is a no-op.
+     *
+     * Android keys a user's per-channel choices (blocked, silent, sound, lock-screen visibility)
+     * by channel id, so the two channels that replace the legacy one are seeded from it on first
+     * creation. A user who had switched the old channel off, on a phone someone else can see,
+     * keeps that choice instead of having health notifications quietly re-enabled by an update.
      */
     fun ensureCreated(context: Context) {
         val manager = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        val legacy = manager.getNotificationChannel(LEGACY_SHARED)
         manager.createNotificationChannels(
             listOf(
-                channel(CYCLE_PREDICTIONS, "Cycle predictions", "Upcoming period and estimated fertile days"),
-                channel(LOG_REMINDERS, "Logging reminders", "Daily reminders to log how you feel"),
+                channel(CYCLE_PREDICTIONS, "Cycle predictions", "Upcoming period and estimated fertile days", inherit = legacy),
+                channel(LOG_REMINDERS, "Logging reminders", "Daily reminders to log how you feel", inherit = legacy),
                 channel(MEDICATIONS, "Medication reminders", "Reminders for scheduled medications")
             )
         )
-        manager.deleteNotificationChannel(LEGACY_SHARED)
+        if (legacy != null) manager.deleteNotificationChannel(LEGACY_SHARED)
     }
 
-    private fun channel(id: String, name: String, description: String): NotificationChannel =
-        NotificationChannel(id, name, NotificationManager.IMPORTANCE_DEFAULT).apply {
+    /**
+     * Settings copied from [inherit] only take effect when the channel is first created; Android
+     * ignores them for a channel that already exists, which is what makes this idempotent.
+     */
+    private fun channel(
+        id: String,
+        name: String,
+        description: String,
+        inherit: NotificationChannel? = null
+    ): NotificationChannel {
+        val importance = inherit?.importance
+            ?.takeIf { it >= NotificationManager.IMPORTANCE_NONE }
+            ?: NotificationManager.IMPORTANCE_DEFAULT
+        return NotificationChannel(id, name, importance).apply {
             this.description = description
+            if (inherit != null) {
+                setSound(inherit.sound, inherit.audioAttributes)
+                enableVibration(inherit.shouldVibrate())
+                vibrationPattern = inherit.vibrationPattern
+                enableLights(inherit.shouldShowLights())
+                lightColor = inherit.lightColor
+                lockscreenVisibility = inherit.lockscreenVisibility
+                setShowBadge(inherit.canShowBadge())
+            }
         }
+    }
 }

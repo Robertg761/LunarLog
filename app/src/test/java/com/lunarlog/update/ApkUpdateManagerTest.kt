@@ -79,4 +79,25 @@ class ApkUpdateManagerTest {
             file.delete()
         }
     }
+
+    @Test
+    fun `a published digest is authoritative and the size is not consulted`() {
+        val digest = "a".repeat(64)
+        assertTrue(ApkUpdateManager.downloadMatchesRelease(digest, expectedSizeBytes = 999, actualSizeBytes = 1) { digest })
+        assertFalse(ApkUpdateManager.downloadMatchesRelease(digest, expectedSizeBytes = 1, actualSizeBytes = 1) { "b".repeat(64) })
+    }
+
+    @Test
+    fun `without a digest the advertised size decides`() {
+        var hashed = false
+        assertTrue(ApkUpdateManager.downloadMatchesRelease(null, expectedSizeBytes = 100, actualSizeBytes = 100) { hashed = true; "" })
+        assertFalse(ApkUpdateManager.downloadMatchesRelease(null, expectedSizeBytes = 100, actualSizeBytes = 99) { hashed = true; "" })
+        assertFalse("size fallback must not hash the file", hashed)
+    }
+
+    @Test
+    fun `with neither digest nor size the download is accepted`() {
+        assertTrue(ApkUpdateManager.downloadMatchesRelease(null, expectedSizeBytes = -1, actualSizeBytes = 42) { "" })
+        assertTrue(ApkUpdateManager.downloadMatchesRelease(null, expectedSizeBytes = 0, actualSizeBytes = 42) { "" })
+    }
 }
