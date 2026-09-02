@@ -1,7 +1,6 @@
 package com.lunarlog.workers
 
 import android.Manifest
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.content.pm.PackageManager
@@ -65,29 +64,26 @@ class MedicationReminderWorker @AssistedInject constructor(
             PackageManager.PERMISSION_GRANTED
         ) return
 
+        NotificationChannels.ensureCreated(applicationContext)
         val notificationManager = applicationContext
             .getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.createNotificationChannel(
-            NotificationChannel(
-                CHANNEL_ID,
-                "Medication reminders",
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
-        )
 
         val privateText = listOfNotNull(
             medication.name,
             medication.dosage.takeIf { it.isNotBlank() }
         ).joinToString(" • ")
-        val publicVersion = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+        val publicVersion = NotificationCompat.Builder(applicationContext, NotificationChannels.MEDICATIONS)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("LunarLog reminder")
             .setContentText("Open LunarLog to view details")
             .build()
-        val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
+        val notification = NotificationCompat.Builder(applicationContext, NotificationChannels.MEDICATIONS)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Medication reminder")
             .setContentText(privateText)
+            .setContentIntent(
+                NotificationIntents.launchApp(applicationContext, requestCode = "medication_${medication.id}".hashCode())
+            )
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
@@ -100,6 +96,5 @@ class MedicationReminderWorker @AssistedInject constructor(
     companion object {
         const val KEY_SCHEDULED_EPOCH_MILLIS = "scheduled_epoch_millis"
         const val KEY_MEDICATION_IDS = "medication_ids"
-        private const val CHANNEL_ID = "lunar_log_medications"
     }
 }

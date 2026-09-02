@@ -1,6 +1,6 @@
 # LunarLog Product and Technical Specification
 
-Last verified against the source: July 13, 2026.
+Last verified against the source: September 2, 2026.
 
 ## Purpose
 
@@ -37,8 +37,8 @@ LunarLog is not a medical device and does not diagnose, treat, cure, or prevent 
 - `data`: entities, DAOs, repositories, converters, backup payloads, and Room migrations.
 - `logic`: deterministic prediction, analysis, scheduling, and narrative logic.
 - `ui`: Compose screens and Hilt ViewModels.
-- `workers`: private cycle, daily-log, and medication reminders.
-- Database version: 9. Schema exports are committed and migrations are tested from the oldest publicly released database version (8).
+- `workers`: private cycle, daily-log, and medication reminders, each on its own notification channel.
+- Database version: 10. Schema exports are committed and migrations are tested from the oldest publicly released database version (8).
 
 ## Distribution
 

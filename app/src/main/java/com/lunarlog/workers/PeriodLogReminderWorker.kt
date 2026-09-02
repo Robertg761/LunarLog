@@ -1,13 +1,10 @@
 package com.lunarlog.workers
 
-import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.content.Intent
 import android.os.Build
 import androidx.core.app.NotificationCompat
-import androidx.core.net.toUri
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkManager
@@ -80,7 +77,10 @@ class PeriodLogReminderWorker @AssistedInject constructor(
                 title = "LunarLog",
                 message = "Is your period over? Open the app to log its end date.",
                 notificationId = ("period_end_reminder_$todayEpochDay").hashCode(),
-                contentIntent = buildLaunchPendingIntent()
+                contentIntent = NotificationIntents.launchApp(
+                    applicationContext,
+                    requestCode = "period_end_reminder".hashCode()
+                )
             )
             return Result.success()
         }
@@ -111,7 +111,7 @@ class PeriodLogReminderWorker @AssistedInject constructor(
 
         val deepLink = "lunarlog://details/$todayEpochDay"
         val requestCode = ("details_$todayEpochDay").hashCode()
-        val pendingIntent = buildDeepLinkPendingIntent(deepLink, requestCode)
+        val pendingIntent = NotificationIntents.deepLink(applicationContext, deepLink, requestCode)
 
         val notificationId = ("period_log_reminder_$todayEpochDay").hashCode()
         sendNotification(
@@ -137,44 +137,16 @@ class PeriodLogReminderWorker @AssistedInject constructor(
             log.cervicalMucus == 0
     }
 
-    /** Opens the app at its start destination (Home), where the period button lives. */
-    private fun buildLaunchPendingIntent(): PendingIntent {
-        // Explicit component, so the PendingIntent can't be redirected by another app.
-        val intent = Intent(applicationContext, com.lunarlog.MainActivity::class.java).apply {
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        return PendingIntent.getActivity(applicationContext, "period_end_reminder".hashCode(), intent, flags)
-    }
-
-    private fun buildDeepLinkPendingIntent(uri: String, requestCode: Int): PendingIntent {
-        // Constructed explicit (MainActivity hosts every lunarlog:// deep link), so the
-        // PendingIntent can't be redirected by another app.
-        val intent = Intent(applicationContext, com.lunarlog.MainActivity::class.java).apply {
-            action = Intent.ACTION_VIEW
-            data = uri.toUri()
-            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-        }
-        val flags = PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        return PendingIntent.getActivity(applicationContext, requestCode, intent, flags)
-    }
-
     private fun sendNotification(
         title: String,
         message: String,
         notificationId: Int,
         contentIntent: PendingIntent
     ) {
+        NotificationChannels.ensureCreated(applicationContext)
+        val channelId = NotificationChannels.LOG_REMINDERS
         val notificationManager =
             applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "lunar_log_channel"
-
-        val channel = NotificationChannel(
-            channelId,
-            "LunarLog Notifications",
-            NotificationManager.IMPORTANCE_DEFAULT
-        )
-        notificationManager.createNotificationChannel(channel)
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)

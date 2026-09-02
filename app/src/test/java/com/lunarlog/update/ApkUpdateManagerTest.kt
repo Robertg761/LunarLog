@@ -65,4 +65,18 @@ class ApkUpdateManagerTest {
     fun `extractVersionFromApkFileName returns null for unrelated filename`() {
         assertNull(ApkUpdateManager.extractVersionFromApkFileName("SomeOtherApp-1.7.0.apk"))
     }
+
+    @Test
+    fun `sha256Hex matches the published digest of a known file`() {
+        val file = java.io.File.createTempFile("lunarlog-apk-", ".apk")
+        try {
+            file.writeText("abc")
+            assertEquals(
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+                ApkUpdateManager.sha256Hex(file)
+            )
+        } finally {
+            file.delete()
+        }
+    }
 }

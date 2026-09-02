@@ -110,6 +110,9 @@ class MainActivity : AppCompatActivity() {
                 if (!apkUpdateManager.hasPendingDownloadedUpdate(this@MainActivity, BuildConfig.VERSION_NAME)) {
                     return@LaunchedEffect
                 }
+                // A file that no longer matches the release is discarded silently; the next update
+                // check offers a fresh download instead of prompting to install it.
+                if (!apkUpdateManager.verifyDownloadedApk(this@MainActivity)) return@LaunchedEffect
                 promptedDownloaded.value = true
 
                 val needsPerm = apkUpdateManager.needsUnknownSourcesPermission(this@MainActivity)

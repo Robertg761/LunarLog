@@ -80,8 +80,11 @@ import com.patrykandpatrick.vico.core.cartesian.data.CartesianValueFormatter
 import com.patrykandpatrick.vico.core.cartesian.data.ColumnCartesianLayerModel
 import com.patrykandpatrick.vico.core.cartesian.data.LineCartesianLayerModel
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.IOException
+import java.io.OutputStream
 import java.time.LocalDate
 import java.time.format.TextStyle
 
@@ -114,21 +117,21 @@ fun AnalysisScreen(
         contract = ActivityResultContracts.CreateDocument(PDF_MIME_TYPE)
     ) { uri ->
         uri?.let {
-            try {
-                val stream = context.contentResolver.openOutputStream(it)
-                    ?: throw IOException("The selected destination could not be opened")
+            val snapshot = uiState
+            exportInBackground(
+                scope = scope,
+                snackbarHostState = snackbarHostState,
+                context = context,
+                uri = it,
+                mimeType = PDF_MIME_TYPE,
+                savedMessage = "PDF saved",
+                failedMessage = "Unable to save PDF. Please try another location."
+            ) { stream ->
                 ReportGenerator.generatePdf(
                     stream,
-                    uiState.cycleHistory,
-                    uiState.symptomCounts,
-                    uiState.moodCounts
-                )
-                announceExportSaved(scope, snackbarHostState, context, it, PDF_MIME_TYPE, "PDF saved")
-            } catch (_: Exception) {
-                announceExportFailed(
-                    scope,
-                    snackbarHostState,
-                    "Unable to save PDF. Please try another location."
+                    snapshot.cycleHistory,
+                    snapshot.symptomCounts,
+                    snapshot.moodCounts
                 )
             }
         }
@@ -138,21 +141,21 @@ fun AnalysisScreen(
         contract = ActivityResultContracts.CreateDocument(CSV_MIME_TYPE)
     ) { uri ->
         uri?.let {
-            try {
-                val stream = context.contentResolver.openOutputStream(it)
-                    ?: throw IOException("The selected destination could not be opened")
+            val snapshot = uiState
+            exportInBackground(
+                scope = scope,
+                snackbarHostState = snackbarHostState,
+                context = context,
+                uri = it,
+                mimeType = CSV_MIME_TYPE,
+                savedMessage = "CSV saved",
+                failedMessage = "Unable to save CSV. Please try another location."
+            ) { stream ->
                 ReportGenerator.generateCsv(
                     stream,
-                    uiState.periods,
-                    uiState.dailyLogs,
-                    uiState.logEntries
-                )
-                announceExportSaved(scope, snackbarHostState, context, it, CSV_MIME_TYPE, "CSV saved")
-            } catch (_: Exception) {
-                announceExportFailed(
-                    scope,
-                    snackbarHostState,
-                    "Unable to save CSV. Please try another location."
+                    snapshot.periods,
+                    snapshot.dailyLogs,
+                    snapshot.logEntries
                 )
             }
         }
@@ -215,6 +218,41 @@ fun AnalysisScreen(
                     )
                 }
             }
+        }
+    }
+}
+
+/**
+ * Both generators walk the whole history, and the PDF additionally lays out and draws every page
+ * through a Canvas, so the write runs on the IO dispatcher rather than inside the activity-result
+ * callback on the main thread, where it stalled the UI for longer with every month of data. The
+ * outcome is announced through the same snackbars as before.
+ */
+private fun exportInBackground(
+    scope: CoroutineScope,
+    snackbarHostState: SnackbarHostState,
+    context: Context,
+    uri: Uri,
+    mimeType: String,
+    savedMessage: String,
+    failedMessage: String,
+    write: (OutputStream) -> Unit
+) {
+    scope.launch {
+        val saved = withContext(Dispatchers.IO) {
+            try {
+                val stream = context.contentResolver.openOutputStream(uri)
+                    ?: throw IOException("The selected destination could not be opened")
+                write(stream)
+                true
+            } catch (_: Exception) {
+                false
+            }
+        }
+        if (saved) {
+            announceExportSaved(scope, snackbarHostState, context, uri, mimeType, savedMessage)
+        } else {
+            announceExportFailed(scope, snackbarHostState, failedMessage)
         }
     }
 }

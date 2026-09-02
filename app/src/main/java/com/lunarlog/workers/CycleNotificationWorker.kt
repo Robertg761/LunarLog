@@ -1,10 +1,13 @@
 package com.lunarlog.workers
 
-import android.app.NotificationChannel
+import android.Manifest
 import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
+import android.content.pm.PackageManager
 import android.os.Build
 import androidx.core.app.NotificationCompat
+import androidx.core.content.ContextCompat
 import androidx.hilt.work.HiltWorker
 import androidx.work.CoroutineWorker
 import androidx.work.WorkerParameters
@@ -49,38 +52,57 @@ class CycleNotificationWorker @AssistedInject constructor(
 
         val today = LocalDate.now()
 
-        // Period due in 2 days
+        // Period due in 2 days. Home is where the period button lives, so the tap lands there.
         if (today.plusDays(2) == nextPeriod) {
             sendNotification(
                 notificationId = ("cycle_update_period_due_${nextPeriod.toEpochDay()}").hashCode(),
                 title = "Cycle Update",
-                message = "Your period is predicted to start in 2 days."
+                message = "Your period is predicted to start in 2 days.",
+                contentIntent = NotificationIntents.launchApp(
+                    applicationContext,
+                    requestCode = "cycle_update_period_due".hashCode()
+                )
             )
         }
 
-        // Fertile window starting (Notification on the start day)
+        // Fertile window starting (Notification on the start day). The calendar is the one screen
+        // that draws the estimated window, so that is where the tap opens.
         if (today == fertileWindow.first) {
-              sendNotification(
+            sendNotification(
                 notificationId = ("cycle_update_fertile_start_${fertileWindow.first.toEpochDay()}").hashCode(),
                 title = "Cycle Update",
-                message = "Your estimated fertile days begin today. Predictions are not birth control."
+                message = "Your estimated fertile days begin today. Predictions are not birth control.",
+                contentIntent = NotificationIntents.deepLink(
+                    applicationContext,
+                    uri = "lunarlog://calendar",
+                    requestCode = "cycle_update_fertile_start".hashCode()
+                )
             )
         }
 
         return Result.success()
     }
 
-    private fun sendNotification(notificationId: Int, title: String, message: String) {
-        val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channelId = "lunar_log_channel"
+    private fun sendNotification(
+        notificationId: Int,
+        title: String,
+        message: String,
+        contentIntent: PendingIntent
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(applicationContext, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) return
 
-        val channel = NotificationChannel(channelId, "LunarLog Notifications", NotificationManager.IMPORTANCE_DEFAULT)
-        notificationManager.createNotificationChannel(channel)
+        NotificationChannels.ensureCreated(applicationContext)
+        val channelId = NotificationChannels.CYCLE_PREDICTIONS
+        val notificationManager = applicationContext.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
             .setContentText(message)
+            .setContentIntent(contentIntent)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setPublicVersion(
@@ -93,16 +115,6 @@ class CycleNotificationWorker @AssistedInject constructor(
             .setAutoCancel(true)
             .build()
 
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-             if (androidx.core.content.ContextCompat.checkSelfPermission(
-                     applicationContext,
-                     android.Manifest.permission.POST_NOTIFICATIONS
-                 ) == android.content.pm.PackageManager.PERMISSION_GRANTED
-             ) {
-                 notificationManager.notify(notificationId, notification)
-              }
-        } else {
-            notificationManager.notify(notificationId, notification)
-        }
+        notificationManager.notify(notificationId, notification)
     }
 }

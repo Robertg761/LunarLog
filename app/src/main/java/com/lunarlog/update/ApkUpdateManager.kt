@@ -8,7 +8,11 @@ import android.provider.Settings
 import androidx.core.content.edit
 import androidx.core.content.FileProvider
 import androidx.core.net.toUri
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.File
+import java.io.IOException
+import java.security.MessageDigest
 
 class ApkUpdateManager(
     private val prefsName: String = "lunarlog_updater"
@@ -42,7 +46,8 @@ class ApkUpdateManager(
             .setMimeType("application/vnd.android.package-archive")
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setAllowedOverMetered(true)
-            .setAllowedOverRoaming(true)
+            // Roaming is left at DownloadManager's default (off): an unannounced APK download is
+            // not worth a roaming bill, and the download resumes when the user is back on a plan.
             .setDestinationInExternalFilesDir(context, Environment.DIRECTORY_DOWNLOADS, fileName)
 
         val dm = context.getSystemService(Context.DOWNLOAD_SERVICE) as DownloadManager
@@ -53,6 +58,8 @@ class ApkUpdateManager(
             putLong(KEY_DOWNLOAD_ID, downloadId)
             putString(KEY_APK_PATH, file.absolutePath)
             putString(KEY_DOWNLOADED_VERSION_NAME, normalizeVersionName(info.latestVersionName))
+            putString(KEY_APK_SHA256, info.apkSha256)
+            putLong(KEY_APK_SIZE_BYTES, info.apkSizeBytes ?: -1L)
         }
 
         return downloadId
@@ -147,7 +154,43 @@ class ApkUpdateManager(
             remove(KEY_DOWNLOAD_ID)
             remove(KEY_APK_PATH)
             remove(KEY_DOWNLOADED_VERSION_NAME)
+            remove(KEY_APK_SHA256)
+            remove(KEY_APK_SIZE_BYTES)
         }
+    }
+
+    /**
+     * Whether the downloaded file is the one the release advertised.
+     *
+     * DownloadManager only reports that a transfer completed; it has no opinion on whether the
+     * bytes are the release asset. The digest GitHub publishes for the asset is compared against
+     * the file before it is offered to the installer, so a truncated, substituted, or tampered
+     * download is discarded here rather than surfacing as an installer failure. Android verifies
+     * the signing certificate at install time regardless; this check sits in front of it.
+     *
+     * Releases predating GitHub's asset digests carry no hash and fall back to the advertised
+     * size; when even that is unknown the file is accepted as-is.
+     *
+     * Reads the whole APK, so it runs on the IO dispatcher. On a mismatch the download and its
+     * bookkeeping are cleared, so the next update check offers a fresh download.
+     */
+    suspend fun verifyDownloadedApk(context: Context): Boolean = withContext(Dispatchers.IO) {
+        val apkFile = getDownloadedApkFile(context) ?: return@withContext false
+        if (!apkFile.exists()) return@withContext false
+        val prefs = prefs(context)
+        val expectedSha256 = prefs.getString(KEY_APK_SHA256, null)
+        val expectedSize = prefs.getLong(KEY_APK_SIZE_BYTES, -1L)
+        val matches = try {
+            when {
+                expectedSha256 != null -> sha256Hex(apkFile) == expectedSha256
+                expectedSize > 0L -> apkFile.length() == expectedSize
+                else -> true
+            }
+        } catch (_: IOException) {
+            false
+        }
+        if (!matches) clearDownloadedState(context, deleteApk = true)
+        matches
     }
 
     fun buildInstallIntentFromDownloadedApk(context: Context): Intent? {
@@ -168,6 +211,21 @@ class ApkUpdateManager(
         private const val KEY_DOWNLOAD_ID = "download_id"
         private const val KEY_APK_PATH = "apk_path"
         private const val KEY_DOWNLOADED_VERSION_NAME = "downloaded_version_name"
+        private const val KEY_APK_SHA256 = "apk_sha256"
+        private const val KEY_APK_SIZE_BYTES = "apk_size_bytes"
+
+        internal fun sha256Hex(file: File): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
 
         internal fun isNewerVersion(downloadedVersionName: String, currentVersionName: String): Boolean {
             val downloaded = normalizeVersionName(downloadedVersionName)

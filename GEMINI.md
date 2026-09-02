@@ -21,13 +21,19 @@
     *   **`ui/`**: Composable screens, ViewModels, Theme.
         *   `analysis/`, `calendar/`, `home/`, `logdetails/`, `loghistory/`, `settings/`
     *   **`di/`**: Hilt modules (`AppModule`).
-    *   **`workers/`**: Background workers (`CycleNotificationWorker`).
+    *   **`workers/`**: WorkManager reminders (`CycleNotificationWorker`, `PeriodLogReminderWorker`, `MedicationReminderWorker`), their shared `NotificationChannels` / `NotificationIntents`, and `NotificationWorkScheduler`.
+    *   **`update/`**: GitHub Releases update check, `SemVer`, and `ApkUpdateManager` (github flavor only).
 
 ## 🚀 Building & Running
-*   **Build Debug APK:** `./gradlew assembleDebug`
-*   **Build Release APK:** `./gradlew assembleRelease`
+*   **Build Debug APK (GitHub flavor):** `./gradlew :app:assembleGithubDebug`
+*   **Build Release APK (GitHub sideload):** `./gradlew :app:assembleGithubRelease`
+*   **Build Play Bundle:** `./gradlew :app:bundlePlayRelease`
 *   **Run Unit Tests:** `./gradlew test`
-*   **Run Instrumented Tests:** `./gradlew connectedAndroidTest`
+*   **Run Lint (as CI does):** `./gradlew lintPlayDebug lintGithubDebug`
+*   **Run Instrumented Tests:** `./gradlew connectedGithubDebugAndroidTest`
+
+The `distribution` flavor dimension (`play` / `github`) means the bare `assembleDebug` and
+`assembleRelease` task names do not exist; always name a flavor.
 
 ## 📝 Development Conventions
 

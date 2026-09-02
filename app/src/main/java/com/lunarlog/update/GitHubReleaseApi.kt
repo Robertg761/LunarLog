@@ -17,7 +17,9 @@ internal data class GitHubLatestReleaseDto(
 internal data class GitHubAssetDto(
     val name: String? = null,
     val browser_download_url: String? = null,
-    val size: Long? = null
+    val size: Long? = null,
+    /** GitHub's published checksum for the asset, formatted `sha256:<hex>`. */
+    val digest: String? = null
 )
 
 class GitHubReleaseApi(

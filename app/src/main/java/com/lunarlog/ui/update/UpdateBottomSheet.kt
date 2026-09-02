@@ -25,6 +25,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -38,6 +39,7 @@ import com.lunarlog.ui.theme.Spacing
 import com.lunarlog.update.ApkUpdateManager
 import com.lunarlog.update.UpdateInfo
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 private enum class UpdateStage {
     Available,
@@ -57,6 +59,7 @@ fun UpdateBottomSheet(
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
     val scroll = rememberScrollState()
+    val scope = rememberCoroutineScope()
 
     var stage by remember { mutableStateOf(UpdateStage.Available) }
     var progress by remember { mutableStateOf<Float?>(null) }
@@ -276,13 +279,20 @@ fun UpdateBottomSheet(
                                 stage = UpdateStage.PermissionRequired
                                 return@Button
                             }
-                            val intent = apkUpdateManager.buildInstallIntentFromDownloadedApk(context)
-                            if (intent == null) {
-                                errorText = "Couldn't start installer. Please re-download the update."
-                                stage = UpdateStage.Error
-                                return@Button
+                            scope.launch {
+                                if (!apkUpdateManager.verifyDownloadedApk(context)) {
+                                    errorText = "The downloaded file didn't match the published release and was removed. Please download it again."
+                                    stage = UpdateStage.Error
+                                    return@launch
+                                }
+                                val intent = apkUpdateManager.buildInstallIntentFromDownloadedApk(context)
+                                if (intent == null) {
+                                    errorText = "Couldn't start installer. Please re-download the update."
+                                    stage = UpdateStage.Error
+                                    return@launch
+                                }
+                                context.startActivity(intent)
                             }
-                            context.startActivity(intent)
                         }) {
                             Text("Install")
                         }

@@ -2,12 +2,16 @@ package com.lunarlog.update
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import java.net.URI
 import javax.inject.Inject
 import javax.inject.Singleton
 
 @Singleton
-class UpdateRepository @Inject constructor() {
-    private val api = GitHubReleaseApi()
+class UpdateRepository internal constructor(
+    private val api: GitHubReleaseApi
+) {
+    @Inject
+    constructor() : this(GitHubReleaseApi())
 
     suspend fun checkForUpdate(
         owner: String,
@@ -24,38 +28,46 @@ class UpdateRepository @Inject constructor() {
 
         if (!isNewer) return@withContext null
 
-        val assets = latest.assets.orEmpty()
-        val apkAssets = assets
-            .mapNotNull { a ->
-                val name = a.name?.trim()
-                val url = a.browser_download_url?.trim()
-                if (name.isNullOrBlank() || url.isNullOrBlank()) null else name to url
-            }
-            .filter { (name, _) -> name.endsWith(".apk", ignoreCase = true) }
-
-        if (apkAssets.isEmpty()) return@withContext null
-
-        // Prefer non-debug apks if multiple exist.
-        val (apkName, apkUrl) = apkAssets.firstOrNull { (name, _) ->
-            !name.contains("debug", ignoreCase = true)
-        } ?: apkAssets.first()
-
-        val apkSizeBytes = assets
-            .firstOrNull { a ->
-                val n = a.name?.trim().orEmpty()
-                n.equals(apkName, ignoreCase = true)
-            }
-            ?.size
+        val asset = selectApkAsset(latest.assets.orEmpty(), owner, repo) ?: return@withContext null
 
         UpdateInfo(
             latestVersionName = latestTag.removePrefix("v"),
-            apkName = apkName,
-            apkUrl = apkUrl,
+            apkName = asset.name,
+            apkUrl = asset.url,
             releaseNotes = sanitizeReleaseNotes(latest.body.orEmpty()),
             releaseUrl = latest.html_url?.trim().orEmpty(),
-            apkSizeBytes = apkSizeBytes,
-            publishedAt = latest.published_at?.trim()
+            apkSizeBytes = asset.sizeBytes,
+            publishedAt = latest.published_at?.trim(),
+            apkSha256 = asset.sha256
         )
+    }
+
+    internal data class ApkAsset(
+        val name: String,
+        val url: String,
+        val sizeBytes: Long?,
+        val sha256: String?
+    )
+
+    /**
+     * The release's APK, preferring a non-debug build when several are attached. Assets whose
+     * download URL is not a GitHub release location are ignored outright rather than offered.
+     */
+    internal fun selectApkAsset(assets: List<GitHubAssetDto>, owner: String, repo: String): ApkAsset? {
+        val candidates = assets.mapNotNull { asset ->
+            val name = asset.name?.trim().orEmpty()
+            val url = asset.browser_download_url?.trim().orEmpty()
+            if (name.isBlank() || !name.endsWith(".apk", ignoreCase = true)) return@mapNotNull null
+            if (!isTrustedApkUrl(url, owner, repo)) return@mapNotNull null
+            ApkAsset(
+                name = name,
+                url = url,
+                sizeBytes = asset.size,
+                sha256 = parseSha256Digest(asset.digest)
+            )
+        }
+        return candidates.firstOrNull { !it.name.contains("debug", ignoreCase = true) }
+            ?: candidates.firstOrNull()
     }
 
     internal fun sanitizeReleaseNotes(raw: String): String {
@@ -81,5 +93,49 @@ class UpdateRepository @Inject constructor() {
             }
             .joinToString("\n")
             .trim()
+    }
+
+    companion object {
+        /**
+         * Hosts GitHub serves release assets from besides `github.com` itself, which redirects
+         * downloads here.
+         */
+        private val assetCdnHosts = setOf(
+            "objects.githubusercontent.com",
+            "release-assets.githubusercontent.com"
+        )
+
+        private val sha256HexPattern = Regex("^[0-9a-f]{64}$")
+
+        /**
+         * The release JSON arrives over TLS from api.github.com, but its `browser_download_url` is
+         * still data from a network response that is handed straight to DownloadManager, which
+         * fetches whatever it is given. Only HTTPS locations under this repository's releases, or
+         * GitHub's asset CDN, are accepted, so a bad response can at worst point at the wrong
+         * GitHub file, which the digest check then rejects, rather than at an arbitrary server.
+         */
+        internal fun isTrustedApkUrl(raw: String, owner: String, repo: String): Boolean {
+            val uri = try {
+                URI(raw)
+            } catch (_: Exception) {
+                return false
+            }
+            if (!uri.scheme.equals("https", ignoreCase = true)) return false
+            if (uri.userInfo != null || uri.port != -1) return false
+            val host = uri.host?.lowercase() ?: return false
+            val path = uri.path.orEmpty()
+            return when (host) {
+                "github.com" -> path.startsWith("/$owner/$repo/releases/download/", ignoreCase = true)
+                in assetCdnHosts -> true
+                else -> false
+            }
+        }
+
+        /** GitHub reports asset digests as `sha256:<hex>`; anything else is treated as absent. */
+        internal fun parseSha256Digest(raw: String?): String? {
+            val value = raw?.trim()?.lowercase() ?: return null
+            if (!value.startsWith("sha256:")) return null
+            return value.removePrefix("sha256:").takeIf(sha256HexPattern::matches)
+        }
     }
 }
