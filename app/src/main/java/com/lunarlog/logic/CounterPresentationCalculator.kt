@@ -21,6 +21,8 @@ data class CounterPresentation(
 
 object CounterPresentationCalculator {
 
+    private const val PERIOD_DAY_TITLE = "Period Day"
+
     fun calculate(cycles: List<Cycle>, today: LocalDate = LocalDate.now()): CounterPresentation {
         if (cycles.isEmpty()) {
             return CounterPresentation(
@@ -37,6 +39,8 @@ object CounterPresentationCalculator {
         val averagePeriodLength = CyclePredictionUtils.calculateAveragePeriodLength(cycles)
 
         return if (latestCycle.endDate == null) {
+            // While a period is open the headline number is how long it has lasted so far
+            // (day 1 on the start date); the estimate against the average goes in the subtitle.
             val dayOfPeriod = ChronoUnit.DAYS.between(latestCycle.startDate, today).toInt() + 1
             // Today counts as a remaining day: day 1 of a 5-day average shows "5 days left",
             // and the last expected day shows "Ending today" instead of an ambiguous 0.
@@ -44,9 +48,9 @@ object CounterPresentationCalculator {
 
             if (daysLeft >= 1) {
                 CounterPresentation(
-                    value = daysLeft,
+                    value = dayOfPeriod,
                     mode = CounterMode.PERIOD_DAYS_LEFT,
-                    title = "Period",
+                    title = PERIOD_DAY_TITLE,
                     subtitle = when (daysLeft) {
                         1 -> "Ending today"
                         else -> "$daysLeft days left in period"
@@ -55,10 +59,13 @@ object CounterPresentationCalculator {
             } else {
                 val overage = 1 - daysLeft
                 CounterPresentation(
-                    value = overage,
+                    value = dayOfPeriod,
                     mode = CounterMode.PERIOD_OVERAGE,
-                    title = "Period",
-                    subtitle = "$overage days over estimate"
+                    title = PERIOD_DAY_TITLE,
+                    subtitle = when (overage) {
+                        1 -> "1 day over estimate"
+                        else -> "$overage days over estimate"
+                    }
                 )
             }
         } else {

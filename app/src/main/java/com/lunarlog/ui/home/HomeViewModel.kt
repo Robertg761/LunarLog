@@ -97,7 +97,12 @@ class HomeViewModel @Inject constructor(
                     val isEndedToday = lastCycle.endDate == today
 
                     val daysRemainingInPeriod =
-                        if (counter.mode == CounterMode.PERIOD_DAYS_LEFT) counter.value else null
+                        if (counter.mode == CounterMode.PERIOD_DAYS_LEFT) {
+                            // Today counts as remaining, matching the counter's subtitle.
+                            averagePeriodLength - currentCycleDay + 1
+                        } else {
+                            null
+                        }
 
                     val quickLogSymptoms = com.lunarlog.logic.SymptomStatsCalculator.getTopSymptomsForPhase(currentCycleDay, cycles, logs)
 
@@ -172,16 +177,8 @@ class HomeViewModel @Inject constructor(
         if (state.isLoading) return "Loading..."
 
         val counterSummary = when (state.counterMode) {
-            CounterMode.PERIOD_DAYS_LEFT -> {
-                // The counter counts today as remaining, so 1 means the last expected day.
-                if (state.counterValue == 1) {
-                    "Estimated period status: ending today"
-                } else {
-                    "Estimated period days left: ${state.counterValue}"
-                }
-            }
-            CounterMode.PERIOD_OVERAGE ->
-                "Period is ${state.counterValue} days beyond estimate"
+            CounterMode.PERIOD_DAYS_LEFT, CounterMode.PERIOD_OVERAGE ->
+                "Period day ${state.counterValue} (${state.counterSubtitle.lowercase()})"
             CounterMode.NEXT_PERIOD_COUNTDOWN -> {
                 if (state.counterValue == 0) {
                     "Estimated next period: due today"
