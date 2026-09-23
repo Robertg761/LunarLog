@@ -225,6 +225,10 @@ class CycleRepository @Inject constructor(
 
         val previous = cycles.firstOrNull { it.endDate != null && it.endDate == date.minusDays(1) }
         val next = cycles.firstOrNull { it.startDate == date.plusDays(1) }
+        // Marking today means the period is still happening, so leave it open rather than
+        // recording it as ended today. An open period keeps filling in on the calendar and
+        // drives the "days left in period" counter until the user ends it.
+        val newEnd: LocalDate? = if (date == LocalDate.now()) null else date
 
         when {
             previous != null && next != null && previous.id != next.id -> {
@@ -236,7 +240,7 @@ class CycleRepository @Inject constructor(
                 cycleDao.deleteCycle(next)
             }
             previous != null -> {
-                val extended = previous.copy(endDate = date, endEstimated = false)
+                val extended = previous.copy(endDate = newEnd, endEstimated = false)
                 if (!isValidCycle(extended)) {
                     return PeriodChangeResult.ValidationError("Invalid period range")
                 }
@@ -250,7 +254,7 @@ class CycleRepository @Inject constructor(
                 cycleDao.updateCycle(extended)
             }
             else -> {
-                cycleDao.insertCycle(Cycle(startDate = date, endDate = date))
+                cycleDao.insertCycle(Cycle(startDate = date, endDate = newEnd))
             }
         }
 
