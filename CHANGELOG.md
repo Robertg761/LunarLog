@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.10.1] - 2026-09-23
+
+### Fixed
+- **Period Logged for Today Ended Immediately**: Marking today as a period day from the calendar or the Log period screen saved it as a period that had already ended. The calendar stopped filling in the following days, and the home counter showed the next period about a month out with "0 days since last period" instead of counting down the current one. A period marked for today now stays ongoing until you end it; past days are still recorded as finished days.
+
 ## [1.10.0] - 2026-08-21
 
 ### Added

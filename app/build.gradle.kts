@@ -37,8 +37,8 @@ android {
         applicationId = "com.lunarlog"
         minSdk = 26
         targetSdk = 35
-        versionCode = 26
-        versionName = "1.10.0"
+        versionCode = 27
+        versionName = "1.10.1"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
