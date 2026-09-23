@@ -43,7 +43,7 @@ class HomeViewModelTest {
     @Test
     fun `uiState should show period days left when ongoing period is within estimate`() = runTest {
         val today = LocalDate.now()
-        val lastCycleStart = today.minusDays(2) // day 3 of default estimate 5 => 3 left counting today
+        val lastCycleStart = today.minusDays(2) // day 3 of default estimate 5 => shows day 3, 3 left counting today
         val cycle = Cycle(id = 1, startDate = lastCycleStart)
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
@@ -59,15 +59,16 @@ class HomeViewModelTest {
 
         assertEquals(CounterMode.PERIOD_DAYS_LEFT, state.counterMode)
         assertEquals(3, state.counterValue)
-        assertEquals("Period", state.counterTitle)
+        assertEquals("Period Day", state.counterTitle)
         assertEquals("3 days left in period", state.counterSubtitle)
+        assertEquals(3, state.daysRemainingInPeriod)
         assertEquals(true, state.isPeriodActive)
     }
 
     @Test
     fun `uiState should show ending today when ongoing period reaches estimate`() = runTest {
         val today = LocalDate.now()
-        val lastCycleStart = today.minusDays(4) // day 5 of default estimate 5 => ending today
+        val lastCycleStart = today.minusDays(4) // day 5 of default estimate 5 => shows day 5, ending today
         val cycle = Cycle(id = 1, startDate = lastCycleStart, endDate = null)
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
@@ -82,14 +83,15 @@ class HomeViewModelTest {
         val state = viewModel.uiState.value
 
         assertEquals(CounterMode.PERIOD_DAYS_LEFT, state.counterMode)
-        assertEquals(1, state.counterValue)
+        assertEquals(5, state.counterValue)
         assertEquals("Ending today", state.counterSubtitle)
+        assertEquals(1, state.daysRemainingInPeriod)
     }
 
     @Test
     fun `uiState should show period overage when ongoing period exceeds estimate`() = runTest {
         val today = LocalDate.now()
-        val lastCycleStart = today.minusDays(6) // elapsed 7 days, default estimate 5 => 2 over
+        val lastCycleStart = today.minusDays(6) // day 7, default estimate 5 => shows day 7, 2 over
         val cycle = Cycle(id = 1, startDate = lastCycleStart, endDate = null)
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
@@ -104,7 +106,7 @@ class HomeViewModelTest {
         val state = viewModel.uiState.value
 
         assertEquals(CounterMode.PERIOD_OVERAGE, state.counterMode)
-        assertEquals(2, state.counterValue)
+        assertEquals(7, state.counterValue)
         assertEquals("2 days over estimate", state.counterSubtitle)
         assertEquals(null, state.daysRemainingInPeriod)
         assertEquals(true, state.isPeriodActive)
@@ -225,7 +227,7 @@ class HomeViewModelTest {
         }
 
         val status = viewModel.getShareableStatus()
-        assertTrue(status.contains("Estimated period days left: 3"))
+        assertTrue(status.contains("Period day 3 (3 days left in period)"))
     }
 
     @Test
@@ -246,7 +248,7 @@ class HomeViewModelTest {
         }
 
         val status = viewModel.getShareableStatus()
-        assertTrue(status.contains("Period is 2 days beyond estimate"))
+        assertTrue(status.contains("Period day 7 (2 days over estimate)"))
     }
 
     @Test

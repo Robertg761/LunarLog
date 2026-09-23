@@ -1,5 +1,10 @@
 # Changelog
 
+## [1.10.2] - 2026-09-23
+
+### Changed
+- **Home Counter Shows Your Period Day**: While your period is active, the big number on the home screen and the counter widget now shows which day of your period it is (day 1 on the day it started) under a "Period Day" heading, instead of counting down the days left. The estimate is still shown underneath ("3 days left in period", "Ending today", or "2 days over estimate").
+
 ## [1.10.1] - 2026-09-23
 
 ### Fixed

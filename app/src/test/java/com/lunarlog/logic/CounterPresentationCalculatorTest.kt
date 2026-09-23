@@ -19,6 +19,7 @@ class CounterPresentationCalculatorTest {
 
         // Day 3 of a 5-day average: today plus two more expected days.
         assertEquals(CounterMode.PERIOD_DAYS_LEFT, result.mode)
+        assertEquals("Period Day", result.title)
         assertEquals(3, result.value)
         assertEquals("3 days left in period", result.subtitle)
     }
@@ -32,7 +33,7 @@ class CounterPresentationCalculatorTest {
         val result = CounterPresentationCalculator.calculate(cycles, today)
 
         assertEquals(CounterMode.PERIOD_DAYS_LEFT, result.mode)
-        assertEquals(5, result.value)
+        assertEquals(1, result.value)
         assertEquals("5 days left in period", result.subtitle)
     }
 
@@ -52,7 +53,7 @@ class CounterPresentationCalculatorTest {
         val result = CounterPresentationCalculator.calculate(cycles, LocalDate.of(2026, 3, 28))
 
         assertEquals(CounterMode.PERIOD_DAYS_LEFT, result.mode)
-        assertEquals(6, result.value)
+        assertEquals(1, result.value)
         assertEquals("6 days left in period", result.subtitle)
     }
 
@@ -65,7 +66,7 @@ class CounterPresentationCalculatorTest {
         val result = CounterPresentationCalculator.calculate(cycles, today)
 
         assertEquals(CounterMode.PERIOD_DAYS_LEFT, result.mode)
-        assertEquals(1, result.value)
+        assertEquals(5, result.value)
         assertEquals("Ending today", result.subtitle)
     }
 
@@ -78,7 +79,7 @@ class CounterPresentationCalculatorTest {
         val result = CounterPresentationCalculator.calculate(cycles, today)
 
         assertEquals(CounterMode.PERIOD_OVERAGE, result.mode)
-        assertEquals(2, result.value)
+        assertEquals(7, result.value)
         assertEquals("2 days over estimate", result.subtitle)
     }
 
