@@ -198,4 +198,53 @@ class CycleRepositoryTest {
         coVerify(exactly = 0) { cycleDao.updateCycle(any()) }
         coVerify { cycleDao.insertCycle(match { it.startDate == LocalDate.of(2026, 1, 10) && it.endDate == null }) }
     }
+
+    @Test
+    fun `setPeriodDay on today with no period nearby starts an ongoing period`() = runTest {
+        val today = LocalDate.now()
+        val newOngoing = Cycle(id = 1, startDate = today, endDate = null)
+
+        coEvery { cycleDao.getAllCyclesSync() } returnsMany listOf(
+            emptyList(),
+            listOf(newOngoing)
+        )
+
+        val result = repository.setPeriodDay(today, true)
+
+        assertTrue(result is PeriodChangeResult.Success)
+        coVerify { cycleDao.insertCycle(match { it.startDate == today && it.endDate == null }) }
+    }
+
+    @Test
+    fun `setPeriodDay on today continuing yesterday leaves the period ongoing`() = runTest {
+        val today = LocalDate.now()
+        val closedYesterday = Cycle(id = 1, startDate = today.minusDays(2), endDate = today.minusDays(1))
+
+        coEvery { cycleDao.getAllCyclesSync() } returnsMany listOf(
+            listOf(closedYesterday),
+            listOf(closedYesterday.copy(endDate = null))
+        )
+
+        val result = repository.setPeriodDay(today, true)
+
+        assertTrue(result is PeriodChangeResult.Success)
+        coVerify { cycleDao.updateCycle(match { it.id == 1 && it.endDate == null }) }
+        coVerify(exactly = 0) { cycleDao.insertCycle(any()) }
+    }
+
+    @Test
+    fun `setPeriodDay on a past day still records a closed day`() = runTest {
+        val day = LocalDate.now().minusDays(20)
+        val inserted = Cycle(id = 1, startDate = day, endDate = day)
+
+        coEvery { cycleDao.getAllCyclesSync() } returnsMany listOf(
+            emptyList(),
+            listOf(inserted)
+        )
+
+        val result = repository.setPeriodDay(day, true)
+
+        assertTrue(result is PeriodChangeResult.Success)
+        coVerify { cycleDao.insertCycle(match { it.startDate == day && it.endDate == day }) }
+    }
 }
