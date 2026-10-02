@@ -107,7 +107,9 @@ class AppNavigationDeviceTest {
             val context = androidx.test.core.app.ApplicationProvider.getApplicationContext<android.content.Context>()
             java.io.File(context.getExternalFilesDir(null), "navigation-failure.txt")
                 .writeText(failure.stackTraceToString())
-            throw failure
+            val tree = runCatching { rule.onRoot(useUnmergedTree = true).printToString() }
+                .getOrDefault("No semantics tree available")
+            throw AssertionError("${failure.message}\nUI at failure:\n${tree.take(2800)}", failure)
         }
     }
 }

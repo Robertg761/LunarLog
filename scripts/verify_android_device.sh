@@ -39,4 +39,5 @@ adb shell input keyevent 82
   adb shell wm density
   adb shell settings get system font_scale
 } > "$report_dir/device.txt"
-./gradlew --no-daemon connectedGithubDebugAndroidTest 2>&1 | tee "$report_dir/gradle.txt"
+# Keep test files available until the EXIT trap pulls screenshots and diagnostics.
+./gradlew --no-daemon -Pandroid.injected.androidTest.leaveApksInstalledAfterRun=true connectedGithubDebugAndroidTest 2>&1 | tee "$report_dir/gradle.txt"
