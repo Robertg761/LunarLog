@@ -81,7 +81,9 @@ def main():
     adb('wait-for-device')
     adb('shell', 'settings', 'put', 'system', 'time_12_24', '24')
     adb('shell', 'wm', 'size', '1080x2400')
-    adb('shell', 'wm', 'density', '360')
+    # Use a roomy viewport for the historical form; compact-layout coverage
+    # belongs to the separate device-test matrix. This gate checks data upgrades.
+    adb('shell', 'wm', 'density', '160')
     adb('shell', 'input', 'keyevent', '82')
     adb('install', baseline)
     adb('shell', 'am', 'start', '-W', '-n', f'{PACKAGE}/.MainActivity')
@@ -89,8 +91,6 @@ def main():
     find(label('Settings'))
     open_today()
     tap(find(label('Add Log')))
-    # Expand the old bottom sheet before selecting its horizontally scrolling tabs.
-    adb('shell', 'input', 'swipe', '540', '1550', '540', '400', '400')
     for attempt in range(12):
         root = tree()
         notes = [n for n in root.iter('node') if label('Note')(n) and len(bounds(n)) == 4 and bounds(n)[2] > bounds(n)[0]]
@@ -102,24 +102,15 @@ def main():
             raise AssertionError('Could not locate the logging tabs')
         box = bounds(tabs[0])
         y = (box[1] + box[3]) // 2
-        adb('shell', 'input', 'swipe', '950', str(y), '120', str(y), '350')
+        left = min(bounds(n)[0] for n in tabs)
+        right = max(bounds(n)[2] for n in tabs)
+        adb('shell', 'input', 'swipe', str(right - 10), str(y), str(left + 10), str(y), '350')
     else:
         raise AssertionError('Could not reach the Note tab')
     tap(find(lambda n: n.get('class') == 'android.widget.EditText'))
     adb('shell', 'input', 'text', NOTE)
     adb('shell', 'input', 'keyevent', '4')
-    for attempt in range(16):
-        root = tree()
-        save = [n for n in root.iter('node') if n.get('text', '').startswith('Save (1 item') and len(bounds(n)) == 4 and bounds(n)[2] > bounds(n)[0]]
-        if save:
-            tap(save[0])
-            break
-        # The published app keeps Save below the scrollable form. Moving focus
-        # from the note through Time/Details brings it into view without guessing
-        # a swipe coordinate that may instead drag the bottom sheet.
-        adb('shell', 'input', 'keyevent', '61')
-    else:
-        raise AssertionError('Could not save the baseline note')
+    tap(find(lambda n: n.get('text', '').startswith('Save (1 item')))
     find(lambda n: n.get('content-desc') == 'Add Log')
     find(lambda n: NOTE in n.get('text', '') or NOTE in n.get('content-desc', ''))
     # Relaunch to verify the baseline write was persisted before upgrading.
