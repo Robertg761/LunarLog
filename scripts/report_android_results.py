@@ -26,6 +26,9 @@ def main():
                 failures += 1
                 details = failure.text or failure.get('message', '')
                 annotation('error', f"{case.get('classname', '')}.{case.get('name', '')}\n{details[:3500]}")
+    if failures:
+        for diagnostic in Path('app/build/device-verification').rglob('navigation-failure.txt'):
+            annotation('error', 'Navigation test body failure before cleanup:\n' + diagnostic.read_text(errors='replace')[:3500])
     if tests:
         annotation('notice', f'{tests} Android tests; {failures} failures/errors; {skipped} skipped.')
     else:
