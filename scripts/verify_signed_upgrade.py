@@ -108,13 +108,16 @@ def main():
     tap(find(lambda n: n.get('class') == 'android.widget.EditText'))
     adb('shell', 'input', 'text', NOTE)
     adb('shell', 'input', 'keyevent', '4')
-    for attempt in range(8):
+    for attempt in range(16):
         root = tree()
         save = [n for n in root.iter('node') if n.get('text', '').startswith('Save (1 item') and len(bounds(n)) == 4 and bounds(n)[2] > bounds(n)[0]]
         if save:
             tap(save[0])
             break
-        adb('shell', 'input', 'swipe', '540', '1950', '540', '550', '400')
+        # The published app keeps Save below the scrollable form. Moving focus
+        # from the note through Time/Details brings it into view without guessing
+        # a swipe coordinate that may instead drag the bottom sheet.
+        adb('shell', 'input', 'keyevent', '61')
     else:
         raise AssertionError('Could not save the baseline note')
     find(lambda n: n.get('content-desc') == 'Add Log')
@@ -145,7 +148,7 @@ if __name__ == '__main__':
             try:
                 (EVIDENCE / 'logcat.txt').write_text(adb('logcat', '-d'))
                 root = tree()
-                labels = [n.get('text') or n.get('content-desc') for n in root.iter('node') if n.get('text') or n.get('content-desc')]
+                labels = [(n.get('text') or n.get('content-desc'), n.get('bounds'), n.get('focused')) for n in root.iter('node') if n.get('text') or n.get('content-desc')]
                 print('::error title=Upgrade screen::' + repr(labels)[-2500:].replace('%', '%25'), flush=True)
             except Exception:
                 pass
