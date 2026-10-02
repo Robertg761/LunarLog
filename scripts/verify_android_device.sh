@@ -11,6 +11,7 @@ mkdir -p "$report_dir"
 collect_evidence() {
   result=$?
   trap - EXIT
+  python3 scripts/report_android_results.py || true
   adb logcat -d > "$report_dir/logcat.txt" 2>&1 || true
   adb shell dumpsys activity activities > "$report_dir/activities.txt" 2>&1 || true
   adb pull /sdcard/Android/data/com.lunarlog.debug/files/ "$report_dir/files" > "$report_dir/pull.txt" 2>&1 || true
@@ -38,4 +39,4 @@ adb shell input keyevent 82
   adb shell wm density
   adb shell settings get system font_scale
 } > "$report_dir/device.txt"
-./gradlew --no-daemon connectedGithubDebugAndroidTest
+./gradlew --no-daemon connectedGithubDebugAndroidTest 2>&1 | tee "$report_dir/gradle.txt"
