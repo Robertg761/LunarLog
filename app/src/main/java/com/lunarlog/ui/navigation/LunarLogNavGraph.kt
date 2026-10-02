@@ -244,7 +244,10 @@ fun LunarLogNavGraph(
                                             saveState = true
                                         }
                                         launchSingleTop = true
-                                        restoreState = true
+                                        // Home remains on the stack after popUpTo. Restoring a
+                                        // saved stack here can reopen the notification destination
+                                        // we just popped instead of showing Home.
+                                        restoreState = screen != Screen.Home
                                     }
                                 }
                             }

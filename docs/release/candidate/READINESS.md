@@ -14,6 +14,9 @@ See [local verification](../../LOCAL_VERIFICATION.md), [audit changes](../../AUD
 - The Git connection supports a review-branch push, which triggers CI. CLI/API access is unavailable (the API proxy rejects the connection); CI results must be checked through the Actions page. No device is attached and this machine has no KVM acceleration; the previous software-emulator UI run ended with an Android system-process crash.
 - The follow-up code review fixed notification-link replay after recreation. Pending links, including ones waiting behind App Lock/onboarding, are saved with activity state; consumed links remain consumed. The existing navigation device test now checks navigation away from a handled link before recreation.
 
+- Hosted verification found and fixed a restored logging sheet that could hide its save/error footer, and a Home-tab back-stack restoration bug after notification navigation. The navigation regression covers the production notification intent, returning Home, activity recreation, rotation and saving a retained draft. Its harness follows resumed activities because Android's ActivityScenario stops observing when the activity changes its intent.
+- CI keeps the test APK installed until evidence collection finishes, preserving generated screenshots and PDFs along with test reports. The Actions result for the branch's current commit is the source of truth for full device-test completion.
+
 ## Completion sequence
 
 1. Let CI and both device profiles finish on the review branch’s exact commit. Review retained artifacts, resolve failures, and open a PR using the branch comparison page if API access remains unavailable.
