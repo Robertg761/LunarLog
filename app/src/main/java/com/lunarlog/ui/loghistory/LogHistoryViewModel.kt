@@ -18,13 +18,15 @@ class LogHistoryViewModel @Inject constructor(
     private val symptomRepository: SymptomRepository
 ) : ViewModel() {
 
+    val error = MutableStateFlow<String?>(null)
+    val isLoading = MutableStateFlow(true)
     private val _searchQuery = MutableStateFlow("")
     val searchQuery = _searchQuery.asStateFlow()
 
     private val _selectedSymptom = MutableStateFlow<SymptomDefinition?>(null)
     val selectedSymptom = _selectedSymptom.asStateFlow()
 
-    val availableSymptoms = symptomRepository.getAllSymptoms()
+    val availableSymptoms = symptomRepository.getManagedSymptoms()
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     val logs: StateFlow<List<DailyLog>> = combine(
@@ -33,13 +35,15 @@ class LogHistoryViewModel @Inject constructor(
     ) { query, symptom ->
         Pair(query, symptom)
     }.flatMapLatest { (query, symptom) ->
-        if (symptom != null) {
-            dailyLogRepository.searchLogsBySymptom(symptom.name)
+        val source = if (symptom != null) {
+            dailyLogRepository.searchLogsBySymptom(symptom.name, if (symptom.category == com.lunarlog.data.SymptomCategory.EMOTIONAL) com.lunarlog.data.LogEntryType.MOOD else com.lunarlog.data.LogEntryType.SYMPTOM)
         } else if (query.isNotBlank()) {
             dailyLogRepository.searchLogs(query)
         } else {
             dailyLogRepository.getAllLogs()
         }
+        source.onStart { isLoading.value = true; error.value = null }.onEach { isLoading.value = false }
+        .catch { if (it is kotlinx.coroutines.CancellationException) throw it; isLoading.value = false; error.value = "Unable to load history. Change your search to retry."; emit(emptyList()) }
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 
     fun onSearchQueryChanged(query: String) {

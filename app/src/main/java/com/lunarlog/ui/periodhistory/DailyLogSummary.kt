@@ -28,7 +28,7 @@ fun buildDailyLogSummaryLines(log: DailyLog): DailyLogSummaryLines {
     }
 
     if (log.sexDrive > 0) secondaryParts += "Libido: ${sexDriveLabel(log.sexDrive)}"
-    if (log.temperature != null) secondaryParts += "Temp: ${formatFloat1(log.temperature)}"
+    if (log.temperature != null) secondaryParts += "Temp: ${com.lunarlog.ui.util.formatTemperature(log.temperature)}"
     if (log.cervicalMucus > 0) secondaryParts += "Mucus: ${mucusLabel(log.cervicalMucus)}"
     if (log.notes.isNotBlank()) secondaryParts += "Notes"
 
@@ -50,4 +50,3 @@ private fun formatFloat1(value: Float): String {
     val s = String.format(Locale.US, "%.1f", value)
     return if (s.endsWith(".0")) s.dropLast(2) else s
 }
-

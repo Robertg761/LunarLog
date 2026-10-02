@@ -80,6 +80,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
@@ -117,13 +118,6 @@ import java.time.LocalTime
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 
-private data class MedicationDraft(
-    val name: String,
-    val dosage: String,
-    val frequency: String,
-    val reminderTime: Long
-)
-
 private const val MINUTES_PER_DAY = 24L * 60L
 
 /** Label for the snackbar action that deep-links to this app's system settings page. */
@@ -151,7 +145,8 @@ fun SettingsScreen(
     onBack: () -> Unit,
     viewModel: SettingsViewModel = hiltViewModel(),
     isUpdateAvailable: Boolean = false,
-    onInstallUpdate: () -> Unit = {}
+    onInstallUpdate: () -> Unit = {},
+    onCheckUpdates: () -> Unit = {}
 ) {
     val isAppLockEnabled by viewModel.isAppLockEnabled.collectAsState()
     val themeSeedColor by viewModel.themeSeedColor.collectAsState()
@@ -159,6 +154,7 @@ fun SettingsScreen(
     val periodReminderTimeMinutes by viewModel.periodReminderTimeMinutes.collectAsState()
     val cycleNotificationEnabled by viewModel.cycleNotificationEnabled.collectAsState()
     val appLockTimeoutSeconds by viewModel.appLockTimeoutSeconds.collectAsState()
+    val redactWidgets by viewModel.redactWidgets.collectAsState()
     val medications by viewModel.medications.collectAsState()
     val message by viewModel.message.collectAsState()
     val isLoaded by viewModel.isLoaded.collectAsState()
@@ -171,11 +167,23 @@ fun SettingsScreen(
     val scope = rememberCoroutineScope()
 
     var showNukeDialog by remember { mutableStateOf(false) }
-    var showAddMedicationDialog by remember { mutableStateOf(false) }
+    var showAddMedicationDialog by rememberSaveable { mutableStateOf(false) }
     var showReminderTimePicker by remember { mutableStateOf(false) }
     var medicationPendingDelete by remember { mutableStateOf<Medication?>(null) }
-    var medicationPendingNotificationPermission by remember { mutableStateOf<MedicationDraft?>(null) }
-    var restorePendingConfirmation by remember { mutableStateOf<Uri?>(null) }
+    var medicationPendingNotificationPermission by rememberSaveable { mutableStateOf<String?>(null) }
+    var editingMedicationId by rememberSaveable { mutableStateOf<Int?>(null) }
+    val medicationSaving by viewModel.medicationSaving.collectAsState()
+    val medicationSaved by viewModel.medicationSaved.collectAsState()
+    val medicationError by viewModel.medicationError.collectAsState()
+    LaunchedEffect(medicationSaved) {
+        if (medicationSaved) { showAddMedicationDialog = false; editingMedicationId = null; viewModel.resetMedicationSave() }
+    }
+    val restorePreview by viewModel.restorePreview.collectAsState()
+    val hasRecovery by viewModel.hasRecoveryBackup.collectAsState()
+    val recoveryLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument("application/json")) { uri -> uri?.let(viewModel::exportRecovery) }
+    var manageSymptoms by rememberSaveable { mutableStateOf(false) }
+    val managedSymptoms by viewModel.managedSymptoms.collectAsState()
+    if (manageSymptoms) CustomSymptomManager(managedSymptoms, viewModel::renameSymptom, viewModel::archiveSymptom, { manageSymptoms = false })
     var notificationsBlocked by remember { mutableStateOf(false) }
 
     val privacyPolicyFailedMessage = stringResource(id = R.string.privacy_policy_open_failed)
@@ -225,7 +233,7 @@ fun SettingsScreen(
     val importLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.OpenDocument()
     ) { uri: Uri? ->
-        restorePendingConfirmation = uri
+        uri?.let(viewModel::importData)
     }
 
     // Biometric Logic for enabling
@@ -295,17 +303,11 @@ fun SettingsScreen(
     val medicationNotificationPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { granted ->
-        medicationPendingNotificationPermission?.let { draft ->
-            viewModel.addMedication(
-                draft.name,
-                draft.dosage,
-                draft.frequency,
-                draft.reminderTime.takeIf { granted }
-            )
+        medicationPendingNotificationPermission?.let { json ->
+            val draft = com.google.gson.Gson().fromJson(json, Medication::class.java)
+            viewModel.saveMedication(draft.copy(reminderTime = draft.reminderTime.takeIf { granted }, reminderTimes = draft.reminderTimes.takeIf { granted }.orEmpty()))
             notificationsBlocked = !granted
-            if (!granted) {
-                showBlockedMessage("Notifications are blocked; the medication was added without a reminder.")
-            }
+            if (!granted) showBlockedMessage("Notifications are blocked; the medication will be saved without a reminder.")
         }
         medicationPendingNotificationPermission = null
     }
@@ -339,8 +341,8 @@ fun SettingsScreen(
     if (showNukeDialog) {
         AlertDialog(
             onDismissRequest = { showNukeDialog = false },
-            title = { Text("Delete All Data?") },
-            text = { Text("This cannot be undone. All logs and cycles will be erased forever.") },
+            title = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_all_data_ec409c)) },
+            text = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_this_cannot_be_undone_all_logs_and_cycles_will_be_erase_519023)) },
             confirmButton = {
                 // Matches the other three destructive confirms in the app: a TextButton in `error`.
                 TextButton(
@@ -349,66 +351,54 @@ fun SettingsScreen(
                         showNukeDialog = false
                     }
                 ) {
-                    Text("Delete Forever", color = MaterialTheme.colorScheme.error)
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_forever_704373), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showNukeDialog = false }) {
-                    Text("Cancel")
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e))
                 }
             }
         )
     }
 
-    restorePendingConfirmation?.let { uri ->
+    restorePreview?.let { preview ->
         AlertDialog(
-            onDismissRequest = { restorePendingConfirmation = null },
-            title = { Text("Restore this backup?") },
-            text = { Text("Restoring replaces all current logs and cycles. This cannot be undone.") },
+            onDismissRequest = { if (!isRestoring) viewModel.cancelRestore() },
+            title = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_restore_this_backup_d3357d)) },
+            text = { Text("$preview\n\nRestoring replaces the current records. A recovery backup will be saved privately on this device until your next restore or reset. Backups contain readable health data; store exported files securely.") },
             confirmButton = {
                 TextButton(
+                    enabled = !isRestoring,
                     onClick = {
-                        viewModel.importData(uri)
-                        restorePendingConfirmation = null
+                        viewModel.confirmRestore()
                     }
                 ) {
-                    Text("Restore", color = MaterialTheme.colorScheme.error)
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_restore_a76e13), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { restorePendingConfirmation = null }) { Text("Cancel") }
+                TextButton(enabled = !isRestoring, onClick = { viewModel.cancelRestore() }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e)) }
             }
         )
     }
 
-    if (showAddMedicationDialog) {
-        AddMedicationDialog(
-            onDismiss = { showAddMedicationDialog = false },
-            onSave = { name, dosage, frequency, reminderTime ->
-                val needsNotificationPermission = reminderTime != null &&
-                    Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                    PackageManager.PERMISSION_GRANTED
-                if (needsNotificationPermission) {
-                    medicationPendingNotificationPermission = MedicationDraft(
-                        name = name,
-                        dosage = dosage,
-                        frequency = frequency,
-                        reminderTime = reminderTime!!
-                    )
+    if (showAddMedicationDialog && (editingMedicationId == null || medications.any { it.id == editingMedicationId })) {
+        MedicationEditor(initial = medications.firstOrNull { it.id == editingMedicationId }, isSaving = medicationSaving, error = medicationError,
+            onDismiss = { showAddMedicationDialog = false; editingMedicationId = null; viewModel.resetMedicationSave() },
+            onSave = { medication ->
+                if (medication.reminderTime != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) {
+                    medicationPendingNotificationPermission = com.google.gson.Gson().toJson(medication)
                     medicationNotificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                } else {
-                    viewModel.addMedication(name, dosage, frequency, reminderTime)
-                }
-                showAddMedicationDialog = false
-            }
-        )
+                } else viewModel.saveMedication(medication)
+            })
     }
 
     medicationPendingDelete?.let { medication ->
         AlertDialog(
             onDismissRequest = { medicationPendingDelete = null },
-            title = { Text("Delete medication?") },
+            title = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_medication_249f69)) },
             text = { Text("This also removes the dose history for ${medication.name}.") },
             confirmButton = {
                 TextButton(
@@ -417,11 +407,11 @@ fun SettingsScreen(
                         medicationPendingDelete = null
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_e2d0a5), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
-                TextButton(onClick = { medicationPendingDelete = null }) { Text("Cancel") }
+                TextButton(onClick = { medicationPendingDelete = null }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e)) }
             }
         )
     }
@@ -459,9 +449,9 @@ fun SettingsScreen(
                         Icon(Icons.Filled.Lock, contentDescription = null)
                         Spacer(Modifier.width(Spacing.sm))
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("App Lock")
+                            Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_app_lock_5eb400))
                             Text(
-                                "Require authentication when returning to the app",
+                                androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_require_authentication_when_returning_to_the_app_600021),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -480,7 +470,7 @@ fun SettingsScreen(
                     }
                     if (isAppLockEnabled) {
                         Column {
-                            Text("Lock timeout", style = MaterialTheme.typography.bodyMedium)
+                            Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_lock_timeout_e38013), style = MaterialTheme.typography.bodyMedium)
                             Text(
                                 formatLockTimeout(appLockTimeoutSeconds),
                                 style = MaterialTheme.typography.bodySmall,
@@ -505,9 +495,9 @@ fun SettingsScreen(
                 SettingsSection(title = stringResource(id = R.string.settings_notifications)) {
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Column(modifier = Modifier.weight(1f)) {
-                            Text("Cycle prediction alerts")
+                            Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cycle_prediction_alerts_96dc07))
                             Text(
-                                "Notify about upcoming period and estimated fertile-day updates",
+                                androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_notify_about_upcoming_period_and_estimated_fertile_day__ff901b),
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -579,7 +569,7 @@ fun SettingsScreen(
                     // so it stays on screen until the user actually changes it.
                     if (notificationsBlocked) {
                         Text(
-                            "Notifications are blocked. Enable them in system settings.",
+                            androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_notifications_are_blocked_enable_them_in_system_setting_c7cb64),
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.error
                         )
@@ -611,7 +601,7 @@ fun SettingsScreen(
                 SettingsSection(title = "Medications") {
                     if (medications.isEmpty()) {
                         Text(
-                            "No medications added.",
+                            androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_no_medications_added_a5d701),
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -622,21 +612,27 @@ fun SettingsScreen(
                                 verticalAlignment = Alignment.CenterVertically
                             ) {
                                 Column(modifier = Modifier.weight(1f)) {
-                                    Text(medication.name)
+                                    Text(medication.name, style = MaterialTheme.typography.titleMedium)
+                                    if (medication.isArchived) Text("Archived", style = MaterialTheme.typography.labelMedium,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant)
                                     val schedule = medication.frequency
                                         .replace('_', ' ')
                                         .replaceFirstChar { it.uppercase() }
-                                    val reminder = medication.reminderTime
-                                        ?.let { " at ${formatMinutes(it, is24Hour)}" }
-                                        .orEmpty()
+                                    val times = com.lunarlog.logic.MedicationScheduler.reminderTimes(medication)
+                                    val reminder = if (times.isEmpty()) "" else " at " + times.joinToString(", ") { formatMinutes(it, is24Hour) }
                                     Text(
                                         listOfNotNull(
                                             medication.dosage.takeIf { it.isNotBlank() },
-                                            "$schedule$reminder"
+                                            if (medication.frequency == "as_needed") schedule else "$schedule • ${medication.dosesPerDay} planned doses$reminder"
                                         ).joinToString(" • "),
                                         style = MaterialTheme.typography.bodySmall,
                                         color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
+                                    FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                        TextButton(onClick = { editingMedicationId = medication.id; viewModel.resetMedicationSave(); showAddMedicationDialog = true }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_edit_464c4f)) }
+                                        TextButton(onClick = { viewModel.setMedicationArchived(medication, !medication.isArchived) }) { Text(if (medication.isArchived) "Resume" else "Archive") }
+                                    }
+                                    Spacer(Modifier.height(8.dp))
                                 }
                                 IconButton(onClick = { medicationPendingDelete = medication }) {
                                     Icon(
@@ -649,12 +645,12 @@ fun SettingsScreen(
                         }
                     }
                     OutlinedButton(
-                        onClick = { showAddMedicationDialog = true },
+                        onClick = { editingMedicationId = null; viewModel.resetMedicationSave(); showAddMedicationDialog = true },
                         modifier = Modifier.fillMaxWidth()
                     ) {
                         Icon(Icons.Filled.Add, contentDescription = null)
                         Spacer(Modifier.width(Spacing.sm))
-                        Text("Add Medication")
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_add_medication_65629f))
                     }
                 }
 
@@ -662,7 +658,7 @@ fun SettingsScreen(
                     Row(verticalAlignment = Alignment.CenterVertically) {
                         Icon(Icons.Filled.ColorLens, contentDescription = null)
                         Spacer(Modifier.width(Spacing.sm))
-                        Text("Theme Color")
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_theme_color_d543a8))
                     }
 
                     // SpaceBetween, not spacedBy: six 48dp swatches with 12dp gaps come to 348dp,
@@ -689,7 +685,7 @@ fun SettingsScreen(
                 if (isUpdateAvailable) {
                     SettingsSection(title = "Update Available") {
                         Text(
-                            "A new version of LunarLog is available.",
+                            androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_a_new_version_of_lunarlog_is_available_2c1f05),
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Button(
@@ -698,16 +694,28 @@ fun SettingsScreen(
                         ) {
                             Icon(Icons.Filled.Download, contentDescription = null)
                             Spacer(Modifier.width(Spacing.sm))
-                            Text("Install Update")
+                            Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_install_update_7e08c5))
                         }
                     }
                 }
 
+                SettingsSection(title = "Custom symptoms and moods") {
+                    TextButton(onClick = { manageSymptoms = true }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_manage_custom_choices_52cfcc)) }
+                }
+                SettingsSection(title = "Widget privacy") {
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_widgets_can_display_health_information_and_allow_quick__824be5))
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_hide_widget_details_c1783e), Modifier.weight(1f))
+                        Switch(checked = redactWidgets, onCheckedChange = viewModel::setRedactWidgets)
+                    }
+                }
                 SettingsSection(title = "Data Management") {
+                    if (hasRecovery) TextButton(onClick = { recoveryLauncher.launch("lunarlog_before_restore.json") }, enabled = !isRestoring) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_save_previous_data_recovery_backup_04cd66)) }
                     SettingsActionRow(
                         icon = Icons.Filled.Download,
                         title = "Back up data",
-                        subtitle = "Save every log and cycle to a JSON file.",
+                        enabled = !isRestoring,
+                        subtitle = "Save all records to a readable JSON file. Keep it somewhere private.",
                         onClick = {
                             exportLauncher.launch("lunarlog_backup_${System.currentTimeMillis()}.json")
                         }
@@ -728,6 +736,7 @@ fun SettingsScreen(
                     // need to be the loudest thing on the screen as well.
                     OutlinedButton(
                         onClick = { showNukeDialog = true },
+                        enabled = !isRestoring,
                         modifier = Modifier.fillMaxWidth(),
                         colors = ButtonDefaults.outlinedButtonColors(
                             contentColor = MaterialTheme.colorScheme.error
@@ -736,13 +745,14 @@ fun SettingsScreen(
                     ) {
                         Icon(Icons.Filled.DeleteForever, contentDescription = null)
                         Spacer(Modifier.width(Spacing.sm))
-                        Text("Delete all data")
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_all_data_a867ee))
                     }
                 }
 
                 SettingsSection(title = "About") {
+                    TextButton(onClick = onCheckUpdates) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_check_for_updates_f26f32)) }
                     Column {
-                        Text("LunarLog", style = MaterialTheme.typography.titleLarge)
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_lunarlog_4b65cc), style = MaterialTheme.typography.titleLarge)
                         Text(
                             "Version ${BuildConfig.VERSION_NAME} (${BuildConfig.VERSION_CODE})",
                             style = MaterialTheme.typography.bodyMedium,
@@ -750,12 +760,12 @@ fun SettingsScreen(
                         )
                     }
                     Text(
-                        "A privacy-first period tracker.",
+                        androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_a_privacy_first_period_tracker_43bae8),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                     Text(
-                        "LunarLog is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. Consult a healthcare professional for medical advice, diagnosis, or treatment. Fertile-day estimates are not birth control.",
+                        androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_lunarlog_is_not_a_medical_device_and_does_not_diagnose__0f0567),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -943,7 +953,7 @@ private fun SettingsSkeleton(modifier: Modifier = Modifier) {
  */
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-private fun LunarLogTimePickerDialog(
+internal fun LunarLogTimePickerDialog(
     title: String,
     initialHour: Int,
     initialMinute: Int,
@@ -962,120 +972,10 @@ private fun LunarLogTimePickerDialog(
         title = { Text(title) },
         text = { TimePicker(state = state) },
         confirmButton = {
-            TextButton(onClick = { onConfirm(state.hour, state.minute) }) { Text("OK") }
+            TextButton(onClick = { onConfirm(state.hour, state.minute) }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_ok_565339)) }
         },
         dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
-        }
-    )
-}
-
-@OptIn(ExperimentalMaterial3Api::class)
-@Composable
-private fun AddMedicationDialog(
-    onDismiss: () -> Unit,
-    onSave: (name: String, dosage: String, frequency: String, reminderTime: Long?) -> Unit
-) {
-    var name by remember { mutableStateOf("") }
-    var dosage by remember { mutableStateOf("") }
-    var frequency by remember { mutableStateOf("daily") }
-    var reminderEnabled by remember { mutableStateOf(false) }
-    var reminderMinutes by remember { mutableLongStateOf(9L * 60L) }
-    var showTimePicker by remember { mutableStateOf(false) }
-
-    // Read here rather than taken as a parameter: this dialog is its own composable and the row
-    // below sits directly beside the button that opens LunarLogTimePickerDialog, so the label and
-    // the dial have to agree about 12- vs 24-hour.
-    val context = LocalContext.current
-    val is24Hour = remember(context) { DateFormat.is24HourFormat(context) }
-
-    // The time picker replaces this dialog's body rather than opening on top of it: two stacked
-    // dialog windows meant dismissing the outer one left the inner orphaned.
-    if (showTimePicker) {
-        LunarLogTimePickerDialog(
-            title = "Reminder time",
-            initialHour = (reminderMinutes / 60L).toInt(),
-            initialMinute = (reminderMinutes % 60L).toInt(),
-            onDismiss = { showTimePicker = false },
-            onConfirm = { hour, minute ->
-                reminderMinutes = hour * 60L + minute
-                showTimePicker = false
-            }
-        )
-        return
-    }
-
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Add medication") },
-        text = {
-            Column(
-                modifier = Modifier.verticalScroll(rememberScrollState()),
-                verticalArrangement = Arrangement.spacedBy(Spacing.md)
-            ) {
-                OutlinedTextField(
-                    value = name,
-                    onValueChange = { name = it.take(80) },
-                    label = { Text("Name") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                OutlinedTextField(
-                    value = dosage,
-                    onValueChange = { dosage = it.take(80) },
-                    label = { Text("Dose (optional)") },
-                    singleLine = true,
-                    modifier = Modifier.fillMaxWidth()
-                )
-                Text("Schedule", style = MaterialTheme.typography.labelLarge)
-                Row(horizontalArrangement = Arrangement.spacedBy(Spacing.sm)) {
-                    listOf("daily" to "Daily", "weekly" to "Weekly", "as_needed" to "As needed")
-                        .forEach { (value, label) ->
-                            FilterChip(
-                                modifier = Modifier.minimumInteractiveComponentSize(),
-                                selected = frequency == value,
-                                onClick = {
-                                    frequency = value
-                                    if (value == "as_needed") reminderEnabled = false
-                                },
-                                label = { Text(label) }
-                            )
-                        }
-                }
-                if (frequency != "as_needed") {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            Text("Reminder")
-                            Text(
-                                if (reminderEnabled) formatMinutes(reminderMinutes, is24Hour) else "Off",
-                                style = MaterialTheme.typography.bodySmall,
-                                color = MaterialTheme.colorScheme.onSurfaceVariant
-                            )
-                        }
-                        Switch(
-                            modifier = Modifier.semantics { contentDescription = "Reminder" },
-                            checked = reminderEnabled,
-                            onCheckedChange = { reminderEnabled = it }
-                        )
-                    }
-                    if (reminderEnabled) {
-                        TextButton(onClick = { showTimePicker = true }) {
-                            Text("Change reminder time")
-                        }
-                    }
-                }
-            }
-        },
-        confirmButton = {
-            TextButton(
-                enabled = name.isNotBlank(),
-                onClick = {
-                    onSave(name, dosage, frequency, reminderMinutes.takeIf { reminderEnabled })
-                }
-            ) { Text("Add") }
-        },
-        dismissButton = {
-            TextButton(onClick = onDismiss) { Text("Cancel") }
+            TextButton(onClick = onDismiss) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e)) }
         }
     )
 }

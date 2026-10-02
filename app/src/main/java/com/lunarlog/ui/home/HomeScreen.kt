@@ -89,6 +89,7 @@ fun HomeScreen(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
+    com.lunarlog.ui.util.ObserveDateChanges(viewModel::refreshDate)
     val uiState by viewModel.uiState.collectAsState()
     val scrollState = rememberScrollState()
     val context = LocalContext.current
@@ -187,7 +188,7 @@ fun HomeScreen(
                     ) {
                         LunarLogBrandMark(modifier = Modifier.size(34.dp))
                         Spacer(modifier = Modifier.width(Spacing.sm))
-                        Text("LunarLog", style = MaterialTheme.typography.headlineSmall)
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_lunarlog_4b65cc), style = MaterialTheme.typography.headlineSmall)
                     }
                 }
             },
@@ -199,7 +200,7 @@ fun HomeScreen(
                     contentColor = MaterialTheme.colorScheme.onPrimary,
                     // The adjacent "Log Today" label already names the action.
                     icon = { Icon(Icons.Default.Edit, contentDescription = null) },
-                    text = { Text("Log Today") },
+                    text = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_log_today_6b60cb)) },
                     expanded = true
                 )
             }
@@ -247,7 +248,16 @@ fun HomeScreen(
                                 contentAlignment = Alignment.Center
                             ) {
                                 val circleDiameter = (maxWidth * 0.85f).coerceAtMost(480.dp)
-                                CycleStatusCircle(
+                                if (androidx.compose.ui.platform.LocalDensity.current.fontScale >= 1.5f) {
+                                    LunarLogCard(modifier = Modifier.fillMaxWidth()) {
+                                        Text(uiState.counterTitle, style = MaterialTheme.typography.titleMedium,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                                        Text(uiState.counterValue.toString(), style = MaterialTheme.typography.headlineLarge,
+                                            color = MaterialTheme.colorScheme.onSurface)
+                                        Text(uiState.counterSubtitle, style = MaterialTheme.typography.bodyLarge,
+                                            color = MaterialTheme.colorScheme.onSurface)
+                                    }
+                                } else CycleStatusCircle(
                                     value = uiState.counterValue,
                                     title = uiState.counterTitle,
                                     subtitle = uiState.counterSubtitle,
@@ -282,6 +292,15 @@ fun HomeScreen(
                 }
 
                 // Clearance for the FAB, matching every other FAB-bearing screen.
+                if (!uiState.isLoading && uiState.predictionEvidence.isNotBlank()) {
+                    Spacer(Modifier.height(Spacing.lg))
+                    LunarLogCard(modifier = Modifier.fillMaxWidth()) {
+                        com.lunarlog.ui.components.FormSectionTitle(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.prediction_context_heading))
+                        Spacer(Modifier.height(Spacing.sm))
+                        Text(uiState.predictionEvidence, style = MaterialTheme.typography.bodyMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    }
+                }
                 Spacer(modifier = Modifier.height(Spacing.fabClearance))
             }
         }
@@ -343,18 +362,18 @@ fun HomeScreen(
         if (showEndPeriodConfirm) {
             AlertDialog(
                 onDismissRequest = { showEndPeriodConfirm = false },
-                title = { Text("End Period?") },
-                text = { Text("This will mark today as the end of your current period.") },
+                title = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_end_period_7b4c09)) },
+                text = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_this_will_mark_today_as_the_end_of_your_current_period_46f781)) },
                 confirmButton = {
                     TextButton(
                         onClick = {
                             showEndPeriodConfirm = false
                             viewModel.togglePeriod()
                         }
-                    ) { Text("End") }
+                    ) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_end_f4db1e)) }
                 },
                 dismissButton = {
-                    TextButton(onClick = { showEndPeriodConfirm = false }) { Text("Cancel") }
+                    TextButton(onClick = { showEndPeriodConfirm = false }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e)) }
                 }
             )
         }
@@ -661,18 +680,18 @@ fun DailySummaryCard(
         ) {
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    text = "Daily Insight",
+                    text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_daily_insight_bd2989),
                     style = MaterialTheme.typography.labelLarge,
                     color = MaterialTheme.colorScheme.primary
                 )
                 Text(
-                    text = "How are you feeling?",
+                    text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_how_are_you_feeling_42fe0b),
                     style = MaterialTheme.typography.titleLarge,
                     color = MaterialTheme.colorScheme.onSurface
                 )
                 Spacer(modifier = Modifier.height(Spacing.xs))
                 Text(
-                    text = "Tap to log symptoms & mood",
+                    text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_tap_to_log_symptoms_mood_be84f9),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -680,7 +699,7 @@ fun DailySummaryCard(
             // Cute icon container
             Surface(
                 shape = CircleShape,
-                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.82f),
+                color = MaterialTheme.colorScheme.primaryContainer,
                 modifier = Modifier.size(56.dp)
             ) {
                 Box(contentAlignment = Alignment.Center) {
@@ -688,7 +707,7 @@ fun DailySummaryCard(
                         imageVector = Icons.Default.Edit,
                         // Decorative; the card's own text is the label.
                         contentDescription = null,
-                        tint = MaterialTheme.colorScheme.primary,
+                        tint = MaterialTheme.colorScheme.onPrimaryContainer,
                         modifier = Modifier.size(24.dp)
                     )
                 }
@@ -733,12 +752,12 @@ fun FertilityCard(modifier: Modifier = Modifier) {
 
             Column {
                 Text(
-                    text = "Estimated Fertile Days",
+                    text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_estimated_fertile_days_110312),
                     style = MaterialTheme.typography.titleMedium,
                     color = cycle.onFertileContainer
                 )
                 Text(
-                    text = "Calendar estimate only — not birth control",
+                    text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_calendar_estimate_only_not_birth_control_b1bf18),
                     style = MaterialTheme.typography.bodyMedium,
                     color = cycle.onFertileContainer
                 )

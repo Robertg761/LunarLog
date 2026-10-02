@@ -13,7 +13,10 @@ data class Medication(
     val frequency: String = "daily", // daily, weekly, as_needed
     val startDate: Long, // Epoch Day
     val endDate: Long? = null,
-    val reminderTime: Long? = null // Minutes from midnight, or null if no reminder
+    val reminderTime: Long? = null, // Minutes from midnight, or null if no reminder
+    @androidx.room.ColumnInfo(defaultValue = "0") val isArchived: Boolean = false,
+    @androidx.room.ColumnInfo(defaultValue = "1") val dosesPerDay: Int = 1,
+    @androidx.room.ColumnInfo(defaultValue = "'[]'") val reminderTimes: List<Long> = emptyList()
 )
 
 @Entity(
@@ -28,7 +31,7 @@ data class Medication(
     ],
     indices = [
         Index(value = ["medicationId"]),
-        Index(value = ["date", "medicationId"], unique = true)
+        Index(value = ["date", "medicationId"])
     ]
 )
 data class MedicationLog(

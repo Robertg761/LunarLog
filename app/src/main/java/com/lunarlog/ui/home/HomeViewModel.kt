@@ -16,6 +16,8 @@ import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.catch
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -38,9 +40,11 @@ data class HomeUiState(
     val counterSubtitle: String = "No cycle data yet",
     val counterScaleDays: Int = AppConfig.DEFAULT_CYCLE_LENGTH,
     val quickLogSymptoms: List<String> = emptyList(),
-    val anomalies: List<com.lunarlog.logic.CycleAnomaly> = emptyList()
+    val anomalies: List<com.lunarlog.logic.CycleAnomaly> = emptyList(),
+    val predictionEvidence: String = "Log two period starts to personalize predictions"
 )
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 @HiltViewModel
 class HomeViewModel @Inject constructor(
     private val cycleRepository: CycleRepository,
@@ -51,10 +55,14 @@ class HomeViewModel @Inject constructor(
     private val _message = Channel<String>(Channel.CONFLATED)
     val message = _message.receiveAsFlow()
 
+    private val today = kotlinx.coroutines.flow.MutableStateFlow(LocalDate.now())
+    fun refreshDate(date: LocalDate = LocalDate.now()) { today.value = date }
+
     val uiState: StateFlow<HomeUiState> = combine(
         cycleRepository.getAllCycles(),
-        dailyLogRepository.getAllLogs()
-    ) { cycles, logs ->
+        today.flatMapLatest { dailyLogRepository.getLogsForRange(it.minusYears(2), it) },
+        today
+    ) { cycles, logs, today ->
         kotlinx.coroutines.withContext(defaultDispatcher) {
             runCatching {
                 if (cycles.isEmpty()) {
@@ -77,7 +85,6 @@ class HomeViewModel @Inject constructor(
                         averageLength,
                         averagePeriodLength
                     )
-                    val today = LocalDate.now()
                     val counter = CounterPresentationCalculator.calculate(cycles, today)
 
                     val daysUntil = ChronoUnit.DAYS.between(today, nextPeriodStart).toInt()
@@ -124,11 +131,14 @@ class HomeViewModel @Inject constructor(
                         }.coerceAtLeast(1),
                         isLoading = false,
                         quickLogSymptoms = quickLogSymptoms,
-                        anomalies = anomalies
+                        anomalies = anomalies,
+                        predictionEvidence = "Based on ${CyclePredictionUtils.completedCycleIntervals(cycles).size} completed cycles. " +
+                            if (cycles.size < 4) "Limited history; estimates may change." else if (CyclePredictionUtils.isCycleIrregular(cycles)) "Cycles vary; estimates are less reliable." else "Dates are estimates, not guarantees."
                     )
                 }
             }.getOrElse {
-                HomeUiState(isLoading = false)
+                if (it is kotlinx.coroutines.CancellationException) throw it
+                HomeUiState(isLoading = false, counterSubtitle = "Unable to calculate your cycle. Please check recorded dates.")
             }
         }
     }
@@ -140,6 +150,7 @@ class HomeViewModel @Inject constructor(
 
     fun togglePeriod() {
         viewModelScope.launch {
+            try {
             val today = LocalDate.now()
             val state = uiState.value
             val result = when {
@@ -152,6 +163,8 @@ class HomeViewModel @Inject constructor(
                 is PeriodChangeResult.Success -> _message.trySend(result.message)
                 is PeriodChangeResult.ValidationError -> _message.trySend(result.message)
             }
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+              catch (error: Exception) { _message.trySend(error.message ?: "Unable to save period") }
         }
     }
 
@@ -159,7 +172,7 @@ class HomeViewModel @Inject constructor(
         viewModelScope.launch {
             val today = LocalDate.now().toEpochDay()
             val time = System.currentTimeMillis()
-            
+
             // Create a granular entry
             val entry = LogEntry(
                 date = today,
@@ -167,8 +180,10 @@ class HomeViewModel @Inject constructor(
                 type = LogEntryType.SYMPTOM,
                 value = symptom
             )
-            
-            dailyLogRepository.addEntryIfAbsent(entry)
+
+            try { dailyLogRepository.addEntryIfAbsent(entry) }
+            catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (error: Exception) { _message.trySend(error.message ?: "Unable to log symptom") }
         }
     }
 
@@ -192,11 +207,11 @@ class HomeViewModel @Inject constructor(
 
         return """
             🌙 LunarLog Status Update
-            
+
             📊 $counterSummary
             📅 Cycle day ${state.currentCycleDay}
             ${if (state.isEstimatedFertileWindow) "🌿 Estimated fertile days (prediction only)" else ""}
-            
+
             Sent from my private LunarLog
         """.trimIndent()
     }

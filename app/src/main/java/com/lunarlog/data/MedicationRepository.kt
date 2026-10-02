@@ -18,8 +18,22 @@ class MedicationRepository @Inject constructor(
         medicationDao.getAllMedicationsSync()
 
     suspend fun addMedication(medication: Medication) {
-        medicationDao.insertMedication(medication)
+        require(medication.dosesPerDay in 1..24)
+        require((medication.reminderTimes.isEmpty() || medication.reminderTimes.size == medication.dosesPerDay) && medication.reminderTimes.distinct().size == medication.reminderTimes.size && medication.reminderTimes.all { it in 0L..1439L })
+        require(medication.name.isNotBlank()) { "Medication name is required" }
+        LogValidation.date(medication.startDate)
+        medication.endDate?.let { LogValidation.date(it); require(it >= medication.startDate) { "End date must follow the start date" } }
+        require(medication.frequency in setOf("daily", "weekly", "as_needed"))
+        require(medication.reminderTime == null || medication.reminderTime in 0L..1439L)
+        if (medication.id == 0) medicationDao.insertMedication(medication)
+        else medicationDao.updateMedication(medication) // REPLACE would cascade-delete dose history.
     }
+
+    suspend fun setArchived(id: Int, archived: Boolean) = medicationDao.setArchived(id, archived)
+
+    suspend fun getAllMedicationLogsSync(): List<MedicationLog> = medicationDao.getAllMedicationLogsSync()
+
+    suspend fun getLogsForRangeSync(start: Long, end: Long) = medicationDao.getLogsForRangeSync(start, end)
 
     suspend fun deleteMedication(id: Int) {
         medicationDao.deleteMedication(id)
@@ -35,20 +49,11 @@ class MedicationRepository @Inject constructor(
         medicationDao.logMedication(log)
     }
 
-    suspend fun setMedicationTaken(date: Long, medicationId: Int, taken: Boolean) {
-        if (!taken) {
-            medicationDao.deleteMedicationLog(date, medicationId)
-            return
-        }
-        val existing = medicationDao.getLogForMedicationOnDate(date, medicationId)
-        medicationDao.logMedication(
-            MedicationLog(
-                id = existing?.id ?: 0,
-                date = date,
-                medicationId = medicationId,
-                taken = true,
-                timestamp = System.currentTimeMillis()
-            )
-        )
+    suspend fun logDose(date: Long, medicationId: Int, timestamp: Long = System.currentTimeMillis()) {
+        LogValidation.date(date)
+        medicationDao.logMedication(MedicationLog(date = date, medicationId = medicationId, timestamp = timestamp))
     }
+
+    suspend fun removeDose(id: Long) = medicationDao.deleteDose(id)
+
 }

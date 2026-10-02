@@ -45,10 +45,12 @@ object AdvancedCycleIntelligence {
      * Detects "Peak Day" based on Cervical Mucus.
      * Peak Day is the last day of "Egg White" (4) or "Watery" (3) mucus before drying up.
      */
-    fun detectPeakMucusDay(cycleStartDate: LocalDate, logs: List<DailyLog>): LocalDate? {
+    fun detectPeakMucusDay(cycleStartDate: LocalDate, logs: List<DailyLog>,
+        observedDates: Set<LocalDate> = logs.filter { it.cervicalMucus > 0 }.mapTo(mutableSetOf()) { it.date }
+    ): LocalDate? {
         val cycleLogs = logs.filter { !it.date.isBefore(cycleStartDate) }
             .sortedBy { it.date }
-        
+
         for (i in cycleLogs.indices.reversed()) {
             val candidate = cycleLogs[i]
             if (candidate.cervicalMucus < 3) continue
@@ -57,7 +59,7 @@ object AdvancedCycleIntelligence {
             val hasThreeConsecutiveLowerDays = confirmation.size == 3 &&
                 confirmation.indices.all { index ->
                     confirmation[index].date == candidate.date.plusDays((index + 1).toLong()) &&
-                        confirmation[index].cervicalMucus < 3
+                        confirmation[index].date in observedDates && confirmation[index].cervicalMucus < 3
                 }
             if (hasThreeConsecutiveLowerDays) {
                 return candidate.date

@@ -14,6 +14,7 @@ import com.lunarlog.data.SymptomDefinition
 import com.lunarlog.data.SymptomRepository
 import com.lunarlog.logic.MedicationScheduler
 import dagger.hilt.android.lifecycle.HiltViewModel
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -37,13 +38,18 @@ class LogListViewModel @Inject constructor(
         val date: LocalDate = LocalDate.now(),
         val entries: List<LogEntry> = emptyList(),
         val isLoading: Boolean = false,
+        val isSaving: Boolean = false,
+        val saveCompleted: Boolean = false,
+        val saveError: String? = null,
+        val deletedEntry: LogEntry? = null,
         val isPeriodDay: Boolean = false,
         val periodMessage: String? = null,
         val symptomDefinitions: List<SymptomDefinition> = emptyList(),
         val medications: List<Medication> = emptyList(),
-        val takenMedicationIds: Set<Int> = emptySet()
+        val takenMedicationIds: Set<Int> = emptySet(),
+        val medicationLogs: List<com.lunarlog.data.MedicationLog> = emptyList()
     )
-    
+
     private val _uiState = MutableStateFlow(UiState())
     val uiState: StateFlow<UiState> = _uiState.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), UiState())
     private var loadDateJob: Job? = null
@@ -68,7 +74,7 @@ class LogListViewModel @Inject constructor(
             return
         }
         _uiState.value = _uiState.value.copy(
-            date = localDate, 
+            date = localDate,
             entries = emptyList(), // Clear old entries
             isLoading = true
         )
@@ -79,30 +85,34 @@ class LogListViewModel @Inject constructor(
                 // Load period status first
                 val isPeriod = checkPeriodStatus(localDate)
                 _uiState.value = _uiState.value.copy(isPeriodDay = isPeriod)
-                
+
                 repository.ensureLegacyDataHydrated(date)
-                
+
                 combine(
                     repository.getEntriesForDate(date),
-                    medicationRepository.getActiveMedications(date),
+                    medicationRepository.getAllMedications(),
                     medicationRepository.getLogsForDate(date)
                 ) { entries, activeMedications, medicationLogs ->
                     Triple(
                         entries,
                         activeMedications.filter { medication ->
-                            medication.frequency == "as_needed" ||
-                                MedicationScheduler.isMedicationDueToday(medication, localDate)
+                            medicationLogs.any { it.medicationId == medication.id } ||
+                                (!medication.isArchived && medication.startDate <= date && (medication.endDate == null || medication.endDate >= date) && (medication.frequency == "as_needed" ||
+                                MedicationScheduler.isMedicationDueToday(medication, localDate)))
                         },
-                        medicationLogs.filter { it.taken }.mapTo(mutableSetOf()) { it.medicationId }
+                        medicationLogs.filter { it.taken }
                     )
-                }.collect { (entries, medications, takenMedicationIds) ->
+                }.collect { (entries, medications, medicationLogs) ->
                     _uiState.value = _uiState.value.copy(
                         entries = entries,
                         medications = medications,
-                        takenMedicationIds = takenMedicationIds,
+                        takenMedicationIds = medicationLogs.mapTo(mutableSetOf()) { it.medicationId },
+                        medicationLogs = medicationLogs,
                         isLoading = false
                     )
                 }
+            } catch (cancelled: CancellationException) {
+                throw cancelled
             } catch (_: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -113,8 +123,9 @@ class LogListViewModel @Inject constructor(
     }
 
     fun deleteEntry(entry: LogEntry) {
-        viewModelScope.launch {
+        runWrite {
             repository.deleteEntry(entry)
+            _uiState.value = _uiState.value.copy(deletedEntry = entry)
         }
     }
 
@@ -144,54 +155,44 @@ class LogListViewModel @Inject constructor(
         details: String?,
         editingEntry: LogEntry?
     ) {
+        if (_uiState.value.isSaving) return
+        val date = _uiState.value.date.toEpochDay()
+        _uiState.value = _uiState.value.copy(isSaving = true, saveError = null, saveCompleted = false)
         viewModelScope.launch {
-            val date = _uiState.value.date.toEpochDay()
-
-            // 1. Handle Editing Entry if it exists
-            if (editingEntry != null) {
-                val editingTypeValues = payload[editingEntry.type]
-                if (!editingTypeValues.isNullOrEmpty()) {
-                    // Update the existing entry with the first value from the list for this type
-                    repository.updateEntry(editingEntry.copy(
-                        type = editingEntry.type,
-                        value = editingTypeValues[0],
-                        time = time,
-                        details = details
-                    ))
-                    
-                    // Add any EXTRA values for this type as new entries
-                    for (i in 1 until editingTypeValues.size) {
-                        repository.addEntry(LogEntry(
-                            date = date,
-                            time = time,
-                            type = editingEntry.type,
-                            value = editingTypeValues[i],
-                            details = details
-                        ))
-                    }
-                } else {
-                    repository.deleteEntry(editingEntry)
-                }
+            try {
+                val entries = payload.flatMap { (type, values) -> values.map { value ->
+                    LogEntry(date = date, time = time, type = type, value = value, details = details)
+                } }
+                repository.saveEntries(date, entries, editingEntry)
+                _uiState.value = _uiState.value.copy(isSaving = false, saveCompleted = true)
+            } catch (cancelled: CancellationException) {
+                throw cancelled
+            } catch (error: Exception) {
+                _uiState.value = _uiState.value.copy(isSaving = false, saveError = error.message ?: "Unable to save. Your draft is still here.")
             }
+        }
+    }
 
-            // 2. Handle all other types (New Entries)
-            payload.forEach { (type, values) ->
-                // If we already handled this type for the editing entry, skip the first one (as it updated the entry)
-                // and we already added the rest.
-                if (editingEntry != null && type == editingEntry.type) {
-                    return@forEach
-                }
+    fun acknowledgeSave() {
+        _uiState.value = _uiState.value.copy(saveCompleted = false, saveError = null)
+    }
 
-                // Create new entries for everything else
-                values.forEach { value ->
-                    repository.addEntry(LogEntry(
-                        date = date,
-                        time = time,
-                        type = type,
-                        value = value,
-                        details = details
-                    ))
-                }
+    fun undoDelete() {
+        val entry = _uiState.value.deletedEntry ?: return
+        runWrite {
+            repository.restoreDeletedEntry(entry)
+            _uiState.value = _uiState.value.copy(deletedEntry = null)
+        }
+    }
+
+    fun clearUndo() { _uiState.value = _uiState.value.copy(deletedEntry = null) }
+
+    private fun runWrite(block: suspend () -> Unit) {
+        viewModelScope.launch {
+            try { block() }
+            catch (cancelled: CancellationException) { throw cancelled }
+            catch (error: Exception) {
+                _uiState.value = _uiState.value.copy(periodMessage = error.message ?: "Unable to save. Please try again.")
             }
         }
     }
@@ -201,7 +202,7 @@ class LogListViewModel @Inject constructor(
     }
 
     fun togglePeriod(isPeriodDay: Boolean) {
-        viewModelScope.launch {
+        runWrite {
             val date = _uiState.value.date
             val result = cycleRepository.setPeriodDay(date, isPeriodDay)
             val isPeriod = checkPeriodStatus(date)
@@ -223,20 +224,16 @@ class LogListViewModel @Inject constructor(
     fun addCustomSymptom(name: String, category: SymptomCategory) {
         val normalized = name.trim().replace(Regex("\\s+"), " ").take(50)
         if (normalized.isBlank()) return
-        viewModelScope.launch {
+        runWrite {
             symptomRepository.addCustomSymptom(normalized, category)
         }
     }
 
-    fun setMedicationTaken(medicationId: Int, taken: Boolean) {
-        val state = _uiState.value
-        if (state.medications.none { it.id == medicationId }) return
-        viewModelScope.launch {
-            medicationRepository.setMedicationTaken(
-                date = state.date.toEpochDay(),
-                medicationId = medicationId,
-                taken = taken
-            )
-        }
+    fun logDose(medicationId: Int, hour: Int, minute: Int) {
+        val date = _uiState.value.date
+        val timestamp = date.atTime(hour, minute).atZone(java.time.ZoneId.systemDefault()).toInstant().toEpochMilli()
+        runWrite { medicationRepository.logDose(date.toEpochDay(), medicationId, timestamp) }
     }
+
+    fun removeDose(id: Long) { runWrite { medicationRepository.removeDose(id) } }
 }

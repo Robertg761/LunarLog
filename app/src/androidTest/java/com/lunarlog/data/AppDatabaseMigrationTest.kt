@@ -130,6 +130,25 @@ class AppDatabaseMigrationTest {
         migrated.close()
     }
 
+    @Test
+    fun migrate8Through11_preservesHistoryAndAllowsMultipleDoseEvents() {
+        migrationHelper.createDatabase(TEST_DATABASE, 8).apply {
+            execSQL("INSERT INTO medications (id,name,dosage,frequency,startDate,endDate,reminderTime) VALUES (1,'Example','10 mg','daily',20000,NULL,480)")
+            execSQL("INSERT INTO medication_logs (id,date,medicationId,taken,timestamp) VALUES (1,20000,1,1,1000)")
+            execSQL("INSERT INTO cycles (id,startDate,endDate) VALUES (1,20000,20004)")
+            close()
+        }
+        val migrated = migrationHelper.runMigrationsAndValidate(TEST_DATABASE, 11, true,
+            AppDatabase.MIGRATION_8_9, AppDatabase.MIGRATION_9_10, AppDatabase.MIGRATION_10_11)
+        assertEquals(1, migrated.longQuery("SELECT dosesPerDay FROM medications WHERE id=1"))
+        assertEquals(0, migrated.longQuery("SELECT isArchived FROM medications WHERE id=1"))
+        assertEquals(0, migrated.longQuery("SELECT endEstimated FROM cycles WHERE id=1"))
+        migrated.execSQL("INSERT INTO medication_logs (date,medicationId,taken,timestamp) VALUES (20000,1,1,2000)")
+        assertEquals(2, migrated.longQuery("SELECT COUNT(*) FROM medication_logs"))
+        assertEquals(1000, migrated.longQuery("SELECT timestamp FROM medication_logs WHERE id=1"))
+        migrated.close()
+    }
+
     private fun SupportSQLiteDatabase.longQuery(sql: String): Long =
         query(sql).use { cursor ->
             check(cursor.moveToFirst()) { "Query returned no rows: $sql" }

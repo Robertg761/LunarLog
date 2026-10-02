@@ -59,6 +59,7 @@ class CycleRingWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Responsive(setOf(COMPACT, WIDE, LARGE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        if (widgetsRedacted(context)) { provideContent { RedactedWidget() }; return }
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             WidgetEntryPoint::class.java

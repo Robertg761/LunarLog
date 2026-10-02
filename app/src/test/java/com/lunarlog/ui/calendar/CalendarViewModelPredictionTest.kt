@@ -48,7 +48,7 @@ class CalendarViewModelPredictionTest {
         )
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForWindows(any(), any(), any(), any()) } returns flowOf(emptyList())
 
         val viewModel = CalendarViewModel(cycleRepository, dailyLogRepository)
         val state = viewModel.calendarState.first { it is CalendarDataState.Success } as CalendarDataState.Success

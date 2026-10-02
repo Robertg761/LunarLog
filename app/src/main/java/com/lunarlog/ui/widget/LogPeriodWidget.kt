@@ -56,6 +56,7 @@ class LogPeriodWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Responsive(setOf(COMPACT_SIZE, WIDE_SIZE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        if (widgetsRedacted(context)) { provideContent { RedactedWidget() }; return }
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             WidgetEntryPoint::class.java
@@ -197,6 +198,7 @@ class LogPeriodAction : ActionCallback {
         glanceId: GlanceId,
         parameters: androidx.glance.action.ActionParameters
     ) {
+        if (widgetsRedacted(context)) return
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             WidgetEntryPoint::class.java
@@ -207,7 +209,7 @@ class LogPeriodAction : ActionCallback {
 
         val today = LocalDate.now()
         val todayEpochDay = today.toEpochDay()
-        
+
         withContext(Dispatchers.IO) {
             val periodResult = cycleRepository.startPeriod(today)
             if (periodResult is PeriodChangeResult.Success &&
@@ -223,7 +225,7 @@ class LogPeriodAction : ActionCallback {
                 )
             }
         }
-        
+
         // Starting a period moves the cycle ring, the calendar marks and this counter all at once, so
         // refresh the whole set rather than just the widget that was tapped.
         WidgetRefresher.updateAll(context)

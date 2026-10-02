@@ -80,6 +80,7 @@ class CycleNotificationWorker @AssistedInject constructor(
         val notification = NotificationCompat.Builder(applicationContext, channelId)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle(title)
+            .setContentIntent(notificationDestination(applicationContext, "calendar"))
             .setContentText(message)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)

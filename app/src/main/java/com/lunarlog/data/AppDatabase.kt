@@ -19,7 +19,7 @@ import com.lunarlog.data.Converters
         MedicationLog::class,
         SymptomDefinition::class
     ],
-    version = 10,
+    version = 11,
     exportSchema = true
 )
 @TypeConverters(Converters::class)
@@ -31,6 +31,17 @@ abstract class AppDatabase : RoomDatabase() {
     abstract fun symptomDefinitionDao(): SymptomDefinitionDao
 
     companion object {
+        val MIGRATION_10_11 = object : Migration(10, 11) {
+            override fun migrate(db: SupportSQLiteDatabase) {
+                db.execSQL("ALTER TABLE medications ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+                db.execSQL("ALTER TABLE medications ADD COLUMN dosesPerDay INTEGER NOT NULL DEFAULT 1")
+                db.execSQL("ALTER TABLE medications ADD COLUMN reminderTimes TEXT NOT NULL DEFAULT '[]'")
+                db.execSQL("DROP INDEX index_medication_logs_date_medicationId")
+                db.execSQL("CREATE INDEX index_medication_logs_date_medicationId ON medication_logs(date, medicationId)")
+                db.execSQL("ALTER TABLE symptom_definitions ADD COLUMN isArchived INTEGER NOT NULL DEFAULT 0")
+            }
+        }
+
         val MIGRATION_9_10 = object : Migration(9, 10) {
             override fun migrate(db: SupportSQLiteDatabase) {
                 db.execSQL("ALTER TABLE `cycles` ADD COLUMN `endEstimated` INTEGER NOT NULL DEFAULT 0")
@@ -90,7 +101,7 @@ abstract class AppDatabase : RoomDatabase() {
                 // Drop and recreate FTS table
                 db.execSQL("DROP TABLE IF EXISTS daily_logs_fts")
                 db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS `daily_logs_fts` USING FTS4(`date` INTEGER NOT NULL, `notes` TEXT NOT NULL, content=`daily_logs`)")
-                
+
                 // Rebuild index
                 db.execSQL("INSERT INTO daily_logs_fts(daily_logs_fts) VALUES ('rebuild')")
             }
@@ -98,17 +109,17 @@ abstract class AppDatabase : RoomDatabase() {
 
         val MIGRATION_6_7 = object : Migration(6, 7) {
             override fun migrate(db: SupportSQLiteDatabase) {
-               // 1. Drop the incorrect triggers from MIGRATION_4_5 
+               // 1. Drop the incorrect triggers from MIGRATION_4_5
                db.execSQL("DROP TRIGGER IF EXISTS daily_logs_ai")
                db.execSQL("DROP TRIGGER IF EXISTS daily_logs_ad")
                db.execSQL("DROP TRIGGER IF EXISTS daily_logs_au")
-               
+
                // 2. Drop the FTS table
                db.execSQL("DROP TABLE IF EXISTS daily_logs_fts")
 
                // 3. Recreate FTS table
                db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS `daily_logs_fts` USING FTS4(`date` INTEGER NOT NULL, `notes` TEXT NOT NULL, content=`daily_logs`)")
-               
+
                // 4. Rebuild index
                db.execSQL("INSERT INTO daily_logs_fts(daily_logs_fts) VALUES ('rebuild')")
             }
@@ -119,11 +130,11 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `log_entries` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
-                        `date` INTEGER NOT NULL, 
-                        `time` INTEGER NOT NULL, 
-                        `type` TEXT NOT NULL, 
-                        `value` TEXT NOT NULL, 
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `date` INTEGER NOT NULL,
+                        `time` INTEGER NOT NULL,
+                        `type` TEXT NOT NULL,
+                        `value` TEXT NOT NULL,
                         `details` TEXT
                     )
                     """
@@ -137,10 +148,10 @@ abstract class AppDatabase : RoomDatabase() {
                 db.execSQL(
                     """
                     CREATE TABLE IF NOT EXISTS `symptom_definitions` (
-                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, 
-                        `name` TEXT NOT NULL, 
-                        `displayName` TEXT NOT NULL, 
-                        `category` TEXT NOT NULL, 
+                        `id` INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL,
+                        `name` TEXT NOT NULL,
+                        `displayName` TEXT NOT NULL,
+                        `category` TEXT NOT NULL,
                         `isCustom` INTEGER NOT NULL
                     )
                     """
@@ -153,7 +164,7 @@ abstract class AppDatabase : RoomDatabase() {
             override fun migrate(db: SupportSQLiteDatabase) {
                 // Create FTS table
                 db.execSQL("CREATE VIRTUAL TABLE IF NOT EXISTS `daily_logs_fts` USING FTS4(content=`daily_logs`, date, notes)")
-                
+
                 // Populate with existing data
                 db.execSQL("INSERT INTO daily_logs_fts(daily_logs_fts) VALUES ('rebuild')")
 
@@ -164,14 +175,14 @@ abstract class AppDatabase : RoomDatabase() {
                         INSERT INTO daily_logs_fts(docid, date, notes) VALUES(new.date, new.date, new.notes);
                     END
                 """)
-                
+
                 // Delete
                 db.execSQL("""
                     CREATE TRIGGER IF NOT EXISTS daily_logs_ad AFTER DELETE ON daily_logs BEGIN
                         INSERT INTO daily_logs_fts(daily_logs_fts, docid, date, notes) VALUES('delete', old.date, old.date, old.notes);
                     END
                 """)
-                
+
                 // Update
                 db.execSQL("""
                     CREATE TRIGGER IF NOT EXISTS daily_logs_au AFTER UPDATE ON daily_logs BEGIN

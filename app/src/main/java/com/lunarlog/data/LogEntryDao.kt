@@ -21,18 +21,24 @@ interface LogEntryDao {
     @Query("SELECT * FROM log_entries ORDER BY date ASC, time ASC")
     fun getAllEntries(): Flow<List<LogEntry>>
 
+    @Query("SELECT * FROM log_entries WHERE date BETWEEN :start AND :end ORDER BY date ASC, time ASC")
+    fun getEntriesForRange(start: Long, end: Long): Flow<List<LogEntry>>
+
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertEntry(entry: LogEntry): Long
 
     @Query("SELECT EXISTS(SELECT 1 FROM log_entries WHERE date = :date AND type = :type AND value = :value)")
     suspend fun entryExists(date: Long, type: LogEntryType, value: String): Boolean
 
+    @Query("SELECT * FROM log_entries WHERE id = :id")
+    suspend fun getEntryById(id: Long): LogEntry?
+
     @Update
     suspend fun updateEntry(entry: LogEntry)
 
     @Query("DELETE FROM log_entries WHERE id = :id")
     suspend fun deleteEntry(id: Long)
-    
+
     @Query("DELETE FROM log_entries WHERE date = :date")
     suspend fun deleteEntriesForDate(date: Long)
 

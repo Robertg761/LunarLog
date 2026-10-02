@@ -111,7 +111,7 @@ fun PeriodDetailScreen(
                             onDismissRequest = { showMenu = false }
                         ) {
                             DropdownMenuItem(
-                                text = { Text("Delete Period") },
+                                text = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_period_05944c)) },
                                 leadingIcon = { Icon(Icons.Default.Delete, null, tint = MaterialTheme.colorScheme.error) },
                                 onClick = {
                                     showMenu = false
@@ -161,7 +161,7 @@ fun PeriodDetailScreen(
                     ) {
                         Column(modifier = Modifier.padding(Spacing.cardPadding)) {
                             Text(
-                                "Duration",
+                                androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_duration_4fc52a),
                                 style = MaterialTheme.typography.labelMedium,
                                 color = MaterialTheme.colorScheme.onPrimaryContainer
                             )
@@ -191,7 +191,7 @@ fun PeriodDetailScreen(
                                 Spacer(Modifier.width(Spacing.md))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        "Start Date",
+                                        androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_start_date_4c52fa),
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
@@ -230,7 +230,7 @@ fun PeriodDetailScreen(
                                 Spacer(Modifier.width(Spacing.md))
                                 Column(modifier = Modifier.weight(1f)) {
                                     Text(
-                                        "End Date",
+                                        if (cycle.endEstimated) "End date (estimated — tap to confirm or correct)" else "End Date",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = MaterialTheme.colorScheme.onPrimaryContainer
                                     )
@@ -298,7 +298,7 @@ fun PeriodDetailScreen(
                         description = "It may have been deleted from another screen."
                     )
                     Button(onClick = onBack) {
-                        Text("Back")
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_back_76900f))
                     }
                 }
             }
@@ -309,8 +309,8 @@ fun PeriodDetailScreen(
     if (showDeleteDialog) {
         AlertDialog(
             onDismissRequest = { showDeleteDialog = false },
-            title = { Text("Delete Period?") },
-            text = { Text("This will permanently delete this period record. Daily logs will not be affected.") },
+            title = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_period_7297fd)) },
+            text = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_this_will_permanently_delete_this_period_record_daily_l_d9c747)) },
             confirmButton = {
                 TextButton(
                     onClick = {
@@ -318,12 +318,12 @@ fun PeriodDetailScreen(
                         viewModel.deleteCycle()
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_e2d0a5), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDeleteDialog = false }) {
-                    Text("Cancel")
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e))
                 }
             }
         )
@@ -411,12 +411,12 @@ private fun CycleDatePickerDialog(
                 },
                 enabled = datePickerState.selectedDateMillis != null
             ) {
-                Text("OK")
+                Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_ok_565339))
             }
         },
         dismissButton = {
             TextButton(onClick = onDismiss) {
-                Text("Cancel")
+                Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e))
             }
         }
     ) {
@@ -464,7 +464,7 @@ private fun DailyLogCard(
             }
         } else {
             Text(
-                text = "No details logged",
+                text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_no_details_logged_4bb75c),
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

@@ -41,15 +41,15 @@ class MedicationReminderWorker @AssistedInject constructor(
         if (!isStale) {
             val zoneId = ZoneId.systemDefault()
             val scheduledDate = scheduledInstant.atZone(zoneId).toLocalDate()
-            val takenMedicationIds = medicationRepository
+            val takenCounts = medicationRepository
                 .getLogsForDateSync(scheduledDate.toEpochDay())
                 .filter { it.taken }
-                .mapTo(mutableSetOf()) { it.medicationId }
+                .groupingBy { it.medicationId }.eachCount()
 
             medicationRepository.getAllMedicationsSync()
                 .filter { medication ->
                     medication.id in medicationIds &&
-                        medication.id !in takenMedicationIds &&
+                        MedicationScheduler.needsReminder(medication, takenCounts[medication.id] ?: 0, scheduledInstant.atZone(zoneId).toLocalTime().toSecondOfDay() / 60L) &&
                         MedicationScheduler.isMedicationDueToday(medication, scheduledDate)
                 }
                 .forEach(::sendNotification)
@@ -57,7 +57,7 @@ class MedicationReminderWorker @AssistedInject constructor(
 
         NotificationWorkScheduler.scheduleMedicationReminders(applicationContext)
         Result.success()
-    }.getOrElse { Result.retry() }
+    }.getOrElse { if (it is kotlinx.coroutines.CancellationException) throw it; Result.retry() }
 
     private fun sendNotification(medication: com.lunarlog.data.Medication) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
@@ -87,6 +87,7 @@ class MedicationReminderWorker @AssistedInject constructor(
         val notification = NotificationCompat.Builder(applicationContext, CHANNEL_ID)
             .setSmallIcon(R.drawable.ic_launcher_foreground)
             .setContentTitle("Medication reminder")
+            .setContentIntent(notificationDestination(applicationContext, "details/${java.time.LocalDate.now().toEpochDay()}"))
             .setContentText(privateText)
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_DEFAULT)

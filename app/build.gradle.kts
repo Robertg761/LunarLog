@@ -104,6 +104,10 @@ ksp {
 }
 
 dependencies {
+    // Room's migration helpers require 1.8.1. Keep the app and test APK runtimes
+    // aligned: AGP otherwise pins tests to Navigation's older transitive runtime.
+    implementation(platform(libs.kotlinx.serialization.bom))
+
     // Core Android
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.appcompat)

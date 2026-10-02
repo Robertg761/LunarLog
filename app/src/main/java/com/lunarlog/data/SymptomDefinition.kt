@@ -20,5 +20,6 @@ data class SymptomDefinition(
     val name: String, // The internal key/name used in DailyLog (e.g., "Headache")
     val displayName: String, // Display name (can be localized later, currently same as name)
     val category: SymptomCategory,
-    val isCustom: Boolean = false
+    val isCustom: Boolean = false,
+    @androidx.room.ColumnInfo(defaultValue = "0") val isArchived: Boolean = false
 )

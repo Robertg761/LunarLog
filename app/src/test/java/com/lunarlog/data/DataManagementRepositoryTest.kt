@@ -43,8 +43,25 @@ class DataManagementRepositoryTest {
     }
 
     @Test
+    fun `invalid granular values and oversized backups are rejected before replacement`() = runTest {
+        for (value in listOf("999", "NaN", "-1")) {
+            val payload = com.lunarlog.data.backup.BackupPayloadV2(exportedAtMillis = 0,
+                data = com.lunarlog.data.backup.BackupDataV2(logEntries = listOf(
+                    com.lunarlog.data.backup.LogEntryDto(dateEpochDay = 20000, timeEpochMillis = 1, type = "FLOW", value = value))))
+            try { repository.restoreFromJson(com.google.gson.Gson().toJson(payload)); org.junit.Assert.fail("Invalid entry accepted") }
+            catch (_: IllegalArgumentException) { }
+        }
+        try { repository.restoreFromJson(" ".repeat(LogValidation.MAX_BACKUP_BYTES + 1)); org.junit.Assert.fail("Oversized backup accepted") }
+        catch (_: IllegalArgumentException) { }
+        coVerify(exactly = 0) { appDatabase.clearAllTables() }
+    }
+
+    @Test
     fun `nukeData calls clearAllTables`() = runTest {
+        val block = slot<suspend () -> Unit>()
+        coEvery { appDatabase.withTransaction(capture(block)) } coAnswers { block.captured.invoke() }
         repository.nukeData()
+        coVerify { symptomDao.insertAll(SymptomData.defaultSymptoms) }
         coVerify { appDatabase.clearAllTables() }
     }
 

@@ -172,6 +172,7 @@ fun LunarLogNavGraph(
     pendingDeepLink: String? = null,
     onDeepLinkHandled: (Boolean) -> Unit = {},
     onInstallUpdate: () -> Unit = {},
+    onCheckUpdates: () -> Unit = {},
     snackbarHostState: SnackbarHostState = remember { SnackbarHostState() }
 ) {
     val navController = rememberNavController()
@@ -320,7 +321,8 @@ fun LunarLogNavGraph(
                     SettingsScreen(
                         onBack = { navController.popBackStack() },
                         isUpdateAvailable = isUpdateAvailable,
-                        onInstallUpdate = onInstallUpdate
+                        onInstallUpdate = onInstallUpdate,
+                        onCheckUpdates = onCheckUpdates
                     )
                 }
                 composable(Screen.LogHistory.route) {

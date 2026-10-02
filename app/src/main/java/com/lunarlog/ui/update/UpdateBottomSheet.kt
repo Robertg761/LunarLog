@@ -152,7 +152,7 @@ fun UpdateBottomSheet(
                 .padding(bottom = Spacing.sheetHorizontal)
         ) {
             Text(
-                text = "Update LunarLog",
+                text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_update_lunarlog_cad03b),
                 style = MaterialTheme.typography.titleLarge
             )
             Spacer(modifier = Modifier.height(Spacing.sm))
@@ -171,7 +171,7 @@ fun UpdateBottomSheet(
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    Text("What's new", style = MaterialTheme.typography.titleMedium)
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_what_s_new_135e91), style = MaterialTheme.typography.titleMedium)
                     OutlinedButton(onClick = { notesExpanded = !notesExpanded }) {
                         Text(if (notesExpanded) "Hide" else "Show")
                     }
@@ -190,7 +190,7 @@ fun UpdateBottomSheet(
             when (stage) {
                 UpdateStage.Available -> {
                     Text(
-                        text = "Android will show an install prompt. This update is downloaded directly from LunarLog's releases.",
+                        text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_android_will_show_an_install_prompt_this_update_is_down_d6658c),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -199,16 +199,16 @@ fun UpdateBottomSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        OutlinedButton(onClick = onDismiss) { Text("Not now") }
+                        OutlinedButton(onClick = onDismiss) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_not_now_a0e63d)) }
                         Spacer(modifier = Modifier.width(Spacing.md))
                         Button(onClick = {
                             errorText = null
                             progress = null
                             progressText = null
-                            apkUpdateManager.startDownload(context, info)
-                            stage = UpdateStage.Downloading
+                            try { apkUpdateManager.startDownload(context, info); stage = UpdateStage.Downloading }
+                            catch (e: Exception) { errorText = "Unable to start download: ${e.message}"; stage = UpdateStage.Error }
                         }) {
-                            Text("Download")
+                            Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_download_d6eafe))
                         }
                     }
                 }
@@ -229,18 +229,21 @@ fun UpdateBottomSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        OutlinedButton(onClick = onDismiss) { Text("Close") }
+                        OutlinedButton(onClick = {
+                            apkUpdateManager.clearDownloadedState(context, deleteApk = true)
+                            stage = UpdateStage.Available; progress = null; progressText = null
+                        }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_download_de5b23)) }
                     }
                 }
 
                 UpdateStage.PermissionRequired -> {
                     Text(
-                        text = "To install this update, Android needs you to allow installs from LunarLog one time.",
+                        text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_to_install_this_update_android_needs_you_to_allow_insta_1887c3),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(Spacing.sm))
                     Text(
-                        text = "Tap \"Open settings\", enable \"Allow from this source\", then come back here to install.",
+                        text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_tap_open_settings_enable_allow_from_this_source_then_co_605ff5),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -249,19 +252,19 @@ fun UpdateBottomSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        OutlinedButton(onClick = onDismiss) { Text("Later") }
+                        OutlinedButton(onClick = onDismiss) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_later_73b6e4)) }
                         Spacer(modifier = Modifier.width(Spacing.md))
                         Button(onClick = {
-                            context.startActivity(apkUpdateManager.buildUnknownSourcesSettingsIntent(context))
+                            try { context.startActivity(apkUpdateManager.buildUnknownSourcesSettingsIntent(context)) } catch (e: Exception) { errorText = "Unable to open install settings"; stage = UpdateStage.Error }
                         }) {
-                            Text("Open settings")
+                            Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_open_settings_ca381c))
                         }
                     }
                 }
 
                 UpdateStage.ReadyToInstall -> {
                     Text(
-                        text = "Ready to install. Android will show an install prompt.",
+                        text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_ready_to_install_android_will_show_an_install_prompt_444678),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Spacer(modifier = Modifier.height(Spacing.md))
@@ -269,7 +272,7 @@ fun UpdateBottomSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        OutlinedButton(onClick = onDismiss) { Text("Close") }
+                        OutlinedButton(onClick = onDismiss) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_close_7d9eb7)) }
                         Spacer(modifier = Modifier.width(Spacing.md))
                         Button(onClick = {
                             if (apkUpdateManager.needsUnknownSourcesPermission(context)) {
@@ -282,9 +285,9 @@ fun UpdateBottomSheet(
                                 stage = UpdateStage.Error
                                 return@Button
                             }
-                            context.startActivity(intent)
+                            try { context.startActivity(intent) } catch (e: Exception) { errorText = "Unable to open installer: ${e.message}"; stage = UpdateStage.Error }
                         }) {
-                            Text("Install")
+                            Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_install_569ca4))
                         }
                     }
                 }
@@ -300,16 +303,16 @@ fun UpdateBottomSheet(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.End
                     ) {
-                        OutlinedButton(onClick = onDismiss) { Text("Close") }
+                        OutlinedButton(onClick = onDismiss) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_close_7d9eb7)) }
                         Spacer(modifier = Modifier.width(Spacing.md))
                         Button(onClick = {
                             errorText = null
                             progress = null
                             progressText = null
-                            apkUpdateManager.startDownload(context, info)
-                            stage = UpdateStage.Downloading
+                            try { apkUpdateManager.startDownload(context, info); stage = UpdateStage.Downloading }
+                            catch (e: Exception) { errorText = "Unable to start download: ${e.message}"; stage = UpdateStage.Error }
                         }) {
-                            Text("Try again")
+                            Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_try_again_d8b839))
                         }
                     }
                 }

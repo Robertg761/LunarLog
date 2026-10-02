@@ -52,7 +52,7 @@ fun QuickLogContent(
         horizontalAlignment = Alignment.Start
     ) {
         Text(
-            text = "Quick Log",
+            text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_quick_log_b4d2ff),
             style = MaterialTheme.typography.headlineSmall,
             color = MaterialTheme.colorScheme.onSurface
         )
@@ -105,7 +105,7 @@ fun QuickLogContent(
 
         if (quickSymptoms.isNotEmpty()) {
             Text(
-                text = "Often logged now:",
+                text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_often_logged_now_0479e0),
                 style = MaterialTheme.typography.labelLarge,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
@@ -145,7 +145,7 @@ fun QuickLogContent(
                 modifier = Modifier.size(ButtonIconSize)
             )
             Spacer(modifier = Modifier.width(Spacing.sm))
-            Text("Add More Details")
+            Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_add_more_details_1a3b35))
         }
     }
 }

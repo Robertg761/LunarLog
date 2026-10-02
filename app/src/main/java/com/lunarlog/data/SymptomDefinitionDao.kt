@@ -11,6 +11,16 @@ interface SymptomDefinitionDao {
     @Query("SELECT * FROM symptom_definitions ORDER BY category, displayName")
     fun getAllSymptoms(): Flow<List<SymptomDefinition>>
 
+    @Query("SELECT * FROM symptom_definitions WHERE isArchived = 0 ORDER BY category, displayName")
+    fun getActiveSymptoms(): Flow<List<SymptomDefinition>>
+
+    @Query("UPDATE symptom_definitions SET displayName = :label WHERE id = :id AND isCustom = 1")
+    suspend fun renameCustom(id: Long, label: String)
+
+    @Query("UPDATE symptom_definitions SET isArchived = :archived WHERE id = :id AND isCustom = 1")
+    suspend fun archiveCustom(id: Long, archived: Boolean)
+
+
     @Query("SELECT * FROM symptom_definitions ORDER BY category, displayName")
     suspend fun getAllSymptomsSync(): List<SymptomDefinition>
 

@@ -69,13 +69,14 @@ object WidgetCalendarBuilder {
     fun build(
         cycles: List<Cycle>,
         yearMonth: YearMonth,
-        today: LocalDate = LocalDate.now()
+        today: LocalDate = LocalDate.now(),
+        firstWeekday: java.time.DayOfWeek = java.time.DayOfWeek.SUNDAY
     ): WidgetCalendarMonth {
         val firstOfMonth = yearMonth.atDay(1)
 
         // `dayOfWeek.value` is Monday=1..Sunday=7, so `% 7` maps Sunday to 0 — a Sunday-first grid,
         // matching CalendarScreen.
-        val startOffset = firstOfMonth.dayOfWeek.value % DAYS_PER_WEEK
+        val startOffset = (firstOfMonth.dayOfWeek.value - firstWeekday.value + DAYS_PER_WEEK) % DAYS_PER_WEEK
         val weekCount = ceilDiv(startOffset + yearMonth.lengthOfMonth(), DAYS_PER_WEEK)
         val windowStart = firstOfMonth.minusDays(startOffset.toLong())
         val windowEnd = windowStart.plusDays((weekCount * DAYS_PER_WEEK - 1).toLong())

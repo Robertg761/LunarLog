@@ -59,6 +59,7 @@ class PeriodDetailViewModel @Inject constructor(
                         errorMessage = "Period not found"
                     )
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isLoading = false,
@@ -71,13 +72,13 @@ class PeriodDetailViewModel @Inject constructor(
     fun updateStartDate(date: LocalDate) {
         val cycle = _uiState.value.cycle ?: return
         val endDate = cycle.endDate
-        
+
         // Validate: startDate must be before or equal to endDate
         if (endDate != null && date.isAfter(endDate)) {
             _uiState.value = _uiState.value.copy(errorMessage = "Start date cannot be after end date")
             return
         }
-        
+
         _uiState.value = _uiState.value.copy(isSaving = true)
         viewModelScope.launch {
             try {
@@ -89,7 +90,7 @@ class PeriodDetailViewModel @Inject constructor(
                     )
                     return@launch
                 }
-                val updatedCycle = cycle.copy(startDate = date)
+                val updatedCycle = cycle.copy(startDate = date, endEstimated = false)
                 // Reload logs for new date range
                 val logs = dailyLogRepository.getLogsForRangeSync(date, endDate ?: LocalDate.now())
                 _uiState.value = _uiState.value.copy(
@@ -97,6 +98,7 @@ class PeriodDetailViewModel @Inject constructor(
                     dailyLogs = logs,
                     isSaving = false
                 )
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
@@ -108,13 +110,13 @@ class PeriodDetailViewModel @Inject constructor(
 
     fun updateEndDate(date: LocalDate?) {
         val cycle = _uiState.value.cycle ?: return
-        
+
         // Validate: endDate must be after or equal to startDate
         if (date != null && date.isBefore(cycle.startDate)) {
             _uiState.value = _uiState.value.copy(errorMessage = "End date cannot be before start date")
             return
         }
-        
+
         _uiState.value = _uiState.value.copy(isSaving = true)
         viewModelScope.launch {
             try {
@@ -126,7 +128,7 @@ class PeriodDetailViewModel @Inject constructor(
                     )
                     return@launch
                 }
-                val updatedCycle = cycle.copy(endDate = date)
+                val updatedCycle = cycle.copy(endDate = date, endEstimated = false)
                 // Reload logs for new date range
                 val logs = dailyLogRepository.getLogsForRangeSync(cycle.startDate, date ?: LocalDate.now())
                 _uiState.value = _uiState.value.copy(
@@ -134,6 +136,7 @@ class PeriodDetailViewModel @Inject constructor(
                     dailyLogs = logs,
                     isSaving = false
                 )
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,
@@ -150,6 +153,7 @@ class PeriodDetailViewModel @Inject constructor(
             try {
                 cycleRepository.deleteCycle(cycle)
                 _uiState.value = _uiState.value.copy(isDeleted = true, isSaving = false)
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 _uiState.value = _uiState.value.copy(
                     isSaving = false,

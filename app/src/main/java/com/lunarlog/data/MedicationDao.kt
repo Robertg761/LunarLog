@@ -24,6 +24,12 @@ interface MedicationDao {
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun insertMedication(medication: Medication)
 
+    @androidx.room.Update
+    suspend fun updateMedication(medication: Medication)
+
+    @Query("UPDATE medications SET isArchived = :archived WHERE id = :id")
+    suspend fun setArchived(id: Int, archived: Boolean)
+
     @Query("DELETE FROM medications WHERE id = :id")
     suspend fun deleteMedication(id: Int)
 
@@ -36,11 +42,17 @@ interface MedicationDao {
     @Query("SELECT * FROM medication_logs WHERE date = :date AND medicationId = :medicationId LIMIT 1")
     suspend fun getLogForMedicationOnDate(date: Long, medicationId: Int): MedicationLog?
 
+    @Query("SELECT * FROM medication_logs WHERE date BETWEEN :start AND :end ORDER BY date ASC, timestamp ASC")
+    suspend fun getLogsForRangeSync(start: Long, end: Long): List<MedicationLog>
+
     @Query("SELECT * FROM medication_logs ORDER BY date ASC, timestamp ASC")
     suspend fun getAllMedicationLogsSync(): List<MedicationLog>
 
     @Insert(onConflict = OnConflictStrategy.REPLACE)
     suspend fun logMedication(log: MedicationLog)
+
+    @Query("DELETE FROM medication_logs WHERE id = :id")
+    suspend fun deleteDose(id: Long)
 
     @Query("DELETE FROM medication_logs WHERE date = :date AND medicationId = :medicationId")
     suspend fun deleteMedicationLog(date: Long, medicationId: Int)

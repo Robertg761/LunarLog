@@ -61,6 +61,7 @@ class CycleCalendarWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Responsive(setOf(MEDIUM, LARGE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        if (widgetsRedacted(context)) { provideContent { RedactedWidget() }; return }
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             WidgetEntryPoint::class.java
@@ -71,7 +72,7 @@ class CycleCalendarWidget : GlanceAppWidget() {
         }
 
         val today = LocalDate.now()
-        val month = WidgetCalendarBuilder.build(cycles, YearMonth.from(today), today)
+        val month = WidgetCalendarBuilder.build(cycles, YearMonth.from(today), today, java.time.temporal.WeekFields.of(Locale.getDefault()).firstDayOfWeek)
 
         provideContent { CalendarContent(month) }
     }
@@ -118,7 +119,7 @@ class CycleCalendarWidget : GlanceAppWidget() {
         Row(modifier = GlanceModifier.fillMaxWidth()) {
             // Sunday-first, matching CalendarScreen's `dayOfWeek.value % 7` offset.
             (0 until DAYS_PER_WEEK).forEach { index ->
-                val label = DayOfWeek.SUNDAY.plus(index.toLong())
+                val label = java.time.temporal.WeekFields.of(locale).firstDayOfWeek.plus(index.toLong())
                     .getDisplayName(java.time.format.TextStyle.NARROW, locale)
                 Text(
                     text = label,

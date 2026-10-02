@@ -33,3 +33,7 @@ fun mucusLabel(level: Int): String = when (level) {
     4 -> "Egg White"
     else -> "None/Dry"
 }
+
+/** Existing records encode their scale by the non-overlapping plausible ranges. Preserve that scale. */
+fun formatTemperature(value: Float): String =
+    String.format(java.util.Locale.getDefault(), "%.2f %s", value, if (value >= 90f) "°F" else "°C")

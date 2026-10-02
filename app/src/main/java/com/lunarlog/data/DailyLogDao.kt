@@ -21,7 +21,7 @@ interface DailyLogDao {
 
     @Query("DELETE FROM daily_logs WHERE date = :date")
     suspend fun deleteLog(date: LocalDate)
-    
+
     @Query("SELECT * FROM daily_logs WHERE date BETWEEN :startDate AND :endDate")
     fun getLogsForRange(startDate: LocalDate, endDate: LocalDate): Flow<List<DailyLog>>
 
@@ -40,12 +40,15 @@ interface DailyLogDao {
     """)
     suspend fun getLogsWithoutEntriesSync(): List<DailyLog>
 
+    @Query("SELECT * FROM daily_logs WHERE date BETWEEN :start AND :end OR date BETWEEN :otherStart AND :otherEnd")
+    fun getLogsForWindows(start: LocalDate, end: LocalDate, otherStart: LocalDate, otherEnd: LocalDate): Flow<List<DailyLog>>
+
     @Query("SELECT * FROM daily_logs ORDER BY date DESC")
     fun getAllLogs(): Flow<List<DailyLog>>
 
     @Query("""
-        SELECT daily_logs.* FROM daily_logs 
-        JOIN daily_logs_fts ON daily_logs.date = daily_logs_fts.docid 
+        SELECT daily_logs.* FROM daily_logs
+        JOIN daily_logs_fts ON daily_logs.date = daily_logs_fts.docid
         WHERE daily_logs_fts MATCH :query
         ORDER BY daily_logs.date DESC
     """)
@@ -54,8 +57,8 @@ interface DailyLogDao {
     @Query("""
         SELECT DISTINCT daily_logs.* FROM daily_logs
         INNER JOIN log_entries ON log_entries.date = daily_logs.date
-        WHERE log_entries.type = 'SYMPTOM' AND log_entries.value = :symptom
+        WHERE log_entries.type = :type AND log_entries.value = :symptom
         ORDER BY daily_logs.date DESC
     """)
-    fun searchLogsBySymptom(symptom: String): Flow<List<DailyLog>>
+    fun searchLogsBySymptom(symptom: String, type: LogEntryType = LogEntryType.SYMPTOM): Flow<List<DailyLog>>
 }

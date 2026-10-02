@@ -33,11 +33,18 @@ class SettingsViewModel @Inject constructor(
     private val userPreferencesRepository: UserPreferencesRepository,
     private val dataManagementRepository: DataManagementRepository,
     private val medicationRepository: MedicationRepository,
+    private val symptomRepository: com.lunarlog.data.SymptomRepository,
     @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private companion object {
-        const val MAX_BACKUP_BYTES = 10 * 1024 * 1024
+        const val MAX_BACKUP_BYTES = com.lunarlog.data.LogValidation.MAX_BACKUP_BYTES
+    }
+
+    val redactWidgets = userPreferencesRepository.redactWidgets.stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
+    fun setRedactWidgets(value: Boolean) = launchSafely {
+        userPreferencesRepository.setRedactWidgets(value)
+        com.lunarlog.ui.widget.WidgetRefresher.updateAll(context)
     }
 
     val appLockMode = userPreferencesRepository.appLockMode
@@ -52,7 +59,7 @@ class SettingsViewModel @Inject constructor(
 
     val cycleNotificationEnabled = userPreferencesRepository.cycleNotificationEnabled
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), false)
-        
+
     val themeSeedColor = userPreferencesRepository.themeSeedColor
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), null)
 
@@ -90,7 +97,7 @@ class SettingsViewModel @Inject constructor(
     val message = _message
 
     fun toggleAppLock(enabled: Boolean) {
-        viewModelScope.launch {
+        launchSafely {
             userPreferencesRepository.setAppLockMode(
                 if (enabled) AppLockMode.BIOMETRIC_REQUIRED else AppLockMode.NONE
             )
@@ -98,19 +105,19 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setAppLockTimeoutSeconds(seconds: Long) {
-        viewModelScope.launch {
+        launchSafely {
             userPreferencesRepository.setAppLockTimeoutSeconds(seconds)
         }
     }
-    
+
     fun setThemeSeedColor(color: Long) {
-        viewModelScope.launch {
+        launchSafely {
             userPreferencesRepository.setThemeSeedColor(color)
         }
     }
 
     fun setPeriodReminderEnabled(enabled: Boolean) {
-        viewModelScope.launch {
+        launchSafely {
             userPreferencesRepository.setPeriodLogReminderEnabled(enabled)
             if (enabled) {
                 val minutes = try {
@@ -126,7 +133,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setCycleNotificationEnabled(enabled: Boolean) {
-        viewModelScope.launch {
+        launchSafely {
             userPreferencesRepository.setCycleNotificationEnabled(enabled)
             if (enabled) {
                 NotificationWorkScheduler.scheduleCycleNotifications(context)
@@ -137,7 +144,7 @@ class SettingsViewModel @Inject constructor(
     }
 
     fun setPeriodReminderTimeMinutes(minutes: Long) {
-        viewModelScope.launch {
+        launchSafely {
             userPreferencesRepository.setPeriodLogReminderTimeMinutes(minutes)
             val enabled = try {
                 userPreferencesRepository.getPeriodLogReminderEnabledSync()
@@ -151,51 +158,55 @@ class SettingsViewModel @Inject constructor(
         }
     }
 
-    fun addMedication(
-        name: String,
-        dosage: String,
-        frequency: String,
-        reminderTimeMinutes: Long?
-    ) {
-        val normalizedName = name.trim().replace(Regex("\\s+"), " ").take(80)
-        val normalizedDosage = dosage.trim().replace(Regex("\\s+"), " ").take(80)
-        if (normalizedName.isBlank()) {
-            _message.value = "Medication name is required."
-            return
-        }
-        if (frequency !in setOf("daily", "weekly", "as_needed")) {
-            _message.value = "Medication frequency is invalid."
-            return
-        }
-        if (reminderTimeMinutes != null && reminderTimeMinutes !in 0L..1439L) {
-            _message.value = "Medication reminder time is invalid."
-            return
-        }
+    val managedSymptoms = symptomRepository.getManagedSymptoms()
+        .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
+    private val _medicationSaving = MutableStateFlow(false)
+    val medicationSaving = _medicationSaving.asStateFlow()
+    private val _medicationSaved = MutableStateFlow(false)
+    val medicationSaved = _medicationSaved.asStateFlow()
+    private val _medicationError = MutableStateFlow<String?>(null)
+    val medicationError = _medicationError.asStateFlow()
+    fun resetMedicationSave() { _medicationSaved.value = false; _medicationError.value = null }
 
+    fun saveMedication(medication: Medication) {
+        if (_medicationSaving.value) return
+        _medicationSaving.value = true
+        _medicationError.value = null
         viewModelScope.launch {
-            medicationRepository.addMedication(
-                Medication(
-                    name = normalizedName,
-                    dosage = normalizedDosage,
-                    frequency = frequency,
-                    startDate = LocalDate.now().toEpochDay(),
-                    reminderTime = reminderTimeMinutes.takeUnless { frequency == "as_needed" }
-                )
-            )
-            NotificationWorkScheduler.scheduleMedicationReminders(context)
-            _message.value = "Medication added."
+            try {
+                medicationRepository.addMedication(medication)
+                NotificationWorkScheduler.scheduleMedicationReminders(context)
+                _medicationSaved.value = true
+            } catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+            catch (error: Exception) { _medicationError.value = error.message ?: "Unable to save medication" }
+            finally { _medicationSaving.value = false }
         }
     }
 
-    fun deleteMedication(id: Int) {
-        viewModelScope.launch {
-            medicationRepository.deleteMedication(id)
-            NotificationWorkScheduler.scheduleMedicationReminders(context)
-            _message.value = "Medication deleted."
-        }
+    fun setMedicationArchived(medication: Medication, archived: Boolean) = launchSafely {
+        medicationRepository.setArchived(medication.id, archived)
+        NotificationWorkScheduler.scheduleMedicationReminders(context)
+        _message.value = if (archived) "Medication archived. Dose history kept." else "Medication resumed."
+    }
+
+    fun deleteMedication(id: Int) = launchSafely {
+        medicationRepository.deleteMedication(id)
+        NotificationWorkScheduler.scheduleMedicationReminders(context)
+        _message.value = "Medication deleted."
+    }
+
+    fun renameSymptom(id: Long, label: String) = launchSafely { symptomRepository.renameCustom(id, label) }
+    fun archiveSymptom(id: Long, archived: Boolean) = launchSafely { symptomRepository.archiveCustom(id, archived) }
+
+    private fun launchSafely(block: suspend () -> Unit) = viewModelScope.launch {
+        try { block() }
+        catch (cancelled: kotlinx.coroutines.CancellationException) { throw cancelled }
+        catch (error: Exception) { _message.value = error.message ?: "Unable to save. Please try again." }
     }
 
     fun exportData(uri: Uri) {
+        if (_isRestoring.value) return
+        _isRestoring.value = true
         viewModelScope.launch {
             try {
                 val json = dataManagementRepository.createBackupJson()
@@ -205,15 +216,24 @@ class SettingsViewModel @Inject constructor(
                     outputStream.use { it.write(json.toByteArray(StandardCharsets.UTF_8)) }
                 }
                 _message.value = "Backup saved successfully."
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 _message.value = "Backup failed: ${e.localizedMessage}"
-            }
+            } finally { _isRestoring.value = false }
         }
     }
 
+    val restorePreview = MutableStateFlow<String?>(null)
+    private var pendingRestore: String? = null
+    private val recoveryFile get() = java.io.File(context.noBackupFilesDir, "pre-restore.json")
+    val hasRecoveryBackup = MutableStateFlow(recoveryFile.exists())
+
+    fun cancelRestore() { pendingRestore = null; restorePreview.value = null }
+
     fun importData(uri: Uri) {
+        if (_isRestoring.value) return
+        _isRestoring.value = true
         viewModelScope.launch {
-            _isRestoring.value = true
             try {
                 val jsonString = withContext(Dispatchers.IO) {
                     val declaredLength = context.contentResolver
@@ -241,27 +261,66 @@ class SettingsViewModel @Inject constructor(
                         output.toString(StandardCharsets.UTF_8.name())
                     }
                 }
-                dataManagementRepository.restoreFromJson(jsonString)
+                restorePreview.value = dataManagementRepository.previewBackup(jsonString)
+                pendingRestore = jsonString
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { _message.value = "Cannot restore: ${e.localizedMessage}" }
+            finally { _isRestoring.value = false }
+        }
+    }
+
+    fun confirmRestore() {
+        if (_isRestoring.value) return
+        val json = pendingRestore ?: return
+        _isRestoring.value = true
+        viewModelScope.launch {
+            try {
+                val previous = dataManagementRepository.createBackupJson()
+                withContext(Dispatchers.IO) {
+                    val atomic = android.util.AtomicFile(recoveryFile)
+                    val stream = atomic.startWrite()
+                    try { stream.write(previous.toByteArray(Charsets.UTF_8)); atomic.finishWrite(stream) }
+                    catch (error: Exception) { atomic.failWrite(stream); throw error }
+                }
+                hasRecoveryBackup.value = true
+                dataManagementRepository.restoreFromJson(json)
                 restoreNotificationSchedules()
-                _message.value = "Data restored successfully."
-            } catch (e: Exception) {
-                _message.value = "Restore failed: ${e.localizedMessage}"
-            } finally {
-                _isRestoring.value = false
+                cancelRestore()
+                _message.value = "Data restored. The previous data is available in the recovery backup."
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e }
+            catch (e: Exception) { _message.value = "Restore failed: ${e.localizedMessage}" }
+            finally { _isRestoring.value = false }
+        }
+    }
+
+    fun exportRecovery(uri: Uri) {
+        launchSafely {
+            withContext(Dispatchers.IO) {
+                val output = context.contentResolver.openOutputStream(uri) ?: error("Destination cannot be opened")
+                output.use { recoveryFile.inputStream().use { input -> input.copyTo(it) } }
             }
+            _message.value = "Recovery backup saved. You can restore this file using Restore backup."
         }
     }
 
     fun nukeData() {
+        if (_isRestoring.value) return
+        _isRestoring.value = true
         viewModelScope.launch {
             try {
                 dataManagementRepository.nukeData()
+                withContext(Dispatchers.IO) { android.util.AtomicFile(recoveryFile).delete() }
+                hasRecoveryBackup.value = false
                 userPreferencesRepository.clearAll()
                 NotificationWorkScheduler.cancelMedicationReminders(context)
+                NotificationWorkScheduler.cancelCycleNotifications(context)
+                NotificationWorkScheduler.cancelPeriodLogReminders(context)
+                (context.getSystemService(Context.NOTIFICATION_SERVICE) as android.app.NotificationManager).cancelAll()
                 _message.value = "All data cleared."
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (e: Exception) {
                 _message.value = "Failed to clear data: ${e.localizedMessage}"
-            }
+            } finally { _isRestoring.value = false }
         }
     }
 

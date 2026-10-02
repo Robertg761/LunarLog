@@ -12,6 +12,9 @@ import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
+import androidx.activity.compose.BackHandler
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -113,19 +116,21 @@ private val addEntryTypeOrder = listOf(LogEntryType.FLOW) +
 fun AddEntrySheet(
     date: LocalDate,
     initialEntry: LogEntry? = null,
+    isSaving: Boolean = false,
+    saveError: String? = null,
     symptomDefinitions: List<SymptomDefinition> = emptyList(),
     onAddCustomSymptom: (String, SymptomCategory) -> Unit = { _, _ -> },
     onDismiss: () -> Unit,
     onSave: (Map<LogEntryType, List<String>>, Long, String?) -> Unit
 ) {
     // Current active tab
-    var selectedType by remember { mutableStateOf(initialEntry?.type ?: LogEntryType.FLOW) }
+    var selectedType by rememberSaveable { mutableStateOf(initialEntry?.type ?: LogEntryType.FLOW) }
     var customCategory by remember { mutableStateOf<SymptomCategory?>(null) }
     var customName by remember { mutableStateOf("") }
-    
+
     // Shared Details/Time
-    var details by remember { mutableStateOf(initialEntry?.details ?: "") }
-    var time by remember { 
+    var details by rememberSaveable { mutableStateOf(initialEntry?.details ?: "") }
+    var time by rememberSaveable(stateSaver = listSaver<LocalTime, Int>(save = { listOf(it.hour, it.minute, it.second) }, restore = { LocalTime.of(it[0], it[1], it[2]) })) {
         mutableStateOf(
             if (initialEntry != null) {
                 Instant.ofEpochMilli(initialEntry.time).atZone(ZoneId.systemDefault()).toLocalTime()
@@ -145,7 +150,22 @@ fun AddEntrySheet(
     // SYMPTOM/MOOD -> Set<String>
     // FLOW/WATER/SLEEP/SLEEP_QUALITY -> Float
     // NOTE/etc -> String
-    val entryData = remember { 
+    val entryData = rememberSaveable(saver = listSaver<androidx.compose.runtime.snapshots.SnapshotStateMap<LogEntryType, Any>, String>(
+        save = { map -> map.flatMap { (type, value) -> listOf(type.name, when (value) {
+            is Set<*> -> com.google.gson.Gson().toJson(value)
+            else -> value.toString()
+        }) } },
+        restore = { saved -> mutableStateMapOf<LogEntryType, Any>().apply {
+            saved.chunked(2).forEach { pair ->
+                val type = LogEntryType.valueOf(pair[0])
+                put(type, when (type) {
+                    LogEntryType.SYMPTOM, LogEntryType.MOOD -> com.google.gson.Gson().fromJson(pair[1], Array<String>::class.java).toSet()
+                    LogEntryType.NOTE, LogEntryType.TEMPERATURE -> pair[1]
+                    else -> pair[1].toFloat()
+                })
+            }
+        } }
+    )) {
         mutableStateMapOf<LogEntryType, Any>().apply {
             if (initialEntry != null) {
                 when (initialEntry.type) {
@@ -165,7 +185,7 @@ fun AddEntrySheet(
                         // while the readout said "None", and saving without touching it would
                         // write the stale 5 straight back.
                         initialEntry.value.toFloatOrNull()
-                            ?.takeIf { it > 0f }
+                            ?.takeIf { it >= 0f }
                             ?.coerceIn(sliderRangeFor(initialEntry.type))
                             ?.let { put(initialEntry.type, it) }
                     }
@@ -177,6 +197,21 @@ fun AddEntrySheet(
                 }
             }
         }
+    }
+
+    var dirty by rememberSaveable { mutableStateOf(false) }
+    val originalDraft = remember { Triple(entryData.toMap(), details, time) }
+    LaunchedEffect(entryData.toMap(), details, time) {
+        if (Triple(entryData.toMap(), details, time) != originalDraft) dirty = true
+    }
+    var confirmDiscard by remember { mutableStateOf(false) }
+    val requestDismiss: () -> Unit = { if (!isSaving) { if (dirty) confirmDiscard = true else onDismiss() } }
+    BackHandler { requestDismiss() }
+    if (confirmDiscard) {
+        AlertDialog(onDismissRequest = { confirmDiscard = false }, title = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_discard_unsaved_changes_470e7e)) },
+            text = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_your_changes_have_not_been_saved_3cac58)) },
+            confirmButton = { TextButton(onClick = onDismiss) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_discard_eb1a70)) } },
+            dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_keep_editing_e76fd2)) } })
     }
 
     if (customCategory != null) {
@@ -191,7 +226,7 @@ fun AddEntrySheet(
                     value = customName,
                     onValueChange = { customName = it.take(50) },
                     singleLine = true,
-                    label = { Text("Name") }
+                    label = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_name_dcd1d5)) }
                 )
             },
             confirmButton = {
@@ -207,13 +242,13 @@ fun AddEntrySheet(
                         customCategory = null
                         customName = ""
                     }
-                ) { Text("Add") }
+                ) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_add_9fd728)) }
             },
             dismissButton = {
                 TextButton(onClick = {
                     customCategory = null
                     customName = ""
-                }) { Text("Cancel") }
+                }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e)) }
             }
         )
     }
@@ -228,7 +263,7 @@ fun AddEntrySheet(
         )
         AlertDialog(
             onDismissRequest = { showTimePicker = false },
-            title = { Text("Select time") },
+            title = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_select_time_e52933)) },
             text = {
                 Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                     TimePicker(state = pickerState)
@@ -240,10 +275,10 @@ fun AddEntrySheet(
                         time = LocalTime.of(pickerState.hour, pickerState.minute)
                         showTimePicker = false
                     }
-                ) { Text("OK") }
+                ) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_ok_565339)) }
             },
             dismissButton = {
-                TextButton(onClick = { showTimePicker = false }) { Text("Cancel") }
+                TextButton(onClick = { showTimePicker = false }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e)) }
             },
             // The clock dial is 256dp wide; the platform default dialog width clips it on
             // narrow screens, so let the M3 dialog size itself to its content instead.
@@ -252,7 +287,7 @@ fun AddEntrySheet(
     }
 
     ModalBottomSheet(
-        onDismissRequest = onDismiss,
+        onDismissRequest = requestDismiss,
         // Sheets take the same warm `surfaceContainer` as LunarLogCard rather than
         // BottomSheetDefaults' `surfaceContainerLow`, so a sheet reads as the same material
         // as the cards it slides over instead of a second, paler one.
@@ -268,317 +303,323 @@ fun AddEntrySheet(
                 .padding(horizontal = Spacing.sheetHorizontal)
                 .padding(top = Spacing.sm)
                 .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
         ) {
-            Text(if (initialEntry != null) "Edit Log" else "Add Log", style = MaterialTheme.typography.titleLarge)
-            Spacer(Modifier.height(Spacing.lg))
+            Column(Modifier.weight(1f, fill = false).verticalScroll(rememberScrollState())) {
+                Text(if (initialEntry != null) "Edit Log" else "Add Log", style = MaterialTheme.typography.titleLarge)
+                Spacer(Modifier.height(Spacing.lg))
 
-            // Summary of Selected Items
-            if (entryData.isNotEmpty()) {
-                Text("Currently Selected:", style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
-                Spacer(Modifier.height(Spacing.sm))
-                LazyRow(
-                    horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
-                    contentPadding = PaddingValues(bottom = Spacing.lg)
-                ) {
-                    entryData.forEach { (type, data) ->
-                        when (type) {
-                            LogEntryType.SYMPTOM, LogEntryType.MOOD -> {
-                                val set = data.asStringSet()
-                                items(set.toList()) { item ->
-                                    InputChip(
-                                        selected = true,
-                                        onClick = { 
-                                            // Remove this specific item
-                                            val newSet = set - item
-                                            if (newSet.isEmpty()) {
-                                                entryData.remove(type)
-                                            } else {
-                                                entryData[type] = newSet
+                // Summary of Selected Items
+                if (entryData.isNotEmpty()) {
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_currently_selected_fc8b92), style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.primary)
+                    Spacer(Modifier.height(Spacing.sm))
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(Spacing.sm),
+                        contentPadding = PaddingValues(bottom = Spacing.lg)
+                    ) {
+                        entryData.forEach { (type, data) ->
+                            when (type) {
+                                LogEntryType.SYMPTOM, LogEntryType.MOOD -> {
+                                    val set = data.asStringSet()
+                                    items(set.toList()) { item ->
+                                        InputChip(
+                                            selected = true,
+                                            onClick = {
+                                                // Remove this specific item
+                                                val newSet = set - item
+                                                if (newSet.isEmpty()) {
+                                                    entryData.remove(type)
+                                                } else {
+                                                    entryData[type] = newSet
+                                                }
+                                            },
+                                            label = { Text(item) },
+                                            trailingIcon = {
+                                                Icon(
+                                                    Icons.Default.Close,
+                                                    contentDescription = "Remove ${type.displayName}",
+                                                    modifier = Modifier.size(16.dp)
+                                                )
                                             }
-                                        },
-                                        label = { Text(item) },
-                                        trailingIcon = {
-                                            Icon(
-                                                Icons.Default.Close,
-                                                contentDescription = "Remove ${type.displayName}",
-                                                modifier = Modifier.size(16.dp)
-                                            )
-                                        }
-                                    )
-                                }
-                            }
-                            else -> {
-                                // For scalars, clicking removes the whole entry for that type
-                                item {
-                                    // Words, not raw numbers. These chips are the running summary of
-                                    // what is about to be saved, and "Flow: 3" asks the reader to
-                                    // remember a scale the sheet is no longer showing them. SEX and
-                                    // MUCUS used to fall through to the `else` branch and render the
-                                    // Float itself — "Sex: 2.0".
-                                    val displayValue = when(type) {
-                                        LogEntryType.FLOW -> "Flow: ${flowLabel((data as Float).toInt())}"
-                                        LogEntryType.WATER -> "Water: ${(data as Float).toInt()} cups"
-                                        LogEntryType.SLEEP -> "Sleep: ${String.format(Locale.US, "%.1f", data as Float)}h"
-                                        LogEntryType.SLEEP_QUALITY -> "Quality: ${(data as Float).toInt()}/5"
-                                        LogEntryType.SEX -> "Sex drive: ${sexDriveLabel((data as Float).toInt())}"
-                                        LogEntryType.MUCUS -> "Mucus: ${mucusLabel((data as Float).toInt())}"
-                                        else -> "${type.displayName}: $data"
+                                        )
                                     }
-                                    InputChip(
-                                        selected = true,
-                                        onClick = { entryData.remove(type) },
-                                        label = { Text(displayValue) },
-                                        trailingIcon = { Icon(Icons.Default.Close, "Remove", modifier = Modifier.size(16.dp)) }
-                                    )
+                                }
+                                else -> {
+                                    // For scalars, clicking removes the whole entry for that type
+                                    item {
+                                        // Words, not raw numbers. These chips are the running summary of
+                                        // what is about to be saved, and "Flow: 3" asks the reader to
+                                        // remember a scale the sheet is no longer showing them. SEX and
+                                        // MUCUS used to fall through to the `else` branch and render the
+                                        // Float itself — "Sex: 2.0".
+                                        val displayValue = when(type) {
+                                            LogEntryType.FLOW -> "Flow: ${flowLabel((data as Float).toInt())}"
+                                            LogEntryType.WATER -> "Water: ${(data as Float).toInt()} cups"
+                                            LogEntryType.SLEEP -> "Sleep: ${String.format(Locale.US, "%.1f", data as Float)}h"
+                                            LogEntryType.SLEEP_QUALITY -> "Quality: ${(data as Float).toInt()}/5"
+                                            LogEntryType.SEX -> "Sex drive: ${sexDriveLabel((data as Float).toInt())}"
+                                            LogEntryType.MUCUS -> "Mucus: ${mucusLabel((data as Float).toInt())}"
+                                            else -> "${type.displayName}: $data"
+                                        }
+                                        InputChip(
+                                            selected = true,
+                                            onClick = { entryData.remove(type) },
+                                            label = { Text(displayValue) },
+                                            trailingIcon = { Icon(Icons.Default.Close, "Remove", modifier = Modifier.size(16.dp)) }
+                                        )
+                                    }
                                 }
                             }
                         }
                     }
                 }
+
+                // Type Selector. Transparent so the strip sits on the sheet's own colour instead of
+                // TabRow's default `surface`, which is a different tone from the sheet container and
+                // drew a pale band across it.
+                ScrollableTabRow(
+                    selectedTabIndex = addEntryTypeOrder.indexOf(selectedType),
+                    edgePadding = 0.dp,
+                    containerColor = Color.Transparent
+                ) {
+                    addEntryTypeOrder.forEach { type ->
+                        Tab(
+                            selected = selectedType == type,
+                            onClick = { selectedType = type },
+                            // Without this every tab label renders in `primary` (the M3 default is
+                            // unselectedContentColor = selectedContentColor), so the ten types looked
+                            // uniformly "active".
+                            unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
+                            text = { Text(type.displayName) }
+                        )
+                    }
+                }
+
+                Spacer(Modifier.height(Spacing.xl))
+
+                // Value Input based on Type
+                when (selectedType) {
+                    LogEntryType.SYMPTOM -> {
+                        val currentSet = entryData[LogEntryType.SYMPTOM].asStringSet()
+                        SymptomSelector(
+                            title = "symptoms",
+                            symptoms = symptomDefinitions.filter { it.category != SymptomCategory.EMOTIONAL },
+                            onSelect = { symptom ->
+                                val newSet = if (currentSet.contains(symptom)) currentSet - symptom else currentSet + symptom
+                                if (newSet.isEmpty()) entryData.remove(LogEntryType.SYMPTOM)
+                                else entryData[LogEntryType.SYMPTOM] = newSet
+                            },
+                            selected = currentSet,
+                            onAddCustom = { customCategory = SymptomCategory.PHYSICAL }
+                        )
+                    }
+                    LogEntryType.MOOD -> {
+                        val currentSet = entryData[LogEntryType.MOOD].asStringSet()
+                         SymptomSelector(
+                            title = "moods",
+                            symptoms = symptomDefinitions.filter { it.category == SymptomCategory.EMOTIONAL },
+                            onSelect = { mood ->
+                                val newSet = if (currentSet.contains(mood)) currentSet - mood else currentSet + mood
+                                if (newSet.isEmpty()) entryData.remove(LogEntryType.MOOD)
+                                else entryData[LogEntryType.MOOD] = newSet
+                            },
+                            selected = currentSet,
+                            onAddCustom = { customCategory = SymptomCategory.EMOTIONAL }
+                        )
+                    }
+                    LogEntryType.FLOW -> {
+                        val currentVal = entryData[LogEntryType.FLOW] as? Float ?: 0f
+                        // The readout names the level, so the legend that spelled out the whole 0–4
+                        // scale underneath is gone — it was a second copy of the same mapping, and it
+                        // had already drifted out of step with `flowLabel` on the other sliders.
+                        ValueReadout("Flow: ${flowLabel(currentVal.toInt())}")
+                        Slider(
+                            value = currentVal,
+                            onValueChange = {
+                                entryData[LogEntryType.FLOW] = it
+                            },
+                            valueRange = sliderRangeFor(LogEntryType.FLOW),
+                            steps = 3,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Flow level"
+                                stateDescription = flowLabel(currentVal.toInt())
+                            }
+                        )
+                    }
+                    LogEntryType.WATER -> {
+                        val currentVal = entryData[LogEntryType.WATER] as? Float ?: 0f
+                        ValueReadout("Cups: ${currentVal.toInt()}")
+                        Slider(
+                            value = currentVal,
+                            onValueChange = {
+                                entryData[LogEntryType.WATER] = it
+                            },
+                            valueRange = sliderRangeFor(LogEntryType.WATER),
+                            steps = 14,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Water cups"
+                                stateDescription = currentVal.toInt().toString()
+                            }
+                        )
+                        ScaleLegend("0: Not recorded")
+                    }
+                    LogEntryType.SLEEP -> {
+                        val currentVal = entryData[LogEntryType.SLEEP] as? Float ?: 0f
+                        ValueReadout("Hours: ${String.format(Locale.US, "%.1f", currentVal)}")
+                        Slider(
+                            value = currentVal,
+                            onValueChange = {
+                                entryData[LogEntryType.SLEEP] = it
+                            },
+                            valueRange = sliderRangeFor(LogEntryType.SLEEP),
+                            steps = 23,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Sleep hours"
+                                stateDescription = String.format(Locale.US, "%.1f", currentVal)
+                            }
+                        )
+                    }
+                    LogEntryType.SLEEP_QUALITY -> {
+                        val currentVal = entryData[LogEntryType.SLEEP_QUALITY] as? Float ?: 0f
+                        ValueReadout("Stars: ${currentVal.toInt()}")
+                        Slider(
+                            value = currentVal,
+                            onValueChange = {
+                                entryData[LogEntryType.SLEEP_QUALITY] = it
+                            },
+                            valueRange = sliderRangeFor(LogEntryType.SLEEP_QUALITY),
+                            steps = 4,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Sleep quality stars"
+                                stateDescription = currentVal.toInt().toString()
+                            }
+                        )
+                        ScaleLegend("0: Not recorded, 1: Poor, 5: Excellent")
+                    }
+                    LogEntryType.NOTE -> {
+                        val currentVal = entryData[LogEntryType.NOTE] as? String ?: ""
+                        OutlinedTextField(
+                            value = currentVal,
+                            onValueChange = {
+                                if (it.isBlank()) entryData.remove(LogEntryType.NOTE)
+                                else entryData[LogEntryType.NOTE] = it
+                            },
+                            label = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_note_d8da2c)) },
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                    LogEntryType.SEX -> {
+                        val currentVal = entryData[LogEntryType.SEX] as? Float ?: 0f
+                        // 0..3, not 0..5. `DailyLog.sexDrive` defines exactly four levels and every
+                        // reader of it — the day summary, the report generator, `sexDriveLabel` — maps
+                        // anything above 3 to "None". The slider let you pick 4 or 5, saved them, and
+                        // then showed the day as having no sex drive logged at all.
+                        ValueReadout("Sex drive: ${sexDriveLabel(currentVal.toInt())}")
+                        Slider(
+                            value = currentVal,
+                            onValueChange = {
+                                entryData[LogEntryType.SEX] = it
+                            },
+                            valueRange = sliderRangeFor(LogEntryType.SEX),
+                            steps = 2,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Sex drive"
+                                stateDescription = sexDriveLabel(currentVal.toInt())
+                            }
+                        )
+                    }
+                    LogEntryType.MUCUS -> {
+                        val currentVal = entryData[LogEntryType.MUCUS] as? Float ?: 0f
+                        // This slider had its own list of words — "Not recorded, Dry, Sticky, Watery,
+                        // Egg white" — one rung short of `DailyLog.cervicalMucus`, which defines
+                        // 0=None/Dry, 1=Sticky, 2=Creamy, 3=Watery, 4=Egg White. Everything from 1 up
+                        // was mislabelled: picking "Sticky" here stored a 2 and came back as "Creamy"
+                        // in the day summary. The numbers are load-bearing too — AdvancedCycleIntelligence
+                        // treats >= 3 as the fertile signal — so the words were what was wrong.
+                        val label = mucusLabel(currentVal.toInt())
+                        ValueReadout("Cervical mucus: $label")
+                        Slider(
+                            value = currentVal,
+                            onValueChange = {
+                                entryData[LogEntryType.MUCUS] = it
+                            },
+                            valueRange = sliderRangeFor(LogEntryType.MUCUS),
+                            steps = 3,
+                            modifier = Modifier.semantics {
+                                contentDescription = "Cervical mucus"
+                                stateDescription = label
+                            }
+                        )
+                    }
+                    LogEntryType.TEMPERATURE -> {
+                        val currentVal = entryData[LogEntryType.TEMPERATURE] as? String ?: ""
+                        val parsed = currentVal.replace(',', '.').toFloatOrNull()
+                        val isValid = currentVal.isBlank() || parsed != null &&
+                            (parsed in 34f..43f || parsed in 90f..110f)
+                        OutlinedTextField(
+                            value = currentVal,
+                            onValueChange = { value ->
+                                val normalized = value.replace(',', '.').take(6)
+                                if (normalized.isBlank()) entryData.remove(LogEntryType.TEMPERATURE)
+                                else entryData[LogEntryType.TEMPERATURE] = normalized
+                            },
+                            label = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_basal_temperature_c_or_f_f34b18)) },
+                            supportingText = {
+                                Text(if (isValid) "Enter 34–43 °C or 90–110 °F" else "Enter a plausible °C or °F temperature")
+                            },
+                            isError = !isValid,
+                            keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                            singleLine = true,
+                            modifier = Modifier.fillMaxWidth()
+                        )
+                    }
+                }
+
+                if (selectedType in setOf(LogEntryType.FLOW, LogEntryType.SEX, LogEntryType.MUCUS, LogEntryType.SLEEP, LogEntryType.WATER)) {
+                    TextButton(onClick = { entryData[selectedType] = 0f }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_record_zero_none_23d7d6)) }
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_remove_a_selected_chip_to_leave_it_unrecorded_bc80bc), style = MaterialTheme.typography.bodySmall)
+                }
+                Spacer(Modifier.height(Spacing.lg))
+
+                // Entries have always carried a time; until now the sheet silently stamped "now"
+                // and gave no way to correct a log written after the fact.
+                FieldPrompt("Time")
+                Spacer(Modifier.height(Spacing.sm))
+                OutlinedButton(
+                    onClick = { showTimePicker = true },
+                    shape = MaterialTheme.shapes.medium,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .heightIn(min = Spacing.minTouchTarget)
+                        .semantics { contentDescription = "Entry time, $timeLabel" }
+                ) {
+                    Icon(Icons.Outlined.Schedule, contentDescription = null)
+                    Spacer(Modifier.width(Spacing.sm))
+                    Text(timeLabel, style = MaterialTheme.typography.titleMedium)
+                }
+
+                Spacer(Modifier.height(Spacing.lg))
+
+                OutlinedTextField(
+                    value = details,
+                    onValueChange = { details = it },
+                    label = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_details_applied_to_all_6b1d23)) },
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                Spacer(Modifier.height(Spacing.xl))
+
             }
-
-            // Type Selector. Transparent so the strip sits on the sheet's own colour instead of
-            // TabRow's default `surface`, which is a different tone from the sheet container and
-            // drew a pale band across it.
-            ScrollableTabRow(
-                selectedTabIndex = addEntryTypeOrder.indexOf(selectedType),
-                edgePadding = 0.dp,
-                containerColor = Color.Transparent
-            ) {
-                addEntryTypeOrder.forEach { type ->
-                    Tab(
-                        selected = selectedType == type,
-                        onClick = { selectedType = type },
-                        // Without this every tab label renders in `primary` (the M3 default is
-                        // unselectedContentColor = selectedContentColor), so the ten types looked
-                        // uniformly "active".
-                        unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                        text = { Text(type.displayName) }
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(Spacing.xl))
-
-            // Value Input based on Type
-            when (selectedType) {
-                LogEntryType.SYMPTOM -> {
-                    val currentSet = entryData[LogEntryType.SYMPTOM].asStringSet()
-                    SymptomSelector(
-                        title = "symptoms",
-                        symptoms = symptomDefinitions.filter { it.category != SymptomCategory.EMOTIONAL },
-                        onSelect = { symptom ->
-                            val newSet = if (currentSet.contains(symptom)) currentSet - symptom else currentSet + symptom
-                            if (newSet.isEmpty()) entryData.remove(LogEntryType.SYMPTOM)
-                            else entryData[LogEntryType.SYMPTOM] = newSet
-                        },
-                        selected = currentSet,
-                        onAddCustom = { customCategory = SymptomCategory.PHYSICAL }
-                    )
-                }
-                LogEntryType.MOOD -> {
-                    val currentSet = entryData[LogEntryType.MOOD].asStringSet()
-                     SymptomSelector(
-                        title = "moods",
-                        symptoms = symptomDefinitions.filter { it.category == SymptomCategory.EMOTIONAL },
-                        onSelect = { mood ->
-                            val newSet = if (currentSet.contains(mood)) currentSet - mood else currentSet + mood
-                            if (newSet.isEmpty()) entryData.remove(LogEntryType.MOOD)
-                            else entryData[LogEntryType.MOOD] = newSet
-                        },
-                        selected = currentSet,
-                        onAddCustom = { customCategory = SymptomCategory.EMOTIONAL }
-                    )
-                }
-                LogEntryType.FLOW -> {
-                    val currentVal = entryData[LogEntryType.FLOW] as? Float ?: 0f
-                    // The readout names the level, so the legend that spelled out the whole 0–4
-                    // scale underneath is gone — it was a second copy of the same mapping, and it
-                    // had already drifted out of step with `flowLabel` on the other sliders.
-                    ValueReadout("Flow: ${flowLabel(currentVal.toInt())}")
-                    Slider(
-                        value = currentVal,
-                        onValueChange = {
-                            if (it == 0f) entryData.remove(LogEntryType.FLOW)
-                            else entryData[LogEntryType.FLOW] = it
-                        },
-                        valueRange = sliderRangeFor(LogEntryType.FLOW),
-                        steps = 3,
-                        modifier = Modifier.semantics {
-                            contentDescription = "Flow level"
-                            stateDescription = flowLabel(currentVal.toInt())
-                        }
-                    )
-                }
-                LogEntryType.WATER -> {
-                    val currentVal = entryData[LogEntryType.WATER] as? Float ?: 0f
-                    ValueReadout("Cups: ${currentVal.toInt()}")
-                    Slider(
-                        value = currentVal,
-                        onValueChange = {
-                            if (it == 0f) entryData.remove(LogEntryType.WATER)
-                            else entryData[LogEntryType.WATER] = it
-                        },
-                        valueRange = sliderRangeFor(LogEntryType.WATER),
-                        steps = 14,
-                        modifier = Modifier.semantics {
-                            contentDescription = "Water cups"
-                            stateDescription = currentVal.toInt().toString()
-                        }
-                    )
-                    ScaleLegend("0: Not recorded")
-                }
-                LogEntryType.SLEEP -> {
-                    val currentVal = entryData[LogEntryType.SLEEP] as? Float ?: 0f
-                    ValueReadout("Hours: ${String.format(Locale.US, "%.1f", currentVal)}")
-                    Slider(
-                        value = currentVal,
-                        onValueChange = {
-                            if (it == 0f) entryData.remove(LogEntryType.SLEEP)
-                            else entryData[LogEntryType.SLEEP] = it
-                        },
-                        valueRange = sliderRangeFor(LogEntryType.SLEEP),
-                        steps = 23,
-                        modifier = Modifier.semantics {
-                            contentDescription = "Sleep hours"
-                            stateDescription = String.format(Locale.US, "%.1f", currentVal)
-                        }
-                    )
-                }
-                LogEntryType.SLEEP_QUALITY -> {
-                    val currentVal = entryData[LogEntryType.SLEEP_QUALITY] as? Float ?: 0f
-                    ValueReadout("Stars: ${currentVal.toInt()}")
-                    Slider(
-                        value = currentVal,
-                        onValueChange = {
-                            if (it == 0f) entryData.remove(LogEntryType.SLEEP_QUALITY)
-                            else entryData[LogEntryType.SLEEP_QUALITY] = it
-                        },
-                        valueRange = sliderRangeFor(LogEntryType.SLEEP_QUALITY),
-                        steps = 4,
-                        modifier = Modifier.semantics {
-                            contentDescription = "Sleep quality stars"
-                            stateDescription = currentVal.toInt().toString()
-                        }
-                    )
-                    ScaleLegend("0: Not recorded, 1: Poor, 5: Excellent")
-                }
-                LogEntryType.NOTE -> {
-                    val currentVal = entryData[LogEntryType.NOTE] as? String ?: ""
-                    OutlinedTextField(
-                        value = currentVal,
-                        onValueChange = { 
-                            if (it.isBlank()) entryData.remove(LogEntryType.NOTE)
-                            else entryData[LogEntryType.NOTE] = it
-                        },
-                        label = { Text("Note") },
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-                LogEntryType.SEX -> {
-                    val currentVal = entryData[LogEntryType.SEX] as? Float ?: 0f
-                    // 0..3, not 0..5. `DailyLog.sexDrive` defines exactly four levels and every
-                    // reader of it — the day summary, the report generator, `sexDriveLabel` — maps
-                    // anything above 3 to "None". The slider let you pick 4 or 5, saved them, and
-                    // then showed the day as having no sex drive logged at all.
-                    ValueReadout("Sex drive: ${sexDriveLabel(currentVal.toInt())}")
-                    Slider(
-                        value = currentVal,
-                        onValueChange = {
-                            if (it == 0f) entryData.remove(LogEntryType.SEX)
-                            else entryData[LogEntryType.SEX] = it
-                        },
-                        valueRange = sliderRangeFor(LogEntryType.SEX),
-                        steps = 2,
-                        modifier = Modifier.semantics {
-                            contentDescription = "Sex drive"
-                            stateDescription = sexDriveLabel(currentVal.toInt())
-                        }
-                    )
-                }
-                LogEntryType.MUCUS -> {
-                    val currentVal = entryData[LogEntryType.MUCUS] as? Float ?: 0f
-                    // This slider had its own list of words — "Not recorded, Dry, Sticky, Watery,
-                    // Egg white" — one rung short of `DailyLog.cervicalMucus`, which defines
-                    // 0=None/Dry, 1=Sticky, 2=Creamy, 3=Watery, 4=Egg White. Everything from 1 up
-                    // was mislabelled: picking "Sticky" here stored a 2 and came back as "Creamy"
-                    // in the day summary. The numbers are load-bearing too — AdvancedCycleIntelligence
-                    // treats >= 3 as the fertile signal — so the words were what was wrong.
-                    val label = mucusLabel(currentVal.toInt())
-                    ValueReadout("Cervical mucus: $label")
-                    Slider(
-                        value = currentVal,
-                        onValueChange = {
-                            if (it == 0f) entryData.remove(LogEntryType.MUCUS)
-                            else entryData[LogEntryType.MUCUS] = it
-                        },
-                        valueRange = sliderRangeFor(LogEntryType.MUCUS),
-                        steps = 3,
-                        modifier = Modifier.semantics {
-                            contentDescription = "Cervical mucus"
-                            stateDescription = label
-                        }
-                    )
-                }
-                LogEntryType.TEMPERATURE -> {
-                    val currentVal = entryData[LogEntryType.TEMPERATURE] as? String ?: ""
-                    val parsed = currentVal.replace(',', '.').toFloatOrNull()
-                    val isValid = currentVal.isBlank() || parsed != null &&
-                        (parsed in 34f..43f || parsed in 90f..110f)
-                    OutlinedTextField(
-                        value = currentVal,
-                        onValueChange = { value ->
-                            val normalized = value.replace(',', '.').take(6)
-                            if (normalized.isBlank()) entryData.remove(LogEntryType.TEMPERATURE)
-                            else entryData[LogEntryType.TEMPERATURE] = normalized
-                        },
-                        label = { Text("Basal temperature (°C or °F)") },
-                        supportingText = {
-                            Text(if (isValid) "Enter 34–43 °C or 90–110 °F" else "Enter a plausible °C or °F temperature")
-                        },
-                        isError = !isValid,
-                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
-                        singleLine = true,
-                        modifier = Modifier.fillMaxWidth()
-                    )
-                }
-            }
-
-            Spacer(Modifier.height(Spacing.lg))
-
-            // Entries have always carried a time; until now the sheet silently stamped "now"
-            // and gave no way to correct a log written after the fact.
-            FieldPrompt("Time")
+            HorizontalDivider()
             Spacer(Modifier.height(Spacing.sm))
-            OutlinedButton(
-                onClick = { showTimePicker = true },
-                shape = MaterialTheme.shapes.medium,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .heightIn(min = Spacing.minTouchTarget)
-                    .semantics { contentDescription = "Entry time, $timeLabel" }
-            ) {
-                Icon(Icons.Outlined.Schedule, contentDescription = null)
-                Spacer(Modifier.width(Spacing.sm))
-                Text(timeLabel, style = MaterialTheme.typography.titleMedium)
-            }
+            saveError?.let { com.lunarlog.ui.components.InlineError(it) }
+            if (entryData.isEmpty()) Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.choose_entries_help),
+                style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
 
-            Spacer(Modifier.height(Spacing.lg))
-
-            OutlinedTextField(
-                value = details,
-                onValueChange = { details = it },
-                label = { Text("Details (Applied to all)") },
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(Modifier.height(Spacing.xl))
-
+            if (isSaving) LinearProgressIndicator(modifier = Modifier.fillMaxWidth())
             Button(
                 onClick = {
                     val timestamp = date.atTime(time).atZone(ZoneId.systemDefault()).toInstant().toEpochMilli()
-                    
+
                     // Convert raw map to simplified (Type -> List<String>) format for the ViewModel
                     val payload = entryData.mapValues { (type, data) ->
                         when(type) {
@@ -597,16 +638,18 @@ fun AddEntrySheet(
                             }
                         }
                     }
-                    
+
                     onSave(payload, timestamp, details.ifBlank { null })
                 },
                 modifier = Modifier.fillMaxWidth(),
-                enabled = (entryData.isNotEmpty() || initialEntry != null) &&
+                enabled = !isSaving && (entryData.isNotEmpty() || initialEntry != null) &&
                     ((entryData[LogEntryType.TEMPERATURE] as? String)?.let { value ->
                         value.toFloatOrNull()?.let { it in 34f..43f || it in 90f..110f } == true
                     } ?: true)
             ) {
-                Text("Save (${entryData.values.sumOf { if (it is Set<*>) it.size else 1 }} items)")
+                val count = entryData.values.sumOf { if (it is Set<*>) it.size else 1 }
+                Text(if (isSaving) androidx.compose.ui.res.stringResource(com.lunarlog.R.string.saving_changes)
+                    else androidx.compose.ui.res.pluralStringResource(com.lunarlog.R.plurals.save_entry_count, count, count))
             }
             Spacer(Modifier.height(Spacing.sheetHorizontal))
         }
@@ -638,7 +681,7 @@ fun SymptomSelector(
             item {
                 AssistChip(
                     onClick = onAddCustom,
-                    label = { Text("Custom") },
+                    label = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_custom_494ca7)) },
                     leadingIcon = { Icon(Icons.Default.Add, contentDescription = null) },
                     modifier = Modifier.heightIn(min = Spacing.minTouchTarget)
                 )

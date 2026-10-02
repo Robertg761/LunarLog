@@ -49,7 +49,7 @@ class AdvancedCycleIntelligenceTest {
             DailyLog(date = start.plusDays(3), cervicalMucus = 0)
         )
 
-        assertEquals(start, AdvancedCycleIntelligence.detectPeakMucusDay(start, logs))
+        assertEquals(start, AdvancedCycleIntelligence.detectPeakMucusDay(start, logs, logs.mapTo(mutableSetOf()) { it.date }))
     }
 
     @Test

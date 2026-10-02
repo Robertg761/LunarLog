@@ -28,12 +28,17 @@ class OnboardingViewModel @Inject constructor(
     private val _onboardingState = MutableStateFlow<OnboardingState>(OnboardingState.Idle)
     val onboardingState = _onboardingState.asStateFlow()
 
-    fun completeOnboarding(lastPeriodDate: LocalDate) {
+    fun completeOnboarding(lastPeriodDate: LocalDate?, endDate: LocalDate? = null) {
         if (_onboardingState.value == OnboardingState.Saving) return
         viewModelScope.launch {
             _onboardingState.value = OnboardingState.Saving
             try {
-                when (val result = cycleRepository.setPeriodDay(lastPeriodDate, true)) {
+                if (lastPeriodDate == null) {
+                    userPreferencesRepository.setFirstRunComplete()
+                    _onboardingState.value = OnboardingState.Success
+                    return@launch
+                }
+                when (val result = cycleRepository.recordPeriod(lastPeriodDate, endDate)) {
                     is PeriodChangeResult.Success -> {
                         userPreferencesRepository.setFirstRunComplete()
                         _onboardingState.value = OnboardingState.Success
@@ -42,6 +47,8 @@ class OnboardingViewModel @Inject constructor(
                         _onboardingState.value = OnboardingState.Error(result.message)
                     }
                 }
+            } catch (e: kotlinx.coroutines.CancellationException) {
+                throw e
             } catch (e: Exception) {
                 _onboardingState.value = OnboardingState.Error(
                     e.localizedMessage ?: "Couldn't complete setup"

@@ -10,6 +10,7 @@ import java.time.ZonedDateTime
 object MedicationScheduler {
 
     fun isMedicationDueToday(medication: Medication, date: LocalDate): Boolean {
+        if (medication.isArchived) return false
         val startDate = LocalDate.ofEpochDay(medication.startDate)
         val endDate = medication.endDate?.let { LocalDate.ofEpochDay(it) }
 
@@ -24,13 +25,22 @@ object MedicationScheduler {
         }
     }
 
+    fun reminderTimes(medication: Medication): List<Long> =
+        medication.reminderTimes.ifEmpty { listOfNotNull(medication.reminderTime) }
+            .filter { it in 0L..1439L }.distinct().sorted()
+
+    fun needsReminder(medication: Medication, takenDoses: Int, scheduledMinutes: Long): Boolean {
+        val index = reminderTimes(medication).indexOf(scheduledMinutes)
+        return index >= 0 && takenDoses <= index
+    }
+
     fun getNextReminderTime(
         medication: Medication,
         now: Instant = Instant.now(),
         zoneId: ZoneId = ZoneId.systemDefault()
     ): Long? {
-        val reminderMinutes = medication.reminderTime ?: return null
-        if (reminderMinutes !in 0L..1439L || medication.frequency == "as_needed") return null
+        val times = reminderTimes(medication)
+        if (times.isEmpty() || medication.isArchived || medication.frequency == "as_needed") return null
 
         val nowLocal = ZonedDateTime.ofInstant(now, zoneId)
         val medicationStart = LocalDate.ofEpochDay(medication.startDate)
@@ -40,12 +50,14 @@ object MedicationScheduler {
         repeat(370) {
             if (medicationEnd != null && candidateDate.isAfter(medicationEnd)) return null
             if (isMedicationDueToday(medication, candidateDate)) {
+                for (reminderMinutes in times) {
                 val candidate = ZonedDateTime.of(
                     candidateDate,
                     LocalTime.MIDNIGHT.plusMinutes(reminderMinutes),
                     zoneId
                 ).toInstant()
                 if (candidate.isAfter(now)) return candidate.toEpochMilli()
+                }
             }
             candidateDate = candidateDate.plusDays(1)
         }

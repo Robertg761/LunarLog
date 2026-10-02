@@ -9,6 +9,12 @@ class Converters {
     private val gson = Gson()
 
     @TypeConverter
+    fun fromLongList(value: List<Long>): String = gson.toJson(value)
+
+    @TypeConverter
+    fun toLongList(value: String): List<Long> = gson.fromJson(value, object : TypeToken<List<Long>>() {}.type)
+
+    @TypeConverter
     fun fromTimestamp(value: Long?): LocalDate? {
         return value?.let { LocalDate.ofEpochDay(it) }
     }

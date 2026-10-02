@@ -83,6 +83,9 @@ class DataManagementRepository @Inject constructor(
                 frequency = it.frequency,
                 startDateEpochDay = it.startDate,
                 endDateEpochDay = it.endDate,
+                isArchived = it.isArchived,
+                dosesPerDay = it.dosesPerDay,
+                reminderTimes = it.reminderTimes,
                 reminderTimeMinutes = it.reminderTime
             )
         }
@@ -103,7 +106,8 @@ class DataManagementRepository @Inject constructor(
                 name = it.name,
                 displayName = it.displayName,
                 category = it.category.name,
-                isCustom = it.isCustom
+                isArchived = it.isArchived,
+                    isCustom = it.isCustom
             )
         }
 
@@ -123,10 +127,16 @@ class DataManagementRepository @Inject constructor(
             data = data.copy(preferences = userPreferencesRepository.createBackupPreferences())
         )
 
-        gson.toJson(payload)
+        validatePayload(payload)
+        gson.toJson(payload).also {
+            require(it.toByteArray(Charsets.UTF_8).size <= LogValidation.MAX_BACKUP_BYTES) {
+                "Backup exceeds the 10 MB restore limit. Export smaller date ranges as CSV, or remove unneeded large notes before backing up."
+            }
+        }
     }
 
     suspend fun restoreFromJson(json: String) = withContext(Dispatchers.IO) {
+        require(json.toByteArray(Charsets.UTF_8).size <= LogValidation.MAX_BACKUP_BYTES) { "Backup exceeds the 10 MB import limit" }
         val payload = parseBackupPayload(json)
             ?: throw IllegalArgumentException("Unsupported or invalid backup format")
 
@@ -154,6 +164,7 @@ class DataManagementRepository @Inject constructor(
                     name = it.name,
                     displayName = it.displayName,
                     category = SymptomCategory.valueOf(it.category),
+                    isArchived = it.isArchived,
                     isCustom = it.isCustom
                 )
             }.filterNot { !it.isCustom && it.name in SymptomData.retiredDefaultNames }
@@ -169,6 +180,9 @@ class DataManagementRepository @Inject constructor(
                         frequency = it.frequency,
                         startDate = it.startDateEpochDay,
                         endDate = it.endDateEpochDay,
+                        isArchived = it.isArchived,
+                        dosesPerDay = it.dosesPerDay ?: 1,
+                        reminderTimes = it.reminderTimes.orEmpty(),
                         reminderTime = it.reminderTimeMinutes
                     )
                 )
@@ -260,7 +274,20 @@ class DataManagementRepository @Inject constructor(
     }
 
     suspend fun nukeData() = withContext(Dispatchers.IO) {
-        appDatabase.clearAllTables()
+        appDatabase.withTransaction {
+            appDatabase.clearAllTables()
+            appDatabase.symptomDefinitionDao().insertAll(SymptomData.defaultSymptoms)
+        }
+    }
+
+    suspend fun previewBackup(json: String): String = withContext(Dispatchers.IO) {
+        require(json.toByteArray(Charsets.UTF_8).size <= LogValidation.MAX_BACKUP_BYTES) { "Backup exceeds 10 MiB" }
+        val payload = parseBackupPayload(json) ?: throw IllegalArgumentException("Unsupported backup")
+        validatePayload(payload)
+        val data = payload.data
+        val dates = data.cycles.map { it.startEpochDay } + data.dailyLogs.map { it.dateEpochDay } + data.logEntries.map { it.dateEpochDay } + data.medicationLogs.map { it.dateEpochDay }
+        "${data.cycles.size} periods, ${data.dailyLogs.size} daily summaries, ${data.logEntries.size} entries, ${data.medications.size} medications, ${data.medicationLogs.size} dose records." +
+            (dates.minOrNull()?.let { "\nDates: ${LocalDate.ofEpochDay(it)} to ${LocalDate.ofEpochDay(dates.max())}." } ?: "\nNo dated records.")
     }
 
     private fun parseBackupPayload(json: String): BackupPayloadV2? {
@@ -273,7 +300,7 @@ class DataManagementRepository @Inject constructor(
         return try {
             val obj = root.asJsonObject
             val version = obj.get("version")?.takeIf { it.isJsonPrimitive }?.asInt ?: 1
-            if (version == 2 && obj.has("data")) {
+            if (version in 2..3 && obj.has("data")) {
                 gson.fromJson(obj, BackupPayloadV2::class.java)
             } else {
                 parseLegacyPayload(obj)
@@ -357,9 +384,12 @@ class DataManagementRepository @Inject constructor(
 
     private fun validatePayload(payload: BackupPayloadV2) {
         val data = payload.data
+        require(listOf(data.cycles.size, data.dailyLogs.size, data.logEntries.size, data.medications.size,
+            data.medicationLogs.size, data.symptomDefinitions.size).sum() <= LogValidation.MAX_BACKUP_RECORDS) { "Backup contains too many records" }
+        val granularDates = data.logEntries.mapTo(mutableSetOf()) { it.dateEpochDay }
 
         fun requireDate(epochDay: Long, label: String): LocalDate = try {
-            LocalDate.ofEpochDay(epochDay)
+            LogValidation.date(epochDay)
         } catch (error: Exception) {
             throw IllegalArgumentException("$label is outside the supported date range", error)
         }
@@ -393,6 +423,8 @@ class DataManagementRepository @Inject constructor(
             if (!dailyLogDates.add(log.dateEpochDay)) {
                 throw IllegalArgumentException("Backup contains duplicate daily log dates")
             }
+            // Granular records are authoritative; the cached daily aggregate is rebuilt on restore.
+            if (log.dateEpochDay in granularDates) return@forEachIndexed
             require(log.flowLevel in 0..4) { "Daily log $index has an invalid flow level" }
             require(log.waterIntake >= 0) { "Daily log $index has invalid water intake" }
             require(log.sleepHours in 0f..24f) { "Daily log $index has invalid sleep hours" }
@@ -413,13 +445,17 @@ class DataManagementRepository @Inject constructor(
             } catch (error: IllegalArgumentException) {
                 throw IllegalArgumentException("Log entry $index has an unknown type", error)
             }
-            require(entry.value.isNotBlank()) { "Log entry $index has an empty value" }
+            LogValidation.entry(LogEntry(date = entry.dateEpochDay, time = entry.timeEpochMillis,
+                type = LogEntryType.valueOf(entry.type), value = entry.value, details = entry.details), legacy = true)
         }
 
         requireUniquePositiveIds(data.medications.map { it.id.toLong() }, "medication")
         data.medications.forEachIndexed { index, medication ->
             val start = requireDate(medication.startDateEpochDay, "Medication $index start date")
             val end = medication.endDateEpochDay?.let { requireDate(it, "Medication $index end date") }
+            require((medication.dosesPerDay ?: 1) in 1..24) { "Invalid daily dose count" }
+            val times = medication.reminderTimes.orEmpty()
+            require((times.isEmpty() || times.size == (medication.dosesPerDay ?: 1)) && times.distinct().size == times.size && times.all { it in 0L..1439L }) { "Invalid dose reminders" }
             require(medication.name.isNotBlank()) { "Medication $index has no name" }
             require(medication.id > 0) { "Medication $index has an invalid ID" }
             require(medication.frequency in setOf("daily", "weekly", "as_needed")) {
@@ -433,14 +469,10 @@ class DataManagementRepository @Inject constructor(
 
         val medicationIds = data.medications.map { it.id }.toSet()
         requireUniquePositiveIds(data.medicationLogs.map { it.id }, "medication log")
-        val medicationLogKeys = mutableSetOf<Pair<Long, Int>>()
         data.medicationLogs.forEachIndexed { index, log ->
             requireDate(log.dateEpochDay, "Medication log $index date")
             require(log.medicationId in medicationIds) {
                 "Medication log $index references a missing medication"
-            }
-            require(medicationLogKeys.add(log.dateEpochDay to log.medicationId)) {
-                "Backup contains duplicate medication doses for one day"
             }
         }
 

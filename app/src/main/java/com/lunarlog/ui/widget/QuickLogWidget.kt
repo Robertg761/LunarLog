@@ -70,6 +70,7 @@ class QuickLogWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Responsive(setOf(COMPACT, TALL))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        if (widgetsRedacted(context)) { provideContent { RedactedWidget() }; return }
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             WidgetEntryPoint::class.java
@@ -234,6 +235,7 @@ class SetFlowAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
+        if (widgetsRedacted(context)) return
         val level = parameters[LevelKey] ?: return
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
@@ -274,6 +276,7 @@ class AddWaterAction : ActionCallback {
         glanceId: GlanceId,
         parameters: ActionParameters
     ) {
+        if (widgetsRedacted(context)) return
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             WidgetEntryPoint::class.java

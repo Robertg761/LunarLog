@@ -64,7 +64,7 @@ class MainViewModel @Inject constructor(
         initialValue = MainActivityUiState(isLoading = true),
         started = SharingStarted.WhileSubscribed(5_000)
     )
-    
+
     private val _isLocked = MutableStateFlow(false)
     val isLocked = _isLocked.asStateFlow()
     private val _isLockStateReady = MutableStateFlow(false)
@@ -126,11 +126,17 @@ class MainViewModel @Inject constructor(
         if (uiState.value.appLockTimeoutSeconds == 0L) _isLocked.value = true
     }
 
-    fun checkForUpdates() {
+    val updateMessage = MutableStateFlow<String?>(null)
+    private var checkingUpdate = false
+    fun checkForUpdates(manual: Boolean = false) {
+        if (checkingUpdate) return
+        checkingUpdate = true
         viewModelScope.launch {
             if (BuildConfig.DEBUG || !BuildConfig.ENABLE_GITHUB_UPDATES) {
                 // Debug builds are often signed differently than release APK assets.
                 _updateInfo.value = null
+                checkingUpdate = false
+                if (manual) updateMessage.value = "Updates are managed by your distribution for this build."
                 return@launch
             }
             try {
@@ -140,10 +146,11 @@ class MainViewModel @Inject constructor(
                     currentVersionName = BuildConfig.VERSION_NAME
                 )
                 _updateInfo.value = info
+                if (manual) updateMessage.value = if (info == null) "You are up to date." else "Update available: ${info.latestVersionName}"
+            } catch (e: kotlinx.coroutines.CancellationException) { throw e
             } catch (_: Exception) {
-                // Network failures should be silent; the app remains functional without update checks.
-                _updateInfo.value = null
-            }
+                if (manual) updateMessage.value = "Could not check for updates. Please try again."
+            } finally { checkingUpdate = false }
         }
     }
 

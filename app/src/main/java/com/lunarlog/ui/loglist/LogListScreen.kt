@@ -11,11 +11,19 @@ import androidx.compose.material.icons.filled.WaterDrop
 import androidx.compose.material.icons.outlined.Timeline
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.saveable.listSaver
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.res.pluralStringResource
+import com.lunarlog.R
+import com.lunarlog.logic.MedicationScheduler
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.hilt.navigation.compose.hiltViewModel
@@ -42,8 +50,11 @@ fun LogListScreen(
     viewModel: LogListViewModel = hiltViewModel()
 ) {
     val uiState by viewModel.uiState.collectAsState()
-    var showAddSheet by remember { mutableStateOf(false) }
-    var editingEntry by remember { mutableStateOf<LogEntry?>(null) }
+    var showAddSheet by rememberSaveable { mutableStateOf(false) }
+    var editingEntry by rememberSaveable(stateSaver = listSaver<LogEntry?, Any>(
+        save = { it?.let { e -> listOf(e.id, e.date, e.time, e.type.name, e.value, e.details.orEmpty()) } ?: emptyList() },
+        restore = { if (it.isEmpty()) null else LogEntry(it[0] as Long, it[1] as Long, it[2] as Long, com.lunarlog.data.LogEntryType.valueOf(it[3] as String), it[4] as String, (it[5] as String).ifEmpty { null }) }
+    )) { mutableStateOf<LogEntry?>(null) }
     var entryPendingDelete by remember { mutableStateOf<LogEntry?>(null) }
     val snackbarHostState = remember { SnackbarHostState() }
     // Pinned rather than enterAlways: the Scaffold reserves the bar's full height for content, so
@@ -59,6 +70,20 @@ fun LogListScreen(
         uiState.periodMessage?.let { message ->
             snackbarHostState.showSnackbar(message)
             viewModel.onPeriodMessageShown()
+        }
+    }
+
+    LaunchedEffect(uiState.saveCompleted) {
+        if (uiState.saveCompleted) {
+            showAddSheet = false
+            editingEntry = null
+            viewModel.acknowledgeSave()
+        }
+    }
+    LaunchedEffect(uiState.deletedEntry) {
+        if (uiState.deletedEntry != null) {
+            if (snackbarHostState.showSnackbar("Entry deleted", "Undo", duration = SnackbarDuration.Long) == SnackbarResult.ActionPerformed) viewModel.undoDelete()
+            else viewModel.clearUndo()
         }
     }
 
@@ -113,9 +138,11 @@ fun LogListScreen(
                 if (uiState.medications.isNotEmpty()) {
                     item {
                         MedicationSection(
+                            date = java.time.LocalDate.ofEpochDay(date),
                             medications = uiState.medications,
-                            takenMedicationIds = uiState.takenMedicationIds,
-                            onTakenChange = viewModel::setMedicationTaken
+                            logs = uiState.medicationLogs,
+                            onLogDose = viewModel::logDose,
+                            onRemoveDose = viewModel::removeDose
                         )
                     }
                 }
@@ -160,11 +187,11 @@ fun LogListScreen(
 
         AlertDialog(
             onDismissRequest = { entryPendingDelete = null },
-            title = { Text("Delete log?") },
+            title = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_log_4669af)) },
             text = {
                 Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
                     Text(
-                        text = "This action can't be undone.",
+                        text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_you_can_undo_this_deletion_using_the_message_below_6961cf),
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
@@ -188,12 +215,12 @@ fun LogListScreen(
                         entryPendingDelete = null
                     }
                 ) {
-                    Text("Delete", color = MaterialTheme.colorScheme.error)
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_delete_e2d0a5), color = MaterialTheme.colorScheme.error)
                 }
             },
             dismissButton = {
                 TextButton(onClick = { entryPendingDelete = null }) {
-                    Text("Cancel")
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e))
                 }
             }
         )
@@ -203,6 +230,8 @@ fun LogListScreen(
         AddEntrySheet(
             date = uiState.date,
             initialEntry = editingEntry,
+            isSaving = uiState.isSaving,
+            saveError = uiState.saveError,
             symptomDefinitions = uiState.symptomDefinitions,
             onAddCustomSymptom = viewModel::addCustomSymptom,
             onDismiss = { showAddSheet = false },
@@ -213,8 +242,6 @@ fun LogListScreen(
                     details = details,
                     editingEntry = editingEntry
                 )
-                showAddSheet = false
-                editingEntry = null
             }
         )
     }
@@ -247,54 +274,79 @@ private fun SkeletonBlock(height: Dp) {
 
 @Composable
 private fun MedicationSection(
+    date: java.time.LocalDate,
     medications: List<Medication>,
-    takenMedicationIds: Set<Int>,
-    onTakenChange: (Int, Boolean) -> Unit,
+    logs: List<com.lunarlog.data.MedicationLog>,
+    onLogDose: (Int, Int, Int) -> Unit,
+    onRemoveDose: (Long) -> Unit,
     modifier: Modifier = Modifier
 ) {
-    Column(modifier = modifier.fillMaxWidth()) {
+    var selectedId by rememberSaveable { mutableStateOf<Int?>(null) }
+    var removeId by rememberSaveable { mutableStateOf<Long?>(null) }
+    selectedId?.let { id ->
+        val time = java.time.LocalTime.now()
+        com.lunarlog.ui.settings.LunarLogTimePickerDialog("Dose time", time.hour, time.minute,
+            onDismiss = { selectedId = null }, onConfirm = { hour, minute -> onLogDose(id, hour, minute); selectedId = null })
+    }
+    removeId?.let { id -> AlertDialog(onDismissRequest = { removeId = null }, title = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_remove_this_dose_186f4e)) },
+        text = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_only_this_dose_event_will_be_removed_411deb)) },
+        confirmButton = { TextButton(onClick = { onRemoveDose(id); removeId = null }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_remove_dose_ece327)) } },
+        dismissButton = { TextButton(onClick = { removeId = null }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e)) } }) }
+    Column(modifier.fillMaxWidth()) {
         SectionHeader("Medications")
-        LunarLogCard(modifier = Modifier.fillMaxWidth()) {
-            Text(
-                "Record doses taken on this day",
-                style = MaterialTheme.typography.bodySmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
-            Spacer(Modifier.height(Spacing.sm))
+        val formatter = rememberEntryTimeFormatter()
+        Column(verticalArrangement = Arrangement.spacedBy(Spacing.md)) {
             medications.forEach { medication ->
-                val isTaken = medication.id in takenMedicationIds
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .heightIn(min = Spacing.minTouchTarget)
-                        // toggleable on the row merges the checkbox into one labelled,
-                        // state-carrying stop instead of two unlabelled ones.
-                        .toggleable(
-                            value = isTaken,
-                            role = Role.Checkbox,
-                            onValueChange = { checked -> onTakenChange(medication.id, checked) }
-                        ),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Checkbox(
-                        checked = isTaken,
-                        onCheckedChange = null
-                    )
-                    Spacer(Modifier.width(Spacing.sm))
-                    Column(modifier = Modifier.weight(1f)) {
-                        Text(
-                            medication.name,
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        val details = listOfNotNull(
-                            medication.dosage.takeIf { it.isNotBlank() },
-                            medication.frequency.replace('_', ' ').replaceFirstChar { it.uppercase() }
-                        ).joinToString(" • ")
-                        Text(
-                            details,
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
+                val doses = logs.filter { it.medicationId == medication.id && it.taken }.sortedBy { it.timestamp }
+                val scheduled = medication.frequency != "as_needed"
+                val remaining = (medication.dosesPerDay - doses.size).coerceAtLeast(0)
+                LunarLogCard(modifier = Modifier.fillMaxWidth()) {
+                    Text(medication.name, style = MaterialTheme.typography.titleMedium)
+                    if (medication.dosage.isNotBlank()) Text(medication.dosage,
+                        style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    Spacer(Modifier.height(Spacing.sm))
+                    Text(if (scheduled) stringResource(R.string.dose_progress, doses.size, medication.dosesPerDay)
+                        else pluralStringResource(R.plurals.doses_logged, doses.size, doses.size),
+                        style = MaterialTheme.typography.titleSmall)
+                    if (scheduled) {
+                        Spacer(Modifier.height(Spacing.sm))
+                        LinearProgressIndicator(progress = { (doses.size.toFloat() / medication.dosesPerDay).coerceIn(0f, 1f) },
+                            modifier = Modifier.fillMaxWidth())
+                        Spacer(Modifier.height(Spacing.sm))
+                        Text(if (remaining == 0) stringResource(R.string.dose_target_met)
+                            else pluralStringResource(R.plurals.doses_remaining, remaining, remaining),
+                            style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        if (date == java.time.LocalDate.now() && MedicationScheduler.isMedicationDueToday(medication, date)) {
+                            val minute = java.time.LocalTime.now().let { it.hour * 60L + it.minute }
+                            MedicationScheduler.reminderTimes(medication).firstOrNull {
+                                it > minute && MedicationScheduler.needsReminder(medication, doses.size, it)
+                            }?.let { next ->
+                                Text(stringResource(R.string.next_dose_reminder,
+                                    java.time.LocalTime.MIDNIGHT.plusMinutes(next).format(formatter)),
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    } else Text(stringResource(R.string.as_needed_help), style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant)
+                    doses.forEachIndexed { index, dose ->
+                        val time = Instant.ofEpochMilli(dose.timestamp).atZone(ZoneId.systemDefault()).format(formatter)
+                        val removeLabel = stringResource(R.string.remove_named_dose, medication.name, time)
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(stringResource(R.string.logged_dose_time, index + 1, time), Modifier.weight(1f),
+                                style = MaterialTheme.typography.bodyMedium)
+                            IconButton(onClick = { removeId = dose.id }) {
+                                Icon(Icons.Default.Delete, contentDescription = removeLabel,
+                                    tint = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                        }
+                    }
+                    Spacer(Modifier.height(Spacing.sm))
+                    val logLabel = stringResource(R.string.log_named_dose, medication.name)
+                    FilledTonalButton(onClick = { selectedId = medication.id },
+                        modifier = Modifier.fillMaxWidth().semantics { contentDescription = logLabel }) {
+                        Icon(Icons.Default.Add, contentDescription = null)
+                        Spacer(Modifier.width(Spacing.sm))
+                        Text(stringResource(R.string.ui_log_dose_a665b9))
                     }
                 }
             }
@@ -338,7 +390,9 @@ fun LogEntryCard(
                 }
                 Spacer(Modifier.height(Spacing.xs))
                 Text(
-                    text = entry.value,
+                    text = if (entry.type == com.lunarlog.data.LogEntryType.TEMPERATURE)
+                        entry.value.toFloatOrNull()?.let { com.lunarlog.ui.util.formatTemperature(it) } ?: entry.value
+                        else entry.value,
                     style = MaterialTheme.typography.bodyLarge
                 )
                 if (!entry.details.isNullOrEmpty()) {
@@ -399,7 +453,7 @@ fun PeriodToggleCard(
             Spacer(Modifier.width(Spacing.lg))
             Column(modifier = Modifier.weight(1f)) {
                 Text(
-                    "Period",
+                    androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_period_6e795d),
                     style = MaterialTheme.typography.titleMedium
                 )
                 Text(

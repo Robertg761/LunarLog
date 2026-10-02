@@ -63,7 +63,7 @@ fun LogPeriodScreen(
     val durationText = remember(datePickerState.selectedStartDateMillis, datePickerState.selectedEndDateMillis) {
         val start = datePickerState.selectedStartDateMillis
         val end = datePickerState.selectedEndDateMillis
-        
+
         if (start != null) {
             if (end != null) {
                 val s = Instant.ofEpochMilli(start).atZone(ZoneId.of("UTC")).toLocalDate()
@@ -113,7 +113,7 @@ fun LogPeriodScreen(
                         }
                     },
                     expanded = true,
-                    icon = { 
+                    icon = {
                         if (uiState.isSaving) {
                             CircularProgressIndicator(
                                 modifier = Modifier.padding(2.dp),
@@ -161,7 +161,7 @@ fun LogPeriodScreen(
                 }
                 if (!isReady) {
                     Text(
-                        text = "Select a start date to enable saving.",
+                        text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_select_a_start_date_to_enable_saving_2a48d5),
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(horizontal = Spacing.xl)

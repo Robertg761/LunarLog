@@ -60,6 +60,7 @@ class MedicationWidget : GlanceAppWidget() {
     override val sizeMode: SizeMode = SizeMode.Responsive(setOf(COMPACT, LARGE))
 
     override suspend fun provideGlance(context: Context, id: GlanceId) {
+        if (widgetsRedacted(context)) { provideContent { RedactedWidget() }; return }
         val entryPoint = EntryPointAccessors.fromApplication(
             context.applicationContext,
             WidgetEntryPoint::class.java
@@ -156,25 +157,12 @@ class MedicationWidget : GlanceAppWidget() {
 
     @Composable
     private fun MedicationRow(medication: WidgetMedication) {
-        CheckBox(
-            checked = medication.taken,
-            onCheckedChange = actionRunCallback<ToggleMedicationAction>(
-                actionParametersOf(
-                    ToggleMedicationAction.MedicationIdKey to medication.id,
-                    ToggleMedicationAction.TakenKey to !medication.taken
-                )
-            ),
-            text = medication.label(),
-            maxLines = 2,
-            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 2.dp),
-            style = TextStyle(
-                color = if (medication.taken) WidgetColors.muted else WidgetColors.onSurface,
-                fontSize = 13.sp
-            ),
-            colors = CheckboxDefaults.colors(
-                checkedColor = WidgetColors.primary,
-                uncheckedColor = WidgetColors.outline
-            )
+        Text(
+            text = "${medication.label()} · ${medication.doseCount}/${medication.expectedDoses} doses · Tap to log",
+            maxLines = 3,
+            modifier = GlanceModifier.fillMaxWidth().padding(vertical = 8.dp)
+                .clickable(deepLinkAction(LocalContext.current, "details/${LocalDate.now().toEpochDay()}")),
+            style = TextStyle(color = WidgetColors.onSurface, fontSize = 13.sp)
         )
     }
 
@@ -190,38 +178,4 @@ class MedicationWidget : GlanceAppWidget() {
 
 class MedicationWidgetReceiver : GlanceAppWidgetReceiver() {
     override val glanceAppWidget: GlanceAppWidget = MedicationWidget()
-}
-
-class ToggleMedicationAction : ActionCallback {
-
-    override suspend fun onAction(
-        context: Context,
-        glanceId: GlanceId,
-        parameters: ActionParameters
-    ) {
-        val medicationId = parameters[MedicationIdKey] ?: return
-        val taken = parameters[TakenKey] ?: return
-
-        val entryPoint = EntryPointAccessors.fromApplication(
-            context.applicationContext,
-            WidgetEntryPoint::class.java
-        )
-
-        withContext(Dispatchers.IO) {
-            runCatching {
-                entryPoint.medicationRepository().setMedicationTaken(
-                    date = LocalDate.now().toEpochDay(),
-                    medicationId = medicationId,
-                    taken = taken
-                )
-            }
-        }
-
-        MedicationWidget().update(context, glanceId)
-    }
-
-    companion object {
-        val MedicationIdKey = ActionParameters.Key<Int>("medication_id")
-        val TakenKey = ActionParameters.Key<Boolean>("medication_taken")
-    }
 }

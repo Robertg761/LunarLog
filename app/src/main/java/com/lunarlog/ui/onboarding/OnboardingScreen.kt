@@ -48,6 +48,9 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.material3.Checkbox
+import androidx.compose.foundation.layout.Row
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -86,7 +89,11 @@ fun OnboardingScreen(
 ) {
     val onboardingState by viewModel.onboardingState.collectAsState()
     val isLoading = onboardingState is OnboardingViewModel.OnboardingState.Saving
-    var selectedDate by remember { mutableStateOf(LocalDate.now()) }
+    var selectedDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
+    val selectedDate = LocalDate.ofEpochDay(selectedDay)
+    var endDay by rememberSaveable { mutableStateOf(LocalDate.now().toEpochDay()) }
+    var ongoing by rememberSaveable { mutableStateOf(true) }
+    var pickingEnd by rememberSaveable { mutableStateOf(false) }
     var showDatePicker by remember { mutableStateOf(false) }
 
     LaunchedEffect(onboardingState) {
@@ -116,13 +123,13 @@ fun OnboardingScreen(
             verticalArrangement = Arrangement.Center
         ) {
             Text(
-                text = "LunarLog",
+                text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_lunarlog_4b65cc),
                 style = MaterialTheme.typography.displayMedium,
                 color = MaterialTheme.colorScheme.primary
             )
             Spacer(modifier = Modifier.height(Spacing.md))
             Text(
-                text = "Your Cycle. Your Rhythm.\nYour Privacy.",
+                text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_your_cycle_your_rhythm_your_privacy_d4e445),
                 style = MaterialTheme.typography.headlineSmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurface
@@ -145,13 +152,13 @@ fun OnboardingScreen(
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
                     Text(
-                        text = "Let's get started",
+                        text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_let_s_get_started_d98fb5),
                         style = MaterialTheme.typography.titleMedium,
                         color = MaterialTheme.colorScheme.secondary
                     )
                     Spacer(modifier = Modifier.height(Spacing.xs))
                     Text(
-                        text = "When did your last period start?",
+                        text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_when_did_your_last_period_start_642137),
                         style = MaterialTheme.typography.bodyMedium,
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -169,8 +176,19 @@ fun OnboardingScreen(
 
                     DateSelectorButton(
                         date = selectedDate,
-                        onClick = { showDatePicker = true }
+                        onClick = { pickingEnd = false; showDatePicker = true }
                     )
+                    Row(verticalAlignment = Alignment.CenterVertically) {
+                        Checkbox(checked = ongoing, onCheckedChange = { ongoing = it })
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_my_period_is_still_ongoing_63f3f0))
+                    }
+                    if (!ongoing) {
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_when_did_it_end_904d54))
+                        DateSelectorButton(date = LocalDate.ofEpochDay(endDay), onClick = { pickingEnd = true; showDatePicker = true })
+                    }
+                    TextButton(enabled = !isLoading, onClick = { viewModel.completeOnboarding(null) }) {
+                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_i_don_t_remember_skip_for_now_247c78))
+                    }
                 }
             }
 
@@ -189,7 +207,7 @@ fun OnboardingScreen(
                 } else {
                     PrimaryCTAButton(
                         text = "Begin Journey",
-                        onClick = { viewModel.completeOnboarding(selectedDate) }
+                        onClick = { viewModel.completeOnboarding(selectedDate, if (ongoing) null else LocalDate.ofEpochDay(endDay)) }
                     )
                 }
             }
@@ -198,7 +216,7 @@ fun OnboardingScreen(
 
     if (showDatePicker) {
         val datePickerState = rememberDatePickerState(
-            initialSelectedDateMillis = selectedDate.toPickerMillis(),
+            initialSelectedDateMillis = (if (pickingEnd) LocalDate.ofEpochDay(endDay) else selectedDate).toPickerMillis(),
             selectableDates = PastOrPresentDates
         )
         DatePickerDialog(
@@ -206,16 +224,16 @@ fun OnboardingScreen(
             confirmButton = {
                 TextButton(onClick = {
                     datePickerState.selectedDateMillis?.let { millis ->
-                        selectedDate = millis.toPickerLocalDate()
+                        if (pickingEnd) endDay = millis.toPickerLocalDate().toEpochDay() else selectedDay = millis.toPickerLocalDate().toEpochDay()
                     }
                     showDatePicker = false
                 }) {
-                    Text("OK")
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_ok_565339))
                 }
             },
             dismissButton = {
                 TextButton(onClick = { showDatePicker = false }) {
-                    Text("Cancel")
+                    Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_cancel_19766e))
                 }
             }
         ) {

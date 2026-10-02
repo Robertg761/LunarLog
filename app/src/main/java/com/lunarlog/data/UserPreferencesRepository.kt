@@ -22,6 +22,10 @@ val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "us
 class UserPreferencesRepository @Inject constructor(
     @ApplicationContext private val context: Context
 ) {
+    private val REDACT_WIDGETS = booleanPreferencesKey("redact_widgets")
+    val redactWidgets: Flow<Boolean> = context.dataStore.data.map { it[REDACT_WIDGETS] ?: false }
+    suspend fun setRedactWidgets(value: Boolean) { context.dataStore.edit { it[REDACT_WIDGETS] = value } }
+
     private val IS_FIRST_RUN = booleanPreferencesKey("is_first_run")
     private val APP_LOCK_ENABLED = booleanPreferencesKey("app_lock_enabled")
     private val APP_LOCK_MODE = stringPreferencesKey("app_lock_mode")
@@ -64,7 +68,7 @@ class UserPreferencesRepository @Inject constructor(
         .map { preferences ->
             preferences[APP_LOCK_TIMEOUT_SECONDS] ?: 0L
         }
-    
+
     val themeSeedColor: Flow<Long?> = context.dataStore.data
         .map { preferences ->
             preferences[THEME_SEED_COLOR]
@@ -87,7 +91,7 @@ class UserPreferencesRepository @Inject constructor(
         .map { preferences ->
             preferences[CYCLE_NOTIFICATION_ENABLED] ?: false
         }
-    
+
     suspend fun setFirstRunComplete() {
         context.dataStore.edit { preferences ->
             preferences[IS_FIRST_RUN] = false

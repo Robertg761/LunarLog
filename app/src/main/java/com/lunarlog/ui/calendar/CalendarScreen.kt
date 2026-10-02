@@ -92,11 +92,14 @@ fun CalendarScreen(
     onDayClicked: (Long) -> Unit,
     viewModel: CalendarViewModel = hiltViewModel()
 ) {
+    com.lunarlog.ui.util.ObserveDateChanges(viewModel::refreshDate)
     // Collect the GLOBAL data state
     val calendarState by viewModel.calendarState.collectAsState()
 
     // Pager Setup
     val initialPage = 5000
+    val anchorMonthText = androidx.compose.runtime.saveable.rememberSaveable { YearMonth.now().toString() }
+    val anchorMonth = YearMonth.parse(anchorMonthText)
     val pagerState = rememberPagerState(initialPage = initialPage) { 10000 }
     val scope = rememberCoroutineScope()
     var previewDay by remember { mutableStateOf<CalendarDayUiModel?>(null) }
@@ -108,10 +111,11 @@ fun CalendarScreen(
     // commits, which is when the user expects the month name to change.
     val currentMonth by remember {
         derivedStateOf {
-            YearMonth.now().plusMonths((pagerState.targetPage - initialPage).toLong())
+            anchorMonth.plusMonths((pagerState.targetPage - initialPage).toLong())
         }
     }
 
+    LaunchedEffect(currentMonth) { viewModel.setVisibleMonth(currentMonth) }
     Scaffold(
         topBar = {
             CalendarHeader(
@@ -126,17 +130,16 @@ fun CalendarScreen(
                     scope.launch {
                         // The pager has 10000 pages; animating from an arbitrary one to page 5000
                         // composes every page in between. Only animate a near jump.
-                        if (abs(pagerState.currentPage - initialPage) > 2) {
-                            pagerState.scrollToPage(initialPage)
-                        } else {
-                            pagerState.animateScrollToPage(initialPage)
-                        }
+                        val todayPage = initialPage + java.time.temporal.ChronoUnit.MONTHS.between(anchorMonth, YearMonth.now()).toInt()
+                        if (abs(pagerState.currentPage - todayPage) > 2) pagerState.scrollToPage(todayPage)
+                        else pagerState.animateScrollToPage(todayPage)
                     }
                 }
             )
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding).fillMaxSize()) {
+            (calendarState as? CalendarDataState.Success)?.error?.let { Text(it, color = MaterialTheme.colorScheme.error) }
             // Day Headers (S M T W T F S) — same gutter as the grid, so the columns align.
             CalendarWeekDaysHeader(modifier = Modifier.padding(horizontal = CalendarGridInset))
 
@@ -145,7 +148,7 @@ fun CalendarScreen(
                 state = pagerState,
                 modifier = Modifier.weight(1f) // Fill remaining space
             ) { page ->
-                val pageMonth = YearMonth.now().plusMonths((page - initialPage).toLong())
+                val pageMonth = anchorMonth.plusMonths((page - initialPage).toLong())
 
                 // Fetch the 42 days for this page from the global state
                 // This is a fast CPU operation
@@ -290,13 +293,13 @@ fun FlowIntensityLegendItem(modifier: Modifier = Modifier) {
         // instead means this caption is what gives — it wraps to a second line, and "Light",
         // the swatches and "Heavy" keep their intrinsic widths.
         Text(
-            text = "Flow intensity",
+            text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_flow_intensity_54935f),
             modifier = Modifier.weight(1f),
             style = MaterialTheme.typography.labelSmall,
             color = labelColor
         )
         Text(
-            text = "Light",
+            text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_light_dbcd5e),
             style = MaterialTheme.typography.labelSmall,
             color = labelColor
         )
@@ -312,7 +315,7 @@ fun FlowIntensityLegendItem(modifier: Modifier = Modifier) {
             }
         }
         Text(
-            text = "Heavy",
+            text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_heavy_caaba8),
             style = MaterialTheme.typography.labelSmall,
             color = labelColor
         )
@@ -373,7 +376,9 @@ fun CalendarWeekDaysHeader(modifier: Modifier = Modifier) {
             .fillMaxWidth()
             .padding(bottom = Spacing.sm)
     ) {
-        val weekDays = listOf("S", "M", "T", "W", "T", "F", "S")
+        val locale = LocalLocale.current.platformLocale
+        val first = java.time.temporal.WeekFields.of(locale).firstDayOfWeek
+        val weekDays = (0L..6L).map { first.plus(it).getDisplayName(java.time.format.TextStyle.SHORT, locale) }
         weekDays.forEach { day ->
             Text(
                 text = day,
@@ -431,7 +436,7 @@ fun CalendarDayPreviewSheet(
     val dateFormatter = FullDayDate
     val statusLabels = remember(day) {
         buildList {
-            if (day.data.isPeriod) add("Period")
+            if (day.data.isPeriod) add(if (day.data.isEstimatedPeriod) "Period — end estimated" else "Period")
             if (day.data.isPredictedPeriod) add("Predicted")
             if (day.data.isFertile) add("Fertile")
             if (day.data.isOvulation) add("Ovulation")
@@ -467,7 +472,7 @@ fun CalendarDayPreviewSheet(
             Button(onClick = onEdit) {
                 Icon(Icons.Filled.Edit, contentDescription = null)
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                Text("Edit")
+                Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_edit_464c4f))
             }
         }
 
@@ -495,7 +500,7 @@ fun CalendarDayPreviewSheet(
             )
             Column {
                 Text(
-                    text = "Flow",
+                    text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_flow_f1273d),
                     style = MaterialTheme.typography.labelMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -509,13 +514,13 @@ fun CalendarDayPreviewSheet(
 
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(
-                text = "Symptoms & mood",
+                text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_symptoms_mood_ad236b),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )
             if (details.isEmpty()) {
                 Text(
-                    text = "No symptoms logged",
+                    text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_no_symptoms_logged_5a5e7c),
                     style = MaterialTheme.typography.bodyMedium,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -536,7 +541,7 @@ fun CalendarDayPreviewSheet(
 
         Column(verticalArrangement = Arrangement.spacedBy(Spacing.sm)) {
             Text(
-                text = "Notes",
+                text = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_notes_8a7525),
                 style = MaterialTheme.typography.labelMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
             )

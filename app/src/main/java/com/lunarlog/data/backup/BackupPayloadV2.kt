@@ -1,7 +1,7 @@
 package com.lunarlog.data.backup
 
 data class BackupPayloadV2(
-    val version: Int = 2,
+    val version: Int = 3,
     val exportedAtMillis: Long,
     val appVersionName: String? = null,
     val data: BackupDataV2
@@ -64,7 +64,10 @@ data class MedicationDto(
     val frequency: String = "daily",
     val startDateEpochDay: Long,
     val endDateEpochDay: Long? = null,
-    val reminderTimeMinutes: Long? = null
+    val reminderTimeMinutes: Long? = null,
+    val dosesPerDay: Int? = null,
+    val reminderTimes: List<Long>? = null,
+    val isArchived: Boolean = false
 )
 
 data class MedicationLogDto(
@@ -80,5 +83,6 @@ data class SymptomDefinitionDto(
     val name: String,
     val displayName: String,
     val category: String,
-    val isCustom: Boolean = false
+    val isCustom: Boolean = false,
+    val isArchived: Boolean = false
 )

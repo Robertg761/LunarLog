@@ -71,7 +71,9 @@ class MainActivity : AppCompatActivity() {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
         window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
-        pendingDeepLink.value = intent.lunarLogDeepLinkOrNull()
+        pendingDeepLink.value = if (savedInstanceState?.containsKey(PENDING_LINK_STATE) == true) {
+            savedInstanceState.getString(PENDING_LINK_STATE)
+        } else intent.lunarLogDeepLinkOrNull()
 
         if (BuildConfig.ENABLE_GITHUB_UPDATES) {
             // Silent update check for sideloaded GitHub builds.
@@ -127,7 +129,12 @@ class MainActivity : AppCompatActivity() {
                     }
                 }
             }
-            
+
+            LaunchedEffect(Unit) {
+                viewModel.updateMessage.collect { message ->
+                    if (message != null) { snackbarHostState.showSnackbar(message); viewModel.updateMessage.value = null }
+                }
+            }
             // Show Snackbar on Update
             LaunchedEffect(uiState.isUpdateAvailable) {
                 if (!BuildConfig.ENABLE_GITHUB_UPDATES) return@LaunchedEffect
@@ -158,6 +165,10 @@ class MainActivity : AppCompatActivity() {
                 }
             }
 
+            val unlockedState = androidx.compose.runtime.saveable.rememberSaveableStateHolder()
+            LaunchedEffect(uiState.startDestination) {
+                if (uiState.startDestination == "onboarding") unlockedState.removeState("unlocked")
+            }
             LunarLogTheme(
                 seedColor = uiState.themeSeedColor
             ) {
@@ -200,9 +211,11 @@ class MainActivity : AppCompatActivity() {
                                     authenticateUser()
                                 }
                             } else {
+                                unlockedState.SaveableStateProvider(if (uiState.startDestination == "onboarding") "onboarding" else "unlocked") {
                                 LunarLogNavGraph(
                                     startDestination = uiState.startDestination,
                                     isUpdateAvailable = uiState.isUpdateAvailable,
+                                    onCheckUpdates = { viewModel.checkForUpdates(manual = true) },
                                     pendingDeepLink = deepLink,
                                     onDeepLinkHandled = { handled ->
                                         pendingDeepLink.value = null
@@ -224,6 +237,7 @@ class MainActivity : AppCompatActivity() {
                                     // nav bar and the system inset automatically.
                                     snackbarHostState = snackbarHostState
                                 )
+                                }
                             }
                         }
                     } else {
@@ -242,6 +256,17 @@ class MainActivity : AppCompatActivity() {
                 }
             }
         }
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        // Save null as well: a consumed launch link must not be replayed on recreation.
+        // A link still waiting behind App Lock/onboarding must remain pending.
+        outState.putString(PENDING_LINK_STATE, pendingDeepLink.value)
+        super.onSaveInstanceState(outState)
+    }
+
+    private companion object {
+        const val PENDING_LINK_STATE = "pending_notification_link"
     }
 
     override fun onResume() {

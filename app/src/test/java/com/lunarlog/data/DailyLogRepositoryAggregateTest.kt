@@ -1,5 +1,6 @@
 package com.lunarlog.data
 
+import androidx.room.withTransaction
 import com.lunarlog.core.model.DailyLog
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -61,7 +62,10 @@ class DailyLogRepositoryAggregateTest {
         coEvery { logEntryDao.getEntriesForDateSync(date.toEpochDay()) } returns emptyList()
         coEvery { dailyLogDao.getLogForDateSync(date) } returns DailyLog(date = date)
 
-        repo.ensureLegacyDataHydrated(date.toEpochDay())
+        io.mockk.mockkStatic("androidx.room.RoomDatabaseKt")
+        val transaction = slot<suspend () -> Unit>()
+        coEvery { appDatabase.withTransaction(capture(transaction)) } coAnswers { transaction.captured.invoke() }
+        try { repo.ensureLegacyDataHydrated(date.toEpochDay()) } finally { io.mockk.unmockkStatic("androidx.room.RoomDatabaseKt") }
 
         coVerify(exactly = 1) { dailyLogDao.deleteLog(date) }
         coVerify(exactly = 0) { logEntryDao.insertEntry(any()) }

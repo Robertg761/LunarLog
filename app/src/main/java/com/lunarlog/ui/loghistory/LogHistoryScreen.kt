@@ -44,6 +44,8 @@ fun LogHistoryScreen(
     sharedTransitionScope: SharedTransitionScope? = null,
     animatedVisibilityScope: AnimatedVisibilityScope? = null
 ) {
+    val loadError by viewModel.error.collectAsState()
+    val loading by viewModel.isLoading.collectAsState()
     val logs by viewModel.logs.collectAsState()
     val searchQuery by viewModel.searchQuery.collectAsState()
     val selectedSymptom by viewModel.selectedSymptom.collectAsState()
@@ -76,13 +78,15 @@ fun LogHistoryScreen(
                     // into the header strip below, where a 32dp pill does not sit off-centre
                     // against a 48dp target.
                     IconButton(onClick = { showFilterSheet = true }) {
-                        Icon(Icons.Default.FilterList, contentDescription = "Filter by Symptom")
+                        Icon(Icons.Default.FilterList, contentDescription = androidx.compose.ui.res.stringResource(com.lunarlog.R.string.filter_symptoms_moods))
                     }
                 }
             )
         }
     ) { padding ->
         Column(modifier = Modifier.padding(padding)) {
+            if (loading) LinearProgressIndicator(Modifier.fillMaxWidth())
+            loadError?.let { com.lunarlog.ui.components.InlineError(it, Modifier.padding(16.dp)) }
             // Search + active filter as one tonal header strip, so the list no longer collides
             // with the text field's bottom border.
             Surface(color = MaterialTheme.colorScheme.surfaceContainer) {
@@ -102,7 +106,7 @@ fun LogHistoryScreen(
                         onValueChange = viewModel::onSearchQueryChanged,
                         modifier = Modifier.fillMaxWidth(),
                         shape = MaterialTheme.shapes.extraLarge,
-                        placeholder = { Text("Search notes...") },
+                        label = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.search_notes_label)) },
                         leadingIcon = { Icon(Icons.Default.Search, contentDescription = null) },
                         trailingIcon = {
                             if (searchQuery.isNotEmpty()) {
@@ -138,7 +142,7 @@ fun LogHistoryScreen(
                 modifier = Modifier.fillMaxSize(),
                 contentPadding = PaddingValues(bottom = Spacing.screenVertical)
             ) {
-                if (logs.isEmpty()) {
+                if (logs.isEmpty() && !loading && loadError == null) {
                     item {
                         Box(
                             modifier = Modifier
@@ -155,6 +159,15 @@ fun LogHistoryScreen(
                                     "Try a different search term or clear the symptom filter."
                                 } else {
                                     "Days you log will show up here."
+                                },
+                                action = {
+                                    if (isFiltered) OutlinedButton(onClick = {
+                                        viewModel.onSearchQueryChanged("")
+                                        viewModel.onSymptomSelected(null)
+                                    }) { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.clear_history_filters)) }
+                                    else FilledTonalButton(onClick = { onLogClick(java.time.LocalDate.now().toEpochDay()) }) {
+                                        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_log_today_6b60cb))
+                                    }
                                 }
                             )
                         }
@@ -196,7 +209,7 @@ fun LogHistoryScreen(
                     )
                 ) {
                     Text(
-                        "Filter by Symptom",
+                        androidx.compose.ui.res.stringResource(com.lunarlog.R.string.filter_symptoms_moods),
                         style = MaterialTheme.typography.titleMedium,
                         modifier = Modifier.padding(bottom = Spacing.lg)
                     )
@@ -206,6 +219,11 @@ fun LogHistoryScreen(
                             .fillMaxWidth()
                             .heightIn(max = maxListHeight)
                     ) {
+                        item {
+                            TextButton(onClick = { viewModel.onSymptomSelected(null); dismissFilterSheet() }) {
+                                Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.clear_history_filters))
+                            }
+                        }
                         items(availableSymptoms) { symptom ->
                             ListItem(
                                 headlineContent = { Text(symptom.displayName) },
@@ -263,7 +281,7 @@ fun LogHistoryItem(
         headlineContent = {
             Text(
                 text = date.format(MediumDate),
-                style = MaterialTheme.typography.bodyLarge
+                style = MaterialTheme.typography.titleMedium
             )
         },
         supportingContent = {
@@ -283,12 +301,12 @@ fun LogHistoryItem(
                     if (log.flowLevel > 0) add("Flow: ${flowLabel(log.flowLevel)}")
                     addAll(log.mood)
                     addAll(log.symptoms)
-                }.take(5).joinToString(", ")
+                }.joinToString(", ")
 
                 if (summary.isNotEmpty()) {
                     Text(
                         text = summary,
-                        maxLines = 1,
+                        maxLines = 2,
                         overflow = TextOverflow.Ellipsis,
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

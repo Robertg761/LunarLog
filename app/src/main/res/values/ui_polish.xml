@@ -1,0 +1,27 @@
+<resources>
+    <string name="medication_details_heading">Medication details</string>
+    <string name="schedule_heading">Schedule</string>
+    <string name="reminders_heading">Reminders</string>
+    <string name="doses_per_day_label">Doses per scheduled day</string>
+    <string name="doses_per_day_help">Enter a number from 1 to 24.</string>
+    <string name="reminder_count_help">Choose one distinct time for each planned dose. Times set: %1$d / %2$d.</string>
+    <string name="as_needed_help">Log a dose whenever needed. There is no daily target or scheduled reminder.</string>
+    <string name="reminder_delivery_help">Reminders may arrive later depending on Android’s background restrictions.</string>
+    <string name="dose_progress">Doses logged: %1$d of %2$d</string>
+    <string name="dose_target_met">Daily target recorded</string>
+    <plurals name="doses_remaining"><item quantity="one">%d dose remaining</item><item quantity="other">%d doses remaining</item></plurals>
+    <plurals name="doses_logged"><item quantity="one">%d dose logged</item><item quantity="other">%d doses logged</item></plurals>
+    <string name="next_dose_reminder">Next reminder: %s</string>
+    <string name="logged_dose_time">Dose %1$d · %2$s</string>
+    <string name="remove_named_dose">Remove %1$s dose at %2$s</string>
+    <string name="log_named_dose">Log a dose of %s</string>
+    <string name="clear_history_filters">Clear filters</string>
+    <string name="search_notes_label">Search notes</string>
+    <string name="prediction_context_heading">About this estimate</string>
+    <string name="saving_changes">Saving…</string>
+    <plurals name="save_entry_count"><item quantity="one">Save %d item</item><item quantity="other">Save %d items</item></plurals>
+    <string name="choose_entries_help">Choose what you want to record, then save your entries together.</string>
+    <string name="edit_reminder_at">Edit reminder at %s</string>
+    <string name="remove_reminder_at">Remove reminder at %s</string>
+    <string name="filter_symptoms_moods">Filter by symptom or mood</string>
+</resources>

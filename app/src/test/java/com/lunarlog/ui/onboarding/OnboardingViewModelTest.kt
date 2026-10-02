@@ -39,9 +39,23 @@ class OnboardingViewModelTest {
     }
 
     @Test
+    fun `skip onboarding creates no period and ongoing start has no invented end`() = runTest {
+        viewModel = OnboardingViewModel(cycleRepository, userPreferencesRepository)
+        viewModel.completeOnboarding(null)
+        advanceUntilIdle()
+        coVerify(exactly = 0) { cycleRepository.recordPeriod(any(), any()) }
+        coVerify { userPreferencesRepository.setFirstRunComplete() }
+        coEvery { cycleRepository.recordPeriod(any(), null) } returns PeriodChangeResult.Success(PeriodChangeAction.PERIOD_DAY_ADDED, "Saved")
+        val start = LocalDate.of(2026, 2, 1)
+        viewModel.completeOnboarding(start)
+        advanceUntilIdle()
+        coVerify { cycleRepository.recordPeriod(start, null) }
+    }
+
+    @Test
     fun `completeOnboarding emits success and marks first run complete`() = runTest {
         coEvery {
-            cycleRepository.setPeriodDay(any(), true)
+            cycleRepository.recordPeriod(any(), any())
         } returns PeriodChangeResult.Success(
             action = PeriodChangeAction.PERIOD_DAY_ADDED,
             message = "Period day added"
@@ -58,7 +72,7 @@ class OnboardingViewModelTest {
     @Test
     fun `completeOnboarding emits error when cycle update fails`() = runTest {
         coEvery {
-            cycleRepository.setPeriodDay(any(), true)
+            cycleRepository.recordPeriod(any(), any())
         } returns PeriodChangeResult.ValidationError("Cannot modify future days")
 
         viewModel = OnboardingViewModel(cycleRepository, userPreferencesRepository)
@@ -69,4 +83,3 @@ class OnboardingViewModelTest {
         coVerify(exactly = 0) { userPreferencesRepository.setFirstRunComplete() }
     }
 }
-

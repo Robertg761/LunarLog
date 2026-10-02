@@ -77,6 +77,10 @@ class DailyLogRepository @Inject constructor(
         replaceEntriesForDate(date, entries)
     }
 
+    fun getLogsForWindows(start: LocalDate, end: LocalDate, otherStart: LocalDate, otherEnd: LocalDate) = dailyLogDao.getLogsForWindows(start, end, otherStart, otherEnd)
+
+    fun getEntriesForRange(start: Long, end: Long) = logEntryDao.getEntriesForRange(start, end)
+
     fun getAllLogs(): Flow<List<DailyLog>> {
         return dailyLogDao.getAllLogs()
     }
@@ -87,7 +91,7 @@ class DailyLogRepository @Inject constructor(
         return dailyLogDao.searchLogsFts(ftsQuery)
     }
 
-    fun searchLogsBySymptom(symptom: String): Flow<List<DailyLog>> = flow {
+    fun searchLogsBySymptom(symptom: String, type: LogEntryType = LogEntryType.SYMPTOM): Flow<List<DailyLog>> = flow {
         // Older databases may have aggregate daily_logs rows that predate granular
         // log_entries. Hydrate them once so the exact-match join remains complete.
         appDatabase.withTransaction {
@@ -95,7 +99,7 @@ class DailyLogRepository @Inject constructor(
                 ensureLegacyDataHydrated(legacyLog.date.toEpochDay())
             }
         }
-        emitAll(dailyLogDao.searchLogsBySymptom(symptom))
+        emitAll(dailyLogDao.searchLogsBySymptom(symptom, type))
     }
 
     // --- Granular Log Entry Support ---
@@ -107,18 +111,22 @@ class DailyLogRepository @Inject constructor(
     fun getAllEntries(): Flow<List<LogEntry>> = logEntryDao.getAllEntries()
 
     suspend fun addEntry(entry: LogEntry) {
+        LogValidation.entry(entry)
         appDatabase.withTransaction {
             ensureLegacyDataHydrated(entry.date)
+            validateSleepChange(entry.date, listOf(entry))
             logEntryDao.insertEntry(entry)
             updateDailyLogAggregateInTransaction(entry.date)
         }
     }
 
     suspend fun addEntryIfAbsent(entry: LogEntry): Boolean = appDatabase.withTransaction {
+        LogValidation.entry(entry)
         ensureLegacyDataHydrated(entry.date)
         if (logEntryDao.entryExists(entry.date, entry.type, entry.value)) {
             return@withTransaction false
         }
+        validateSleepChange(entry.date, listOf(entry))
         logEntryDao.insertEntry(entry)
         updateDailyLogAggregateInTransaction(entry.date)
         true
@@ -129,11 +137,13 @@ class DailyLogRepository @Inject constructor(
      * It must not change coroutine context, otherwise Room's transaction context can be lost.
      */
     suspend fun addEntryInTransaction(entry: LogEntry) {
+        LogValidation.entry(entry)
         ensureLegacyDataHydrated(entry.date)
+        validateSleepChange(entry.date, listOf(entry))
         logEntryDao.insertEntry(entry)
         updateDailyLogAggregateInTransaction(entry.date)
     }
-    
+
     suspend fun deleteEntry(entry: LogEntry) {
         appDatabase.withTransaction {
             logEntryDao.deleteEntry(entry.id)
@@ -142,15 +152,19 @@ class DailyLogRepository @Inject constructor(
     }
 
     suspend fun updateEntry(entry: LogEntry) {
+        LogValidation.entry(entry)
         appDatabase.withTransaction {
+            validateSleepChange(entry.date, listOf(entry), entry.id)
             logEntryDao.updateEntry(entry)
             updateDailyLogAggregateInTransaction(entry.date)
         }
     }
 
     suspend fun replaceEntriesForDate(date: Long, entries: List<LogEntry>) {
+        entries.forEach { require(it.date == date); LogValidation.entry(it) }
         appDatabase.withTransaction {
             ensureLegacyDataHydrated(date)
+            LogValidation.sleepTotal(logEntryDao.getEntriesForDateSync(date), entries)
             logEntryDao.deleteEntriesForDate(date)
             entries.forEach { entry ->
                 logEntryDao.insertEntry(entry)
@@ -181,6 +195,10 @@ class DailyLogRepository @Inject constructor(
     ) {
         appDatabase.withTransaction {
             ensureLegacyDataHydrated(date)
+            val replacement = values.filter { it.isNotBlank() }.map { LogEntry(date = date, time = time, type = type, value = it, details = details) }
+            replacement.forEach { LogValidation.entry(it) }
+            val before = logEntryDao.getEntriesForDateSync(date)
+            LogValidation.sleepTotal(before, before.filterNot { it.type == type } + replacement)
             logEntryDao.deleteEntriesForDateAndType(date, type)
             values.filter { it.isNotBlank() }.forEach { value ->
                 logEntryDao.insertEntry(
@@ -219,7 +237,41 @@ class DailyLogRepository @Inject constructor(
         replaceEntriesForDate(date, entries)
     }
 
-    suspend fun ensureLegacyDataHydrated(date: Long) {
+    suspend fun saveEntries(date: Long, entries: List<LogEntry>, editingEntry: LogEntry?) {
+        LogValidation.date(date)
+        entries.forEach { require(it.date == date); LogValidation.entry(it) }
+        require(editingEntry == null || editingEntry.date == date) { "The selected day changed. Reopen the entry." }
+        appDatabase.withTransaction {
+            ensureLegacyDataHydrated(date)
+            val before = logEntryDao.getEntriesForDateSync(date)
+            require(editingEntry == null || before.any { it.id == editingEntry.id }) { "This entry was removed. Reload the day." }
+            LogValidation.sleepTotal(before, before.filterNot { it.id == editingEntry?.id } + entries)
+            if (editingEntry != null) logEntryDao.deleteEntry(editingEntry.id)
+            entries.forEach { logEntryDao.insertEntry(it) }
+            updateDailyLogAggregateInTransaction(date)
+        }
+    }
+
+    /** Undo restores the original event, including recoverable pre-validation legacy values. */
+    suspend fun restoreDeletedEntry(entry: LogEntry) {
+        require(entry.id > 0)
+        LogValidation.entry(entry, legacy = true)
+        appDatabase.withTransaction {
+            val existing = logEntryDao.getEntryById(entry.id)
+            require(existing == null || existing == entry) { "History changed. This entry can no longer be restored automatically." }
+            if (existing == null) logEntryDao.insertEntry(entry)
+            updateDailyLogAggregateInTransaction(entry.date)
+        }
+    }
+
+    private suspend fun validateSleepChange(date: Long, additions: List<LogEntry>, replacedId: Long? = null) {
+        val before = logEntryDao.getEntriesForDateSync(date)
+        LogValidation.sleepTotal(before, before.filterNot { it.id == replacedId } + additions)
+    }
+
+    suspend fun ensureLegacyDataHydrated(date: Long) = appDatabase.withTransaction { hydrateLegacyData(date) }
+
+    private suspend fun hydrateLegacyData(date: Long) {
         val existingEntries = logEntryDao.getEntriesForDateSync(date)
         if (existingEntries.isNotEmpty()) return
 
@@ -302,7 +354,7 @@ class DailyLogRepository @Inject constructor(
 
     private suspend fun updateDailyLogAggregateInternal(date: Long) {
         val entries = logEntryDao.getEntriesForDateSync(date)
-        
+
         if (entries.isEmpty()) {
             dailyLogDao.deleteLog(LocalDate.ofEpochDay(date))
             return
@@ -310,7 +362,7 @@ class DailyLogRepository @Inject constructor(
 
         val symptoms = entries.filter { it.type == LogEntryType.SYMPTOM }.map { it.value }.distinct()
         val moods = entries.filter { it.type == LogEntryType.MOOD }.map { it.value }.distinct()
-        
+
         val flowEntries = entries.filter { it.type == LogEntryType.FLOW }
         val flowLevel = if (flowEntries.isNotEmpty()) {
             flowEntries.maxOfOrNull { it.value.toIntOrNull() ?: 0 } ?: 0
@@ -352,4 +404,4 @@ class DailyLogRepository @Inject constructor(
         )
         dailyLogDao.insertLog(aggregate)
     }
-} 
+}

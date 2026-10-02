@@ -7,7 +7,7 @@ import com.lunarlog.data.CycleRepository
 import dagger.hilt.android.lifecycle.HiltViewModel
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.stateIn
+import kotlinx.coroutines.flow.*
 import javax.inject.Inject
 
 @HiltViewModel
@@ -15,6 +15,10 @@ class PeriodHistoryViewModel @Inject constructor(
     private val cycleRepository: CycleRepository
 ) : ViewModel() {
 
+    val error = MutableStateFlow<String?>(null)
+    val isLoading = MutableStateFlow(true)
     val cycles: StateFlow<List<Cycle>> = cycleRepository.getAllCycles()
+        .onStart { isLoading.value = true; error.value = null }.onEach { isLoading.value = false }
+        .catch { if (it is kotlinx.coroutines.CancellationException) throw it; error.value = "Unable to load periods. Reopen this screen to retry."; isLoading.value = false; emit(emptyList()) }
         .stateIn(viewModelScope, SharingStarted.WhileSubscribed(5000), emptyList())
 }

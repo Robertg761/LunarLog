@@ -10,12 +10,12 @@ LunarLog is a privacy-first Android app for menstrual cycle and related wellness
 
 - Record, edit, and remove period ranges with overlap and date validation.
 - Log symptoms, custom symptoms, moods, flow, water, sleep, sleep quality, libido, notes, temperature, and cervical mucus by date and time.
-- Add daily, weekly, or as-needed medications; optionally schedule private reminders; record doses by date.
+- Add daily, weekly, or as-needed medications; optionally schedule private reminders; record individual timestamped doses, edit schedules, and archive medications without deleting history.
 - Show history, exact symptom filtering, calendar summaries, and future period/fertile-day estimates.
 - Calculate cycle statistics from start-to-next-start intervals and only from completed cycles.
 - Use temperature and cervical-mucus observations only when enough consecutive, plausible data exists; calendar fertility remains clearly labelled as an estimate.
 - Generate paginated PDF summaries and detailed CSV exports.
-- Create and restore bounded, validated JSON backups, including user-selectable reminder/theme preferences. App-lock state is deliberately not restored.
+- Create and restore bounded, validated version 3 JSON backups (also reads legacy and version 2), including user-selectable reminder/theme preferences. App-lock state is deliberately not restored.
 - Offer optional Android device-credential/biometric app lock, notification reminders, a Glance widget, and GitHub-build updates.
 
 LunarLog is not a medical device and does not diagnose, treat, cure, or prevent any medical condition. Users should consult a healthcare professional for medical advice, diagnosis, or treatment. Fertile-day estimates are not birth control.
@@ -38,7 +38,7 @@ LunarLog is not a medical device and does not diagnose, treat, cure, or prevent 
 - `logic`: deterministic prediction, analysis, scheduling, and narrative logic.
 - `ui`: Compose screens and Hilt ViewModels.
 - `workers`: private cycle, daily-log, and medication reminders.
-- Database version: 9. Schema exports are committed and migrations are tested from the oldest publicly released database version (8).
+- Database version: 11. Schema exports are committed and migrations are tested from the oldest publicly released database version (8).
 
 ## Distribution
 
@@ -51,7 +51,7 @@ LunarLog is not a medical device and does not diagnose, treat, cure, or prevent 
 - Pull requests and `main` builds run unit tests, Android lint, and both debug distribution assemblies.
 - CodeQL analyzes Java/Kotlin on pull requests, `main`, and weekly.
 - Dependabot tracks Gradle and GitHub Actions updates.
-- Room schema export and migration tests protect persisted user data.
+- Room schema export and an API 35 emulator CI job cover upgrades from 8 through 11, mood search, atomic batch rollback, recovery, and dose history.
 - Release tags must be valid SemVer and point to the current `origin/main` HEAD.
 
 ## Remaining Product Roadmap

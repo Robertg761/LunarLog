@@ -49,6 +49,8 @@ fun PeriodHistoryScreen(
     onAddPeriodClick: () -> Unit,
     viewModel: PeriodHistoryViewModel = hiltViewModel()
 ) {
+    val error by viewModel.error.collectAsState()
+    val isLoading by viewModel.isLoading.collectAsState()
     val cycles by viewModel.cycles.collectAsState()
 
     Scaffold(
@@ -66,7 +68,11 @@ fun PeriodHistoryScreen(
             }
         }
     ) { padding ->
-        if (cycles.isEmpty()) {
+        if (isLoading) {
+            com.lunarlog.ui.components.LoadingState()
+        } else if (error != null) {
+            Text(error!!, modifier = Modifier.padding(padding).padding(16.dp))
+        } else if (cycles.isEmpty()) {
             Box(
                 modifier = Modifier
                     .fillMaxSize()
@@ -157,14 +163,14 @@ private fun PeriodCard(
                         maxLines = 1,
                         overflow = TextOverflow.Ellipsis
                     )
-                    if (isOngoing) {
+                    if (isOngoing || cycle.endEstimated) {
                         Spacer(Modifier.width(Spacing.sm))
                         Badge(
                             containerColor = cycleColors.periodStrong,
                             contentColor = cycleColors.onPeriodStrong
                         ) {
                             Text(
-                                "Ongoing",
+                                if (isOngoing) "Ongoing" else "End estimated",
                                 style = MaterialTheme.typography.labelSmall
                             )
                         }

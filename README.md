@@ -37,7 +37,7 @@ Cycle and fertile-day predictions are estimates. LunarLog is not a medical devic
 
 ## Requirements
 
-- Android Studio with Android SDK 35
+- Android Studio with Android SDK 37 (compile SDK); target SDK 35
 - JDK 17
 - Android device or emulator (API 26+)
 
@@ -54,7 +54,8 @@ Cycle and fertile-day predictions are estimates. LunarLog is not a medical devic
 ./gradlew :app:assembleGithubDebug
 ./gradlew :app:bundlePlayRelease
 ./gradlew :app:assembleGithubRelease
-./gradlew test
+./gradlew test lintPlayDebug lintGithubDebug
+./gradlew connectedGithubDebugAndroidTest # requires an emulator/device
 ```
 
 ## Project Structure
@@ -106,7 +107,8 @@ Automated checks cover cycle prediction, fertility-signal validation, reminders,
 Run all unit tests:
 
 ```bash
-./gradlew test
+./gradlew test lintPlayDebug lintGithubDebug
+./gradlew connectedGithubDebugAndroidTest # requires an emulator/device
 ```
 
 ## Security and Privacy Notes
@@ -130,3 +132,5 @@ Run all unit tests:
 ## License
 
 LunarLog is available under the [MIT License](LICENSE).
+
+See [current release QA](docs/QA_CHECKLIST.md) and [audit remediation](docs/AUDIT_REMEDIATION.md) for behavioral changes, migration details, and verification limits. Historical release checklists remain under `docs/release/`.

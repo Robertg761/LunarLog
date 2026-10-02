@@ -36,6 +36,22 @@ class CycleRepository @Inject constructor(
     suspend fun getAllCyclesSync(): List<Cycle> = cycleDao.getAllCyclesSync()
     fun getCyclesInRange(startDate: LocalDate, endDate: LocalDate): Flow<List<Cycle>> = cycleDao.getCyclesInRange(startDate, endDate)
 
+    suspend fun recordPeriod(start: LocalDate, end: LocalDate?): PeriodChangeResult = runValidatedTransaction {
+        if (start.isAfter(LocalDate.now()) || end?.isAfter(LocalDate.now()) == true || end?.isBefore(start) == true) {
+            return@runValidatedTransaction PeriodChangeResult.ValidationError("Choose a valid period range ending no later than today")
+        }
+        LogValidation.date(start.toEpochDay())
+        end?.let { LogValidation.date(it.toEpochDay()) }
+        val cycles = cycleDao.getAllCyclesSync()
+        if (cycles.any { it.startDate == start && it.endDate == end }) {
+            return@runValidatedTransaction PeriodChangeResult.Success(PeriodChangeAction.NO_CHANGE, "Period already recorded")
+        }
+        val cycle = Cycle(startDate = start, endDate = end)
+        if (hasOverlap(cycle, cycles)) return@runValidatedTransaction PeriodChangeResult.ValidationError("These dates overlap another period")
+        cycleDao.insertCycle(cycle)
+        PeriodChangeResult.Success(PeriodChangeAction.PERIOD_STARTED, "Period recorded")
+    }
+
     suspend fun startPeriod(date: LocalDate): PeriodChangeResult = runValidatedTransaction {
         if (date.isAfter(LocalDate.now())) {
             return@runValidatedTransaction PeriodChangeResult.ValidationError("Cannot start a period in the future")
@@ -160,6 +176,8 @@ class CycleRepository @Inject constructor(
 
     suspend fun setPeriodRange(startDate: LocalDate, endDate: LocalDate): PeriodChangeResult =
         runValidatedTransaction {
+            LogValidation.date(startDate.toEpochDay())
+            LogValidation.date(endDate.toEpochDay())
             if (startDate.isAfter(endDate)) {
                 return@runValidatedTransaction PeriodChangeResult.ValidationError("Start date must be on or before end date")
             }

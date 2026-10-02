@@ -11,7 +11,9 @@ data class WidgetMedication(
     val dosage: String,
     val taken: Boolean,
     /** Minutes from midnight, or null when the medication has no reminder set. */
-    val reminderMinutes: Long?
+    val reminderMinutes: Long?,
+    val doseCount: Int = 0,
+    val expectedDoses: Int = 1
 )
 
 data class MedicationWidgetState(
@@ -37,7 +39,7 @@ object MedicationWidgetStateCalculator {
         logs: List<MedicationLog>,
         today: LocalDate = LocalDate.now()
     ): MedicationWidgetState {
-        val takenIds = logs.filter { it.taken }.map { it.medicationId }.toSet()
+        val counts = logs.filter { it.taken && it.date == today.toEpochDay() }.groupingBy { it.medicationId }.eachCount()
 
         val items = medications
             .filter { MedicationScheduler.isMedicationDueToday(it, today) }
@@ -53,7 +55,8 @@ object MedicationWidgetStateCalculator {
                     id = medication.id,
                     name = medication.name,
                     dosage = medication.dosage,
-                    taken = medication.id in takenIds,
+                    taken = (counts[medication.id] ?: 0) >= medication.dosesPerDay,
+                    doseCount = counts[medication.id] ?: 0, expectedDoses = medication.dosesPerDay,
                     reminderMinutes = medication.reminderMinutes
                 )
             }

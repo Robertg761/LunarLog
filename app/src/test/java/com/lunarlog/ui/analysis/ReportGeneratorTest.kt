@@ -11,6 +11,22 @@ import java.time.LocalDate
 
 class ReportGeneratorTest {
     @Test
+    fun `CSV preserves dose events estimated dates and temperature units`() {
+        val output = ByteArrayOutputStream()
+        val date = LocalDate.of(2026, 1, 1)
+        ReportGenerator.generateCsv(output,
+            listOf(Cycle(startDate = date, endDate = date.plusDays(4), endEstimated = true)),
+            listOf(DailyLog(date = date, temperature = 36.5f)), emptyList(),
+            listOf(com.lunarlog.data.Medication(id = 1, name = "Example", startDate = date.toEpochDay(), dosesPerDay = 2)),
+            listOf(com.lunarlog.data.MedicationLog(date = date.toEpochDay(), medicationId = 1, timestamp = 1000),
+                com.lunarlog.data.MedicationLog(date = date.toEpochDay(), medicationId = 1, timestamp = 2000)))
+        val csv = output.toString(Charsets.UTF_8.name())
+        assertTrue(csv.contains("End date estimated"))
+        assertTrue(csv.contains("°C"))
+        org.junit.Assert.assertEquals(2, csv.lineSequence().count { it.startsWith("\"MEDICATION_DOSE\"") })
+    }
+
+    @Test
     fun `CSV contains periods summaries raw entries and escaped values`() {
         val output = ByteArrayOutputStream()
         val date = LocalDate.of(2026, 1, 1)

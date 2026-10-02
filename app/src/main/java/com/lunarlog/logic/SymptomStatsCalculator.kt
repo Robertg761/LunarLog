@@ -24,11 +24,12 @@ object SymptomStatsCalculator {
             .associateBy { it.date }
 
         val symptomCounts = mutableMapOf<String, Int>()
-        
+
         // Iterate through all past cycles
-        for (cycle in cycles) {
+        val sorted = cycles.sortedBy { it.startDate }
+        for ((index, cycle) in sorted.withIndex()) {
             val cycleStartDate = cycle.startDate
-            
+
             // For each day in the target phase
             for (day in phaseRange) {
                 // Calculate the specific date for this cycle day (Day 1 is start date, so plus days is day-1)
@@ -36,8 +37,8 @@ object SymptomStatsCalculator {
 
                 // Check if this date is within the cycle's actual duration (if ended)
                 // or generally valid if open (though we usually only look at past data)
-                val cycleEndDate = cycle.endDate
-                if (cycleEndDate != null && dateToCheck.isAfter(cycleEndDate)) {
+                val cycleEndDate = sorted.getOrNull(index + 1)?.startDate?.minusDays(1) ?: LocalDate.now()
+                if (dateToCheck.isAfter(cycleEndDate)) {
                     continue // This day didn't exist in this cycle (short cycle)
                 }
 

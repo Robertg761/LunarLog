@@ -11,9 +11,9 @@ import dagger.hilt.components.SingletonComponent
 @EntryPoint
 @InstallIn(SingletonComponent::class)
 interface WidgetEntryPoint {
+    fun preferences(): com.lunarlog.data.UserPreferencesRepository
     fun appDatabase(): AppDatabase
     fun cycleRepository(): CycleRepository
     fun dailyLogRepository(): DailyLogRepository
     fun medicationRepository(): MedicationRepository
 }
-

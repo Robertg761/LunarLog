@@ -98,7 +98,7 @@ private const val CSV_MIME_TYPE = "text/csv"
  * another screen, so there is nothing for a back arrow to pop and none is shown — the same as Home,
  * Calendar and Period History.
  */
-@OptIn(ExperimentalMaterial3Api::class)
+@OptIn(ExperimentalMaterial3Api::class, androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
 @Composable
 fun AnalysisScreen(
     onHistoryClick: () -> Unit,
@@ -110,52 +110,23 @@ fun AnalysisScreen(
     val snackbarHostState = remember { SnackbarHostState() }
     val scope = rememberCoroutineScope()
 
-    val pdfLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument(PDF_MIME_TYPE)
-    ) { uri ->
-        uri?.let {
-            try {
-                val stream = context.contentResolver.openOutputStream(it)
-                    ?: throw IOException("The selected destination could not be opened")
-                ReportGenerator.generatePdf(
-                    stream,
-                    uiState.cycleHistory,
-                    uiState.symptomCounts,
-                    uiState.moodCounts
-                )
-                announceExportSaved(scope, snackbarHostState, context, it, PDF_MIME_TYPE, "PDF saved")
-            } catch (_: Exception) {
-                announceExportFailed(
-                    scope,
-                    snackbarHostState,
-                    "Unable to save PDF. Please try another location."
-                )
-            }
+    val exporting by viewModel.exporting.collectAsState()
+    val exportMessage by viewModel.exportMessage.collectAsState()
+    val months by viewModel.rangeMonths.collectAsState()
+    androidx.compose.runtime.LaunchedEffect(exportMessage) {
+        exportMessage?.let { message ->
+            val destination = viewModel.exportDestination.value
+            if (destination != null) announceExportSaved(scope, snackbarHostState, context, destination.first, destination.second, message)
+            else announceExportFailed(scope, snackbarHostState, message)
+            viewModel.exportMessage.value = null
+            viewModel.exportDestination.value = null
         }
     }
-
-    val csvLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.CreateDocument(CSV_MIME_TYPE)
-    ) { uri ->
-        uri?.let {
-            try {
-                val stream = context.contentResolver.openOutputStream(it)
-                    ?: throw IOException("The selected destination could not be opened")
-                ReportGenerator.generateCsv(
-                    stream,
-                    uiState.periods,
-                    uiState.dailyLogs,
-                    uiState.logEntries
-                )
-                announceExportSaved(scope, snackbarHostState, context, it, CSV_MIME_TYPE, "CSV saved")
-            } catch (_: Exception) {
-                announceExportFailed(
-                    scope,
-                    snackbarHostState,
-                    "Unable to save CSV. Please try another location."
-                )
-            }
-        }
+    val pdfLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(PDF_MIME_TYPE)) { uri ->
+        uri?.let { viewModel.export(it, false) }
+    }
+    val csvLauncher = rememberLauncherForActivityResult(ActivityResultContracts.CreateDocument(CSV_MIME_TYPE)) { uri ->
+        uri?.let { viewModel.export(it, true) }
     }
 
     Scaffold(
@@ -190,16 +161,23 @@ fun AnalysisScreen(
                     selected = selectedTab == 0,
                     onClick = { selectedTab = 0 },
                     unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    text = { Text("Trends") }
+                    text = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_trends_e856c6)) }
                 )
                 Tab(
                     selected = selectedTab == 1,
                     onClick = { selectedTab = 1 },
                     unselectedContentColor = MaterialTheme.colorScheme.onSurfaceVariant,
-                    text = { Text("Reports") }
+                    text = { Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_reports_dacca3)) }
                 )
             }
 
+            androidx.compose.foundation.layout.FlowRow(Modifier.padding(horizontal = Spacing.screenHorizontal), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                listOf(1 to "Month", 6 to "6 months", 12 to "Year", 0 to "All time").forEach { (value, label) ->
+                    androidx.compose.material3.FilterChip(months == value, { viewModel.rangeMonths.value = value }, label = { Text(label) }, enabled = !exporting)
+                }
+            }
+            if (exporting) androidx.compose.material3.LinearProgressIndicator(Modifier.fillMaxWidth())
+            uiState.error?.let { Text(it, color = MaterialTheme.colorScheme.error, modifier = Modifier.padding(16.dp)) }
             if (uiState.isLoading) {
                 LoadingState()
             } else {
@@ -207,10 +185,10 @@ fun AnalysisScreen(
                     0 -> TrendsTab(uiState)
                     1 -> ReportsTab(
                         onGeneratePdf = {
-                            pdfLauncher.launch("LunarLog_Report_${LocalDate.now()}.pdf")
+                            if (!exporting) pdfLauncher.launch("LunarLog_Report_${LocalDate.now()}.pdf")
                         },
                         onGenerateCsv = {
-                            csvLauncher.launch("LunarLog_Data_${LocalDate.now()}.csv")
+                            if (!exporting) csvLauncher.launch("LunarLog_Data_${LocalDate.now()}.csv")
                         }
                     )
                 }
@@ -279,7 +257,7 @@ fun TrendsTab(uiState: AnalysisUiState) {
     val hasNothing = !hasDigest &&
         uiState.recentCycleSummaries.isEmpty() &&
         uiState.cycleHistory.isEmpty() &&
-        uiState.symptomCounts.isEmpty()
+        uiState.symptomCounts.isEmpty() && uiState.dailyLogs.isEmpty()
 
     // A fresh install used to get a small icon a third of the way down followed by a large void,
     // because the empty state was emitted inline in the scroll column above sections that had no
@@ -310,6 +288,17 @@ fun TrendsTab(uiState: AnalysisUiState) {
             ),
         verticalArrangement = Arrangement.spacedBy(Spacing.sectionGap)
     ) {
+        SectionHeader("Recorded observations")
+        Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_retrospective_patterns_only_these_observations_do_not_c_61953c), style = MaterialTheme.typography.bodySmall)
+        Text(uiState.bbtObservation?.let { "Temperature shift suggests an ovulation estimate near ${it.format(MediumDate)}" } ?: "No sustained temperature shift confirmed by nine consecutive readings.")
+        Text(uiState.mucusObservation?.let { "Mucus peak observed on ${it.format(MediumDate)}" } ?: "No mucus peak followed by three recorded lower observations.")
+        uiState.dailyLogs.filter { log -> log.temperature != null || log.cervicalMucus > 0 || uiState.logEntries.any { it.date == log.date.toEpochDay() && it.type == com.lunarlog.data.LogEntryType.MUCUS } }.takeLast(30).forEach { log ->
+            val recordedMucus = log.cervicalMucus > 0 || uiState.logEntries.any { it.date == log.date.toEpochDay() && it.type == com.lunarlog.data.LogEntryType.MUCUS }
+            Text("${log.date.format(MediumDate)} • ${log.temperature?.let { com.lunarlog.ui.util.formatTemperature(it) } ?: "Temperature not recorded"} • ${if (recordedMucus) com.lunarlog.ui.util.mucusLabel(log.cervicalMucus) else "Mucus not recorded"}")
+        }
+        SectionHeader("Cycle lengths")
+        uiState.cycleHistory.forEach { (date, length) -> Text("${date.format(MediumDate)} • $length days") }
+
         if (digest != null) {
             WeeklyDigestSection(digest)
         }
@@ -541,7 +530,7 @@ fun ReportsTab(onGeneratePdf: () -> Unit, onGenerateCsv: () -> Unit) {
 
         LunarLogCard(modifier = Modifier.fillMaxWidth()) {
             Text(
-                "A PDF report summarises your cycles for an appointment. The CSV is the raw " +
+                androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_a_pdf_report_summarises_your_cycles_for_an_appointment__733b85) +
                     "export — every period, log and entry — for your own records.",
                 style = MaterialTheme.typography.bodyMedium,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -558,7 +547,7 @@ fun ReportsTab(onGeneratePdf: () -> Unit, onGenerateCsv: () -> Unit) {
             ) {
                 Icon(Icons.Default.PictureAsPdf, contentDescription = null)
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                Text("Generate Doctor's Report (PDF)")
+                Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_generate_doctor_s_report_pdf_c069e2))
             }
 
             Spacer(modifier = Modifier.height(Spacing.sm))
@@ -571,12 +560,12 @@ fun ReportsTab(onGeneratePdf: () -> Unit, onGenerateCsv: () -> Unit) {
             ) {
                 Icon(Icons.Default.Download, contentDescription = null)
                 Spacer(modifier = Modifier.width(Spacing.sm))
-                Text("Export Data (CSV)")
+                Text(androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_export_data_csv_f1d249))
             }
         }
 
         Text(
-            "You can choose where to save your reports (e.g., Downloads or Google Drive).",
+            androidx.compose.ui.res.stringResource(com.lunarlog.R.string.ui_you_can_choose_where_to_save_your_reports_e_g_downloads_01f000),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
             textAlign = TextAlign.Center,

@@ -35,6 +35,7 @@ class ApkUpdateManager(
     }
 
     fun startDownload(context: Context, info: UpdateInfo): Long {
+        clearDownloadedState(context, deleteApk = true)
         val fileName = "LunarLog-${info.latestVersionName}.apk"
         val request = DownloadManager.Request(info.apkUrl.toUri())
             .setTitle("LunarLog update")

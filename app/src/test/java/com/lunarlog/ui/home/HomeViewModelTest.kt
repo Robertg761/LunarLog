@@ -41,16 +41,28 @@ class HomeViewModelTest {
     }
 
     @Test
+    fun `date refresh updates ongoing coverage without a database write`() = runTest {
+        val today = LocalDate.now()
+        every { cycleRepository.getAllCycles() } returns flowOf(listOf(Cycle(id = 1, startDate = today)))
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
+        viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
+        backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) { viewModel.uiState.collect() }
+        assertEquals(1, viewModel.uiState.value.currentCycleDay)
+        viewModel.refreshDate(today.plusDays(1))
+        assertEquals(2, viewModel.uiState.value.currentCycleDay)
+    }
+
+    @Test
     fun `uiState should show period days left when ongoing period is within estimate`() = runTest {
         val today = LocalDate.now()
         val lastCycleStart = today.minusDays(2) // day 3 of default estimate 5 => shows day 3, 3 left counting today
         val cycle = Cycle(id = 1, startDate = lastCycleStart)
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
-        
+
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
             viewModel.uiState.collect()
         }
@@ -72,7 +84,7 @@ class HomeViewModelTest {
         val cycle = Cycle(id = 1, startDate = lastCycleStart, endDate = null)
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
 
@@ -95,7 +107,7 @@ class HomeViewModelTest {
         val cycle = Cycle(id = 1, startDate = lastCycleStart, endDate = null)
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
 
@@ -123,7 +135,7 @@ class HomeViewModelTest {
         )
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -149,7 +161,7 @@ class HomeViewModelTest {
         )
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -174,7 +186,7 @@ class HomeViewModelTest {
         )
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -198,7 +210,7 @@ class HomeViewModelTest {
         )
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -219,7 +231,7 @@ class HomeViewModelTest {
         )
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -240,7 +252,7 @@ class HomeViewModelTest {
         )
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {
@@ -261,7 +273,7 @@ class HomeViewModelTest {
         )
 
         every { cycleRepository.getAllCycles() } returns flowOf(listOf(cycle))
-        every { dailyLogRepository.getAllLogs() } returns flowOf(emptyList())
+        every { dailyLogRepository.getLogsForRange(any(), any()) } returns flowOf(emptyList())
 
         viewModel = HomeViewModel(cycleRepository, dailyLogRepository, testDispatcher)
         backgroundScope.launch(UnconfinedTestDispatcher(testScheduler)) {

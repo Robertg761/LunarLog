@@ -22,7 +22,10 @@ object ReportGenerator {
         outputStream: OutputStream,
         cycleHistory: List<Pair<LocalDate, Int>>,
         symptomCounts: Map<String, Int>,
-        moodCounts: Map<String, Int>
+        moodCounts: Map<String, Int>,
+        medications: List<com.lunarlog.data.Medication> = emptyList(),
+        medicationLogs: List<com.lunarlog.data.MedicationLog> = emptyList(),
+        dailyLogs: List<DailyLog> = emptyList()
     ) {
         val document = PdfDocument()
         val writer = PdfReportWriter(document)
@@ -37,7 +40,7 @@ object ReportGenerator {
                 spacingAfter = 20f
             )
 
-            writer.drawSection("Cycle History (Last 6 Months)")
+            writer.drawSection("Cycle History (Selected Range)")
             if (cycleHistory.isEmpty()) {
                 writer.drawLine("No completed cycles recorded.")
             } else {
@@ -64,6 +67,13 @@ object ReportGenerator {
                 }
             }
 
+            writer.drawSection("Medication doses")
+            medicationLogs.filter { it.taken }.sortedBy { it.timestamp }.forEach { dose ->
+                val medication = medications.firstOrNull { it.id == dose.medicationId }
+                writer.drawWrapped("${LocalDate.ofEpochDay(dose.date)} ${Instant.ofEpochMilli(dose.timestamp)}: ${medication?.name ?: dose.medicationId} ${medication?.dosage.orEmpty()}")
+            }
+            writer.drawSection("Temperature observations")
+            dailyLogs.filter { it.temperature != null }.forEach { log -> writer.drawLine("${log.date}: ${com.lunarlog.ui.util.formatTemperature(log.temperature!!)}") }
             writer.finish()
             outputStream.use(document::writeTo)
         } finally {
@@ -76,7 +86,9 @@ object ReportGenerator {
         outputStream: OutputStream,
         periods: List<Cycle>,
         dailyLogs: List<DailyLog>,
-        logEntries: List<LogEntry>
+        logEntries: List<LogEntry>,
+        medications: List<com.lunarlog.data.Medication> = emptyList(),
+        medicationLogs: List<com.lunarlog.data.MedicationLog> = emptyList()
     ) {
         outputStream.bufferedWriter().use { writer ->
             writer.appendCsvRow("RecordType", "Date", "Time", "Field", "Value", "Details")
@@ -88,7 +100,7 @@ object ReportGenerator {
                     "",
                     "Period end",
                     period.endDate?.toString() ?: "Ongoing",
-                    ""
+                    if (period.endDate == null) "No end recorded" else if (period.endEstimated) "End date estimated" else "End date recorded"
                 )
             }
 
@@ -101,8 +113,18 @@ object ReportGenerator {
                 writer.appendDailyValue(log.date, "Sleep quality", log.sleepQuality.takeIf { it > 0 })
                 writer.appendDailyValue(log.date, "Sex drive", log.sexDrive.takeIf { it > 0 })
                 writer.appendDailyValue(log.date, "Notes", log.notes.takeIf { it.isNotBlank() })
-                writer.appendDailyValue(log.date, "Temperature", log.temperature)
+                writer.appendDailyValue(log.date, "Temperature", log.temperature?.let { com.lunarlog.ui.util.formatTemperature(it) })
                 writer.appendDailyValue(log.date, "Cervical mucus", log.cervicalMucus.takeIf { it > 0 })
+            }
+
+            medications.forEach { medication ->
+                writer.appendCsvRow("MEDICATION", LocalDate.ofEpochDay(medication.startDate).toString(), "", medication.name,
+                    medication.dosage, "${medication.frequency}; end=${medication.endDate?.let(LocalDate::ofEpochDay) ?: "active"}; doses=${medication.dosesPerDay}; reminders=${com.lunarlog.logic.MedicationScheduler.reminderTimes(medication).joinToString("|")}; archived=${medication.isArchived}; id=${medication.id}")
+            }
+            medicationLogs.forEach { log ->
+                val medication = medications.firstOrNull { it.id == log.medicationId }
+                writer.appendCsvRow("MEDICATION_DOSE", LocalDate.ofEpochDay(log.date).toString(), Instant.ofEpochMilli(log.timestamp).toString(),
+                    medication?.name ?: log.medicationId.toString(), if (log.taken) "Taken" else "Not taken", medication?.dosage.orEmpty())
             }
 
             logEntries.sortedWith(compareBy<LogEntry> { it.date }.thenBy { it.time }).forEach { entry ->
@@ -111,7 +133,7 @@ object ReportGenerator {
                     LocalDate.ofEpochDay(entry.date).toString(),
                     Instant.ofEpochMilli(entry.time).toString(),
                     entry.type.name,
-                    entry.value,
+                    if (entry.type == com.lunarlog.data.LogEntryType.TEMPERATURE) entry.value.toFloatOrNull()?.let { com.lunarlog.ui.util.formatTemperature(it) } ?: entry.value else entry.value,
                     entry.details.orEmpty()
                 )
             }
@@ -184,6 +206,7 @@ object ReportGenerator {
             val lineHeight = textSize + 5f
             lines.forEach { line ->
                 ensureSpace(lineHeight)
+                configurePaint(textSize, bold)
                 canvas?.drawText(line, MARGIN, y, paint)
                 y += lineHeight
             }
@@ -225,7 +248,13 @@ object ReportGenerator {
                     current = StringBuilder(candidate)
                 } else {
                     if (current.isNotEmpty()) lines += current.toString()
-                    current = StringBuilder(word)
+                    var remainder = word
+                    while (paint.measureText(remainder) > maxWidth) {
+                        val count = paint.breakText(remainder, true, maxWidth, null).coerceAtLeast(1)
+                        lines += remainder.take(count)
+                        remainder = remainder.drop(count)
+                    }
+                    current = StringBuilder(remainder)
                 }
             }
             if (current.isNotEmpty()) lines += current.toString()
