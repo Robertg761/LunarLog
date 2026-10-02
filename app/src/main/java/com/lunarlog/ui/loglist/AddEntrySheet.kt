@@ -288,6 +288,9 @@ fun AddEntrySheet(
 
     ModalBottomSheet(
         onDismissRequest = requestDismiss,
+        // The fixed footer must stay inside the visible sheet after restoration.
+        // A partially expanded anchor can otherwise leave that footer below the screen.
+        sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         // Sheets take the same warm `surfaceContainer` as LunarLogCard rather than
         // BottomSheetDefaults' `surfaceContainerLow`, so a sheet reads as the same material
         // as the cards it slides over instead of a second, paler one.

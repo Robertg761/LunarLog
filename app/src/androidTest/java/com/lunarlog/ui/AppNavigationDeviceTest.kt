@@ -15,12 +15,13 @@ class AppNavigationDeviceTest {
     @get:Rule val rule = createAndroidComposeRule<MainActivity>()
 
     @Test fun notificationDestinationsAndDraftSurviveActivityRecreation() {
+        val skipLabel = rule.activity.getString(com.lunarlog.R.string.ui_i_don_t_remember_skip_for_now_247c78)
         rule.waitUntil(120_000) {
-            rule.onAllNodesWithText("I don't remember / skip for now").fetchSemanticsNodes().isNotEmpty() ||
+            rule.onAllNodesWithText(skipLabel).fetchSemanticsNodes().isNotEmpty() ||
                 rule.onAllNodesWithContentDescription("Settings").fetchSemanticsNodes().isNotEmpty()
         }
-        if (rule.onAllNodesWithText("I don't remember / skip for now").fetchSemanticsNodes().isNotEmpty()) {
-            rule.onNodeWithText("I don't remember / skip for now").performScrollTo().performClick()
+        if (rule.onAllNodesWithText(skipLabel).fetchSemanticsNodes().isNotEmpty()) {
+            rule.onNodeWithText(skipLabel).performScrollTo().performClick()
         }
         rule.waitUntil(120_000) { rule.onAllNodesWithContentDescription("Settings").fetchSemanticsNodes().isNotEmpty() }
         notificationDestination(rule.activity, "calendar").send()

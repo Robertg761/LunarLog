@@ -30,3 +30,7 @@ The [UI polish pass](UI_POLISH.md) passed `test lintPlayDebug lintGithubDebug as
 - The 10 Node release-helper tests passed again. `actionlint` 1.7.7 accepted both CI and release workflows; shell syntax and a simulated failing device run confirmed diagnostic collection does not hide a test failure.
 - CI now supports normal and compact/200%-text profiles, saves device diagnostics, and is reused as a prerequisite for publication. The Git connection supports pushing the review branch; CLI/API connectivity is unavailable.
 - See [candidate readiness](release/candidate/READINESS.md) and [draft release notes](release/candidate/RELEASE_NOTES.md). Physical-device and accessibility checks remain unsigned off.
+
+### Hosted-device follow-up
+
+Both API 35 profiles initially passed 14 of 16 tests. Diagnostics exposed an off-screen save-error footer after sheet restoration and an outdated onboarding test label. The logging sheet now skips the partially expanded anchor to keep its fixed footer visible, and the navigation test reads the actual onboarding string resource. The branch CI rerun is the source of truth for the final result. Review APKs and device evidence are retained as CI artifacts.

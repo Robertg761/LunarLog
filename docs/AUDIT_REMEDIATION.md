@@ -57,4 +57,4 @@ See [current QA checklist](QA_CHECKLIST.md) for device-only checks. Building an 
 - Executed the actual 10→11 migration SQL against desktop SQLite: ordinary-table columns, defaults and indexes match schema 11; old history remains and multiple doses survive medication edits.
 - A subsequent local API 35 emulator run exposed two issues: Room migration helpers were pinned to an incompatible serialization runtime, and medication backup mappings omitted dose count/reminder times. The app/test serialization runtimes are now aligned to 1.8.1, and both backup mappings preserve these fields.
 - After these fixes, the combined Gradle verification passed again (322 JVM executions, both APKs and lint); all 10 Node tests also passed again. See [local device verification](LOCAL_VERIFICATION.md) for Android execution results and limitations.
-- `git diff --check` passed. No release version bump, commit, push or deployment was performed.
+- `git diff --check` passed. No release version bump or deployment was performed. Changes were subsequently committed and pushed to `codex/audit-remediation-qa` for hosted CI verification.
