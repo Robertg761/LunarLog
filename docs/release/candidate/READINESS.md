@@ -1,10 +1,10 @@
 # Candidate readiness
 
-Status: **not ready to publish**. Changes are prepared on the `codex/audit-remediation-qa` review branch. Version name/code remain 1.10.2 / 28; assign a new version only after verification, before publication. No tag, release or deployment has been created.
+Version **1.11.0 / 29**, authorized for release. The existing GitHub release workflow will publish only after the full CI matrix, signing-secret checks, certificate continuity and a signed in-place upgrade with a persisted synthetic note pass. No physical-device or Play Store sign-off is claimed.
 
 ## Evidence and outstanding work
 
-Local follow-up checks passed: 322 JVM executions, both debug APKs and lint, instrumentation compilation, GitHub release APK and Play release bundle builds, 10 Node tests, and actionlint workflow validation. Production signing and upgrade installation remain unverified.
+Local follow-up checks passed: 322 JVM executions, both debug APKs and lint, instrumentation compilation, GitHub release APK and Play release bundle builds, 10 Node tests, and actionlint workflow validation. Production signing and upgrade installation are now mandatory workflow gates before publication.
 
 See [local verification](../../LOCAL_VERIFICATION.md), [audit changes](../../AUDIT_REMEDIATION.md), [UI polish](../../UI_POLISH.md), and the [device checklist](../../QA_CHECKLIST.md).
 
@@ -19,9 +19,9 @@ See [local verification](../../LOCAL_VERIFICATION.md), [audit changes](../../AUD
 
 ## Completion sequence
 
-1. Let CI and both device profiles finish on the review branch’s exact commit. Review retained artifacts, resolve failures, and open a PR using the branch comparison page if API access remains unavailable.
-2. Complete the remaining physical-device checklist: keyboard/insets, TalkBack focus and announcements, lock/unlock/cancel/relock, notification permissions and delivery, widget privacy/actions, actual backup/restore/export providers, and update installer flows.
-3. Review the full diff and schema/backup changes. Assign the next version name and monotonically increasing version code, then rerun required checks for that candidate.
+1. CI on 772bd59 passed all 322 JVM executions and all 16 Android tests in both display profiles. Repeat the gates for the versioned release commit.
+2. Remaining physical-device coverage (not covered by the automated release gates): keyboard/insets, TalkBack focus and announcements, lock/unlock/cancel/relock, notification permissions and delivery, widget privacy/actions, actual backup/restore/export providers, and update installer flows.
+3. Version 1.11.0 / 29 is assigned; rerun required checks for this candidate.
 4. Build with the existing production signing identity, verify installation over the currently published version using synthetic data, and confirm old data and dose history remain intact. Use the repository's guarded release workflow for publication after readiness is confirmed.
 
 ## Rollback

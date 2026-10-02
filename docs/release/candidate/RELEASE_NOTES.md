@@ -1,6 +1,6 @@
-# Draft release notes
+# Release 1.11.0
 
-Version and publication date: not assigned. This is an unreleased working-tree candidate.
+Version 1.11.0 (code 29), prepared 2026-10-02. Publication is gated by CI and signed-upgrade verification.
 
 - Track multiple medication doses per day, with individual dose times, planned-dose progress and reminders. Edit schedules or archive medications while preserving dose history.
 - Improve backup validation, restore previews, recovery backups and transaction rollback. Backups retain daily medication targets and reminder times.

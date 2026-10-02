@@ -1,5 +1,25 @@
 # Changelog
 
+## [1.11.0] - 2026-10-02
+
+### Added
+- Track multiple medication doses per day, with individual dose times, daily progress and scheduled reminders.
+- Edit medication schedules and archive medications or custom symptoms while preserving history.
+- Preview restores and retain a recovery backup before replacing data. Backup format 3 includes medication dose targets and reminder times and reads supported older formats.
+- Optional widget privacy controls hide health details and disable stale quick actions.
+
+### Improved
+- Clearer logging and medication forms, persistent drafts, fixed save/error feedback, and better compact-screen and large-text layouts.
+- History search, empty states, onboarding choices, explicit zero observations, and cycle-date handling.
+- CSV/PDF date ranges, dose history, temperature labels and long-text wrapping.
+- GitHub update checks, download cancellation, and error feedback.
+
+### Fixed
+- Notification links no longer replay after activity recreation; tapping Home after a notification correctly returns Home.
+- Logging, backup validation, restore rollback, and reset reseeding are covered by expanded regression tests.
+
+Database migration preserves existing records. This release upgrades to schema 11; downgrading the APK is not a supported rollback.
+
 ## [1.10.2] - 2026-09-23
 
 ### Changed

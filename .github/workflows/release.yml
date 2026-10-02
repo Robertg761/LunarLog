@@ -174,6 +174,26 @@ jobs:
           echo "apk_path=$OUT_APK" >> "$GITHUB_OUTPUT"
           echo "logo_path=dist/LunarLog-logo-512.png" >> "$GITHUB_OUTPUT"
 
+      - name: Download Published Upgrade Baseline
+        run: curl --fail --location --retry 3 https://github.com/Robertg761/LunarLog/releases/download/v1.10.2/LunarLog-1.10.2.apk -o "$RUNNER_TEMP/lunarlog-baseline.apk"
+
+      - name: Enable KVM for Signed Upgrade Test
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+
+      - name: Verify Signed Upgrade Preserves Data
+        uses: reactivecircus/android-emulator-runner@4c44018e59b437e86cdfc41da381398f93ed8808 # v2
+        env:
+          CANDIDATE_APK: ${{ steps.dist.outputs.apk_path }}
+          RELEASE_VERSION: ${{ needs.resolve.outputs.release_version }}
+        with:
+          api-level: 35
+          arch: x86_64
+          disable-animations: true
+          script: python3 scripts/verify_signed_upgrade.py "$RUNNER_TEMP/lunarlog-baseline.apk" "$CANDIDATE_APK" "$RELEASE_VERSION"
+
       - name: Extract Release Notes
         env:
           RELEASE_VERSION: ${{ needs.resolve.outputs.release_version }}
