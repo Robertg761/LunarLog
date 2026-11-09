@@ -1,5 +1,15 @@
 # Changelog
 
+## [1.11.1] - 2026-11-08
+
+### Fixed
+- **Calendar "Edit" Button Wrapped Letter by Letter**: On the calendar day preview, a long date could squeeze the Edit button until its label stacked vertically. The button now keeps its full width and a long date wraps onto a second line instead.
+- **Screenshots Were Blocked**: LunarLog no longer blocks screenshots, screen recording or the recents preview, so you can capture your own data. Anything on screen can now appear in those captures. App lock still hides your data once the app locks.
+- **Tapping a Widget Did Not Open the App**: Tapping the counter widget now opens LunarLog, and tapping the Quick Log widget outside its buttons opens the log screen, including at the compact size. The "+ Log", flow and water buttons still log in place without opening the app.
+
+### Changed
+- **Privacy Policy Updated**: The privacy policy (effective November 8, 2026) now states that app screens can appear in screenshots, screen recordings and the recents preview.
+
 ## [1.11.0] - 2026-10-02
 
 ### Added

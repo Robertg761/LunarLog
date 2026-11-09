@@ -48,9 +48,9 @@ import java.time.LocalDate
  * Today's scheduled medications, each tickable straight from the home screen.
  *
  * **This widget puts medication names on the lock/home screen**, which is a deliberate exception to
- * the posture the rest of the app takes — notifications are `VISIBILITY_PRIVATE` and screens carry
- * `FLAG_SECURE` precisely so this information does not appear where a shoulder can see it. A widget
- * has no equivalent of either flag: the launcher renders it, and nothing the app does can redact it
+ * the posture the rest of the app takes — notifications are `VISIBILITY_PRIVATE` and the app sits
+ * behind optional App Lock precisely so this information does not appear where a shoulder can see it.
+ * A widget has no equivalent of either: the launcher renders it, and nothing the app does can redact it
  * over someone's shoulder or in a screenshot. Adding the widget is the consent, so it is opt-in by
  * construction, but it is worth knowing that it is the one surface where LunarLog shows medication
  * names without an unlock.

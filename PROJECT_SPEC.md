@@ -25,7 +25,7 @@ LunarLog is not a medical device and does not diagnose, treat, cure, or prevent 
 - No account, advertising SDK, analytics SDK, or crash-reporting SDK.
 - Room and DataStore are the local sources of truth.
 - Android cloud/device-transfer backup is excluded; exports happen only through a user-selected document destination.
-- Sensitive app screens block screenshots and recents thumbnails.
+- App screens allow screenshots, screen recording, and recents previews; app lock gates content once it locks.
 - Notifications use private visibility and generic lock-screen public versions.
 - App lock gates content until its saved state is loaded and uses monotonic elapsed time for background-timeout decisions.
 - Restore validates size, structure, identifiers, dates, enums, and foreign-key relationships before replacing existing data.

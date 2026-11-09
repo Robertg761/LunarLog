@@ -455,10 +455,16 @@ fun CalendarDayPreviewSheet(
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.SpaceBetween,
+            horizontalArrangement = Arrangement.spacedBy(Spacing.md),
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Column(verticalArrangement = Arrangement.spacedBy(Spacing.xs)) {
+            // weight(1f) makes the Row measure the Edit button first at its natural width and give the
+            // date only what is left. Unweighted, the FULL-style date ("Wednesday, September 18, 2026")
+            // claimed nearly the whole row and squeezed "Edit" into a one-letter-wide column.
+            Column(
+                modifier = Modifier.weight(1f),
+                verticalArrangement = Arrangement.spacedBy(Spacing.xs)
+            ) {
                 Text(
                     text = day.date.format(dateFormatter),
                     style = MaterialTheme.typography.titleLarge

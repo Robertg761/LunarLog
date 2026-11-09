@@ -1,6 +1,6 @@
 # LunarLog Privacy Policy
 
-Effective date: July 13, 2026
+Effective date: November 8, 2026
 
 LunarLog is a menstrual cycle and wellness tracking app for Android. This Privacy Policy explains what data LunarLog handles, how that data is used, and the choices you have.
 
@@ -59,7 +59,7 @@ LunarLog may use the following Android permissions or device features:
 - Biometric or device credentials: used only for app lock and handled through Android's authentication system
 - Local file access through Android's document picker and file APIs: used only when you export, restore, or install an update you requested
 - Home screen widget support: if you add the widget, limited cycle-related information may be visible on your device's home screen
-- Secure-window protection: app screens are excluded from screenshots, screen recording, and the normal recents preview to reduce incidental exposure
+- Screenshots and screen recording: app screens can be captured in screenshots, screen recordings, and the recents preview, so health information on screen can appear in those captures; when app lock is on, it still hides content once the app locks
 
 LunarLog does not receive or store your raw fingerprint, face scan, or other biometric template data. Biometric authentication is processed by Android and only the success or failure result is returned to the app.
 

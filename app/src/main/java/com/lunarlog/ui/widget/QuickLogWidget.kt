@@ -96,11 +96,14 @@ class QuickLogWidget : GlanceAppWidget() {
     private fun QuickLogContent(state: QuickLogState) {
         val isTall = LocalSize.current.height >= TALL.height
 
+        // Taps outside the pills open the app. The compact size has no "More" pill, so without this it
+        // offered no way into the app at all; the pills' own clickables are innermost and still win.
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .widgetSurface()
-                .padding(horizontal = 8.dp, vertical = if (isTall) 8.dp else 4.dp),
+                .padding(horizontal = 8.dp, vertical = if (isTall) 8.dp else 4.dp)
+                .clickable(deepLinkAction(LocalContext.current, "logging")),
             verticalAlignment = Alignment.CenterVertically
         ) {
             if (isTall) {

@@ -3,7 +3,6 @@ package com.lunarlog
 import android.content.Intent
 import android.os.Bundle
 import android.provider.Settings
-import android.view.WindowManager
 import androidx.activity.compose.setContent
 import androidx.activity.viewModels
 import androidx.biometric.BiometricManager
@@ -70,7 +69,6 @@ class MainActivity : AppCompatActivity() {
         val splashScreen = installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
-        window.addFlags(WindowManager.LayoutParams.FLAG_SECURE)
         pendingDeepLink.value = if (savedInstanceState?.containsKey(PENDING_LINK_STATE) == true) {
             savedInstanceState.getString(PENDING_LINK_STATE)
         } else intent.lunarLogDeepLinkOrNull()
@@ -185,9 +183,9 @@ class MainActivity : AppCompatActivity() {
                             // branches at once, and the re-lock decision is made in onResume() —
                             // after the window is already showing content — so fading into the lock
                             // screen would leave the user's cycle data legible underneath it for
-                            // the length of the animation. FLAG_SECURE does not help here: it stops
-                            // screenshots and recents thumbnails, not what is on the display.
-                            // Locking is the direction where the guarantee matters, so it is instant.
+                            // the length of the animation. This is about what is on the display, not
+                            // screenshots or recents thumbnails (the app allows those). Locking is
+                            // the direction where the guarantee matters, so it is instant.
                             animationSpec = if (showLockScreen) snap() else tween(280),
                             label = "lockState"
                         ) { locked ->
