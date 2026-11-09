@@ -29,3 +29,17 @@ internal fun deepLinkAction(context: Context, host: String): Action =
             addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         }
     )
+
+/**
+ * Opens the app the way its launcher icon does — the same MAIN/LAUNCHER intent, pinned to [MainActivity]
+ * for the reasons given on [deepLinkAction]. A cold start lands on Home; a warm one resumes where the
+ * user left off. App lock gates content after opening, exactly as for [deepLinkAction].
+ */
+internal fun openAppAction(context: Context): Action =
+    actionStartActivity(
+        Intent(Intent.ACTION_MAIN).apply {
+            addCategory(Intent.CATEGORY_LAUNCHER)
+            component = ComponentName(context, MainActivity::class.java)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+    )

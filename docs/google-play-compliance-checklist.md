@@ -23,7 +23,7 @@ This checklist is for LunarLog's Google Play submission. Items are checked only 
 - [x] App does not appear to sell or promote age-restricted products or activities
 - [x] In-app About copy and prepared store listing include the required non-medical-device disclaimer and advise consulting a healthcare professional
 - [x] Fertility surfaces label results as estimates and state that predictions are not birth control
-- [x] Sensitive screens use secure-window protection; notifications use private visibility with generic public content
+- [x] Notifications use private visibility with generic public content; app screens allow screenshots and recents previews (secure-window protection removed in 1.11.1), and app lock gates content once it locks
 - [x] Store listing copy is prepared at [docs/play-store-listing.md](play-store-listing.md)
 
 ## Still To Do

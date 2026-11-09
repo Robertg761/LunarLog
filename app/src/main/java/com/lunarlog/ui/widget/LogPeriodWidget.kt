@@ -7,6 +7,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.glance.GlanceId
 import androidx.glance.GlanceModifier
+import androidx.glance.LocalContext
 import androidx.glance.LocalSize
 import androidx.glance.action.clickable
 import androidx.glance.appwidget.GlanceAppWidget
@@ -85,11 +86,15 @@ class LogPeriodWidget : GlanceAppWidget() {
 
         val isCompact = LocalSize.current.width < WIDE_SIZE.width
 
+        // The whole surface opens the app; only the "+ Log" pill below runs the quick action. Without
+        // this, tapping anywhere but the pill did nothing at all. The pill's own clickable is the
+        // innermost one, so it still wins for taps on it.
         Column(
             modifier = GlanceModifier
                 .fillMaxSize()
                 .widgetSurface()
-                .padding(if (isCompact) 10.dp else 14.dp),
+                .padding(if (isCompact) 10.dp else 14.dp)
+                .clickable(openAppAction(LocalContext.current)),
             verticalAlignment = Alignment.CenterVertically,
             horizontalAlignment = Alignment.CenterHorizontally
         ) {

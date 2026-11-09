@@ -115,7 +115,7 @@ Run all unit tests:
 
 - `android:allowBackup` is disabled in the manifest.
 - Android cloud/device-transfer extraction rules exclude app data.
-- App screens use secure-window protection and private notification visibility.
+- Notifications use private visibility. App screens allow screenshots and recents previews; app lock gates content once it locks.
 - App lock and biometric flow are supported.
 - Data backup/restore is handled locally by the app.
 - Update checks query GitHub Releases and install from release APK assets.
